@@ -221,9 +221,11 @@ pub fn editor_ui(
 
     egui::TopBottomPanel::top("file_bar").show(ctx, |ui| {
         ui.horizontal(|ui| {
-            file_buttons(ui, project, &mut events, state);
-            ui.separator();
             let language = state.language;
+            ui.menu_button(language.label(Label::File), |ui| {
+                file_menu(ui, project, &mut events, state);
+            });
+            ui.separator();
             ui.selectable_value(
                 &mut *view_mode,
                 ViewMode::Editor2d,
@@ -325,7 +327,7 @@ fn handle_delete_key(
     }
 }
 
-fn file_buttons(
+fn file_menu(
     ui: &mut egui::Ui,
     project: &Project,
     events: &mut MessageWriter<ProjectMessage>,

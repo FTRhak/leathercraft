@@ -3,6 +3,7 @@ use crate::model::Units;
 
 pub(super) fn label(label: Label) -> &'static str {
     match label {
+        Label::File => "Файл",
         Label::New => "Створити",
         Label::Open => "Відкрити…",
         Label::Save => "Зберегти",

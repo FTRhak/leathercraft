@@ -84,7 +84,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | 186-208 | Helpers | `document_name`, `Viewport` (`to_screen`, `to_world`) |
 | 210-305 | Top-level layout | `editor_ui` |
 | 307-326 | Input | `send`, `handle_delete_key` |
-| 328-434 | File bar | `file_buttons`, `language_control`, `confirm_discard`, `save_as`, `project_dialog`, `export` |
+| 328-434 | File bar | `file_menu`, `language_control`, `confirm_discard`, `save_as`, `project_dialog`, `export` |
 | 436-520 | Sidebar | `view_controls`, `units_control`, `selected_piece_details` |
 | 522-593 | Canvas | `canvas`, `fit_view` |
 | 595-690 | Select tool | `handle_select`, `begin_drag`, `update_drag`, `finish_drag` |

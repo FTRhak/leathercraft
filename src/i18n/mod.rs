@@ -64,6 +64,7 @@ impl Language {
 /// Fixed interface text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Label {
+    File,
     New,
     Open,
     Save,
