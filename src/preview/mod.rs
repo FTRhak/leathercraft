@@ -13,17 +13,27 @@ const PIECE_THICKNESS: f32 = 0.035;
 const MIN_DISTANCE: f32 = 1.0;
 const MAX_DISTANCE: f32 = 60.0;
 
-#[derive(Component)]
-pub struct PreviewCamera;
+pub struct PreviewPlugin;
+
+impl Plugin for PreviewPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<PreviewSettings>()
+            .add_systems(Startup, setup_scene)
+            .add_systems(Update, (rebuild_preview, update_camera));
+    }
+}
 
 #[derive(Component)]
-pub struct PreviewPiece;
+struct PreviewCamera;
+
+#[derive(Component)]
+struct PreviewPiece;
 
 #[derive(Resource)]
 pub struct PreviewSettings {
-    pub azimuth: f32,
-    pub elevation: f32,
-    pub distance: f32,
+    azimuth: f32,
+    elevation: f32,
+    distance: f32,
 }
 
 impl Default for PreviewSettings {
@@ -36,7 +46,7 @@ impl Default for PreviewSettings {
     }
 }
 
-pub fn setup_scene(
+fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -60,7 +70,7 @@ pub fn setup_scene(
     ));
 }
 
-pub fn rebuild_preview(
+fn rebuild_preview(
     mut commands: Commands,
     project: Res<ActiveProject>,
     existing: Query<Entity, With<PreviewPiece>>,
@@ -108,7 +118,7 @@ pub fn rebuild_preview(
     }
 }
 
-pub fn update_camera(
+fn update_camera(
     settings: Res<PreviewSettings>,
     mut cameras: Query<&mut Transform, With<PreviewCamera>>,
 ) {
