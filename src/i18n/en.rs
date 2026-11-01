@@ -34,6 +34,9 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::DisplayUnits => "Display units",
         Label::Pieces => "Pieces",
         Label::DeletePiece => "Delete piece",
+        Label::Layout => "Layout",
+        Label::LockPiece => "Lock piece",
+        Label::UnlockPiece => "Unlock piece",
         Label::Camera => "Camera",
         Label::Orbit => "Orbit",
         Label::Tilt => "Tilt",
@@ -54,6 +57,7 @@ pub(super) fn message(message: &Message) -> String {
         Message::PointCount { count } => format!("{count} points"),
         Message::DefaultPieceName { id } => format!("Piece {id}"),
         Message::PieceNotFound { id } => format!("Piece {id} does not exist."),
+        Message::PieceLocked { name } => format!("Piece '{name}' is locked."),
         Message::UnsupportedVersion { found, expected } => {
             format!("Project version {found} is not supported (expected {expected}).")
         }

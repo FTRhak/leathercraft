@@ -1,3 +1,4 @@
+use super::icon_button;
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::model::Point;
@@ -79,32 +80,19 @@ impl Tool {
     }
 }
 
-fn icon_button(ui: &mut egui::Ui, tool: Tool, selected: bool, name: &str) -> egui::Response {
-    let (rect, response) =
-        ui.allocate_exact_size(egui::Vec2::splat(ICON_BUTTON_SIZE), egui::Sense::click());
-    response.widget_info(|| {
-        egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), selected, name)
-    });
-    if ui.is_rect_visible(rect) {
-        let visuals = ui.style().interact_selectable(&response, selected);
-        ui.painter().rect(
-            rect,
-            visuals.corner_radius,
-            visuals.weak_bg_fill,
-            visuals.bg_stroke,
-            egui::StrokeKind::Inside,
-        );
-        tool.paint_icon(ui.painter(), rect, visuals.fg_stroke);
-    }
-    response.on_hover_text(name)
-}
-
 pub fn show_panel(ui: &mut egui::Ui, tool: &mut Tool, language: Language) {
     ui.label(language.label(Label::Tools));
     ui.horizontal_wrapped(|ui| {
         for option in Tool::ALL {
             let name = language.label(option.label());
-            if icon_button(ui, option, *tool == option, name).clicked() {
+            let response = icon_button(
+                ui,
+                ICON_BUTTON_SIZE,
+                *tool == option,
+                name,
+                |painter, rect, stroke| option.paint_icon(painter, rect, stroke),
+            );
+            if response.clicked() {
                 *tool = option;
             }
         }

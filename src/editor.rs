@@ -1,4 +1,5 @@
 use crate::document::{ActiveProject, ProjectMessage};
+use crate::panels::layout;
 use crate::panels::tools::{self, Tool};
 use crate::preview::{self, PreviewSettings};
 use crate::settings;
@@ -153,9 +154,13 @@ impl EditorState {
                     });
                 }
             }
-            ProjectChange::PieceRemoved(_) => {
-                self.selected = None;
-                self.drag = None;
+            ProjectChange::PieceRemoved(id) => {
+                if self.selected == Some(id) {
+                    self.selected = None;
+                }
+                if self.drag.as_ref().is_some_and(|drag| drag.piece_id == id) {
+                    self.drag = None;
+                }
                 self.report(Message::PieceDeleted);
             }
         }
@@ -169,11 +174,10 @@ impl EditorState {
 
     fn displayed<'a>(&self, piece: &'a PatternPiece) -> Cow<'a, PatternPiece> {
         match &self.drag {
-            Some(drag) if drag.piece_id == piece.id => Cow::Owned(PatternPiece::new(
-                piece.id,
-                piece.name.clone(),
-                drag.points.clone(),
-            )),
+            Some(drag) if drag.piece_id == piece.id => Cow::Owned(PatternPiece {
+                points: drag.points.clone(),
+                ..piece.clone()
+            }),
             _ => Cow::Borrowed(piece),
         }
     }
@@ -277,8 +281,19 @@ pub fn editor_ui(
             }
             units_control(ui, project, &mut events, state.language);
             ui.separator();
-            pieces_list(ui, project, &mut events, state);
+            selected_piece_details(ui, project, &mut events, state);
         });
+
+    egui::SidePanel::right("layout")
+        .default_width(200.0)
+        .show(ctx, |ui| {
+            let event = layout::show_panel(ui, project, &mut state.selected, state.language);
+            if let Some(event) = event {
+                send(&mut events, event);
+            }
+        });
+
+    handle_delete_key(ctx, &mut events, state);
 
     // In preview mode no central panel is drawn, so the 3D scene shows through.
     if *view_mode == ViewMode::Editor2d {
@@ -291,6 +306,23 @@ pub fn editor_ui(
 
 fn send(events: &mut MessageWriter<ProjectMessage>, event: ProjectEvent) {
     events.write(ProjectMessage(event));
+}
+
+fn handle_delete_key(
+    ctx: &egui::Context,
+    events: &mut MessageWriter<ProjectMessage>,
+    state: &EditorState,
+) {
+    let drafting = !state.draft.is_empty() || state.shape_draft.is_some();
+    if drafting || ctx.wants_keyboard_input() {
+        return;
+    }
+    let delete_pressed = ctx.input(|input| {
+        input.key_pressed(egui::Key::Delete) || input.key_pressed(egui::Key::Backspace)
+    });
+    if delete_pressed && let Some(id) = state.selected {
+        send(events, ProjectEvent::RemovePiece { id });
+    }
 }
 
 fn file_buttons(
@@ -441,25 +473,13 @@ fn units_control(
     }
 }
 
-fn pieces_list(
+fn selected_piece_details(
     ui: &mut egui::Ui,
     project: &Project,
     events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
 ) {
     let language = state.language;
-    ui.label(language.label(Label::Pieces));
-    egui::ScrollArea::vertical()
-        .max_height(220.0)
-        .show(ui, |ui| {
-            for piece in &project.pieces {
-                let selected = state.selected == Some(piece.id);
-                if ui.selectable_label(selected, &piece.name).clicked() {
-                    state.selected = Some(piece.id);
-                }
-            }
-        });
-
     let units = project.units;
     let Some(piece) = state
         .selected
@@ -469,7 +489,6 @@ fn pieces_list(
         return;
     };
 
-    ui.separator();
     // The buffer lets the box be empty mid-edit, which the project itself would reject.
     let mut name = state
         .rename_buffer
@@ -497,9 +516,6 @@ fn pieces_list(
             format_length(language, units, bounds.width()),
             format_length(language, units, bounds.height())
         ));
-    }
-    if ui.button(language.label(Label::DeletePiece)).clicked() {
-        send(events, ProjectEvent::RemovePiece { id: piece.id });
     }
 }
 
@@ -603,15 +619,6 @@ fn handle_select(
     {
         state.selected = piece_at(project, view.to_world(position));
     }
-    let delete_pressed = ui.input(|input| {
-        input.key_pressed(egui::Key::Delete) || input.key_pressed(egui::Key::Backspace)
-    });
-    if delete_pressed
-        && !ui.ctx().wants_keyboard_input()
-        && let Some(id) = state.selected
-    {
-        send(events, ProjectEvent::RemovePiece { id });
-    }
 }
 
 fn begin_drag(origin: egui::Pos2, view: Viewport, project: &Project, state: &mut EditorState) {
@@ -631,6 +638,9 @@ fn begin_drag(origin: egui::Pos2, view: Viewport, project: &Project, state: &mut
         return;
     };
     state.selected = Some(piece_id);
+    if piece.locked {
+        return;
+    }
     state.drag = Some(DragState {
         piece_id,
         vertex,
@@ -839,8 +849,10 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
         if !selected {
             continue;
         }
-        for position in &screen {
-            painter.circle_filled(*position, 4.0, stroke.color);
+        if !piece.locked {
+            for position in &screen {
+                painter.circle_filled(*position, 4.0, stroke.color);
+            }
         }
         if piece.points.len() > MAX_POINTS_WITH_EDGE_LABELS {
             continue;

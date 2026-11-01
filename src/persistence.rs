@@ -69,6 +69,42 @@ mod tests {
     }
 
     #[test]
+    fn piece_lock_round_trips_and_defaults_to_unlocked() {
+        let id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "leathercraft-lock-{}-{id}.leathercraft",
+            std::process::id()
+        ));
+        let mut piece = PatternPiece::new(
+            1,
+            "Flap",
+            vec![
+                Point::new(0.0, 0.0),
+                Point::new(10.0, 0.0),
+                Point::new(0.0, 10.0),
+            ],
+        );
+        piece.locked = true;
+        let project = Project {
+            pieces: vec![piece],
+            ..Project::default()
+        };
+        save_project(&path, &project).unwrap();
+        assert!(load_project(&path).unwrap().pieces[0].locked);
+
+        fs::write(
+            &path,
+            r#"{"version":1,"units":"millimeters","pieces":[{"id":1,"name":"Flap","points":[{"x":0.0,"y":0.0},{"x":10.0,"y":0.0},{"x":0.0,"y":10.0}]}]}"#,
+        )
+        .unwrap();
+        assert!(!load_project(&path).unwrap().pieces[0].locked);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn rejects_unknown_project_versions_on_load() {
         let id = SystemTime::now()
             .duration_since(UNIX_EPOCH)

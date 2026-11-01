@@ -36,6 +36,9 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::DisplayUnits => "Одиниці виміру",
         Label::Pieces => "Деталі",
         Label::DeletePiece => "Видалити деталь",
+        Label::Layout => "Макет",
+        Label::LockPiece => "Заблокувати деталь",
+        Label::UnlockPiece => "Розблокувати деталь",
         Label::Camera => "Камера",
         Label::Orbit => "Оберт",
         Label::Tilt => "Нахил",
@@ -58,6 +61,7 @@ pub(super) fn message(message: &Message) -> String {
         }
         Message::DefaultPieceName { id } => format!("Деталь {id}"),
         Message::PieceNotFound { id } => format!("Деталь {id} не існує."),
+        Message::PieceLocked { name } => format!("Деталь «{name}» заблоковано."),
         Message::UnsupportedVersion { found, expected } => {
             format!("Версія проєкту {found} не підтримується (очікується {expected}).")
         }

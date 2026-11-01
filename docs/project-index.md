@@ -2,7 +2,7 @@
 
 A map for finding code without reading whole files. It complements `CLAUDE.md`, which holds the architecture rules and invariants and isn't repeated here.
 
-Indexed at commit `5afa155` plus the Tools panel change. Line numbers drift, so treat them as hints and search for the symbol name if one doesn't match.
+Indexed at commit `5afa155` plus the Tools and Layout panel changes. Line numbers drift, so treat them as hints and search for the symbol name if one doesn't match.
 
 ## How to read this repo cheaply
 
@@ -25,8 +25,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
-| `src/editor.rs` | 945 | 7,500 | bin | egui UI: panels, canvas, tool behavior, drawing |
-| `src/panels/tools/mod.rs` | 112 | 900 | bin | `Tool`, painted tool icons, Tools panel |
+| `src/editor.rs` | 957 | 7,500 | bin | egui UI: panels, canvas, tool behavior, drawing |
+| `src/panels/mod.rs` | 30 | 250 | bin | Shared `icon_button` |
+| `src/panels/tools/mod.rs` | 100 | 800 | bin | `Tool`, painted tool icons, Tools panel |
+| `src/panels/layout/mod.rs` | 127 | 900 | bin | Layout panel: piece tree, lock and delete buttons |
 | `src/preview/mod.rs` | 247 | 2,100 | bin | 3D scene, camera, mesh extrusion |
 | `src/model.rs` | 314 | 2,200 | lib | `Project`, `PatternPiece`, `Point`, `Units`, validation |
 | `src/events.rs` | 213 | 1,700 | lib | `ProjectEvent`, `ProjectChange`, `Project::apply` |
@@ -76,29 +78,34 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 14-23 | Constants | Zoom limits, grid steps, hit radii |
-| 25-67 | Types | `ViewMode`, `ShapeDraft`, `DragState`, `EditorState` |
-| 69-180 | `EditorState` methods | `report`, `report_error`, `snap`, `on_project_change`, `clear_released_drag`, `displayed` |
-| 182-204 | Helpers | `document_name`, `Viewport` (`to_screen`, `to_world`) |
-| 206-290 | Top-level layout | `editor_ui` |
-| 292-402 | File bar | `send`, `file_buttons`, `language_control`, `confirm_discard`, `save_as`, `project_dialog`, `export` |
-| 404-504 | Sidebar | `view_controls`, `units_control`, `pieces_list` |
-| 506-577 | Canvas | `canvas`, `fit_view` |
-| 579-680 | Select tool | `handle_select`, `begin_drag`, `update_drag`, `finish_drag` |
-| 682-721 | Draw tool | `handle_draw`, `finish_draft` |
-| 723-767 | Rectangle and Circle tools | `handle_shape`, `add_piece` |
-| 769-783 | Hit testing | `piece_at`, `vertex_at` |
-| 785-937 | Painting | `draw_grid`, `draw_pieces`, `draw_draft`, `draw_shape_draft` |
-| 939-945 | Formatting | `format_length` |
+| 15-24 | Constants | Zoom limits, grid steps, hit radii |
+| 26-68 | Types | `ViewMode`, `ShapeDraft`, `DragState`, `EditorState` |
+| 70-184 | `EditorState` methods | `report`, `report_error`, `snap`, `on_project_change`, `clear_released_drag`, `displayed` |
+| 186-208 | Helpers | `document_name`, `Viewport` (`to_screen`, `to_world`) |
+| 210-305 | Top-level layout | `editor_ui` |
+| 307-326 | Input | `send`, `handle_delete_key` |
+| 328-434 | File bar | `file_buttons`, `language_control`, `confirm_discard`, `save_as`, `project_dialog`, `export` |
+| 436-520 | Sidebar | `view_controls`, `units_control`, `selected_piece_details` |
+| 522-593 | Canvas | `canvas`, `fit_view` |
+| 595-690 | Select tool | `handle_select`, `begin_drag`, `update_drag`, `finish_drag` |
+| 692-731 | Draw tool | `handle_draw`, `finish_draft` |
+| 733-777 | Rectangle and Circle tools | `handle_shape`, `add_piece` |
+| 779-793 | Hit testing | `piece_at`, `vertex_at` |
+| 795-949 | Painting | `draw_grid`, `draw_pieces`, `draw_draft`, `draw_shape_draft` |
+| 951-957 | Formatting | `format_length` |
 
-### `panels/tools/mod.rs`
+### `panels/`
 
-| Lines | Symbols |
-|---:|---|
-| 6-8 | Icon constants: `ICON_BUTTON_SIZE`, `ICON_MARGIN`, `ICON_VERTEX_RADIUS` |
-| 10-80 | `Tool`: `ALL`, `label`, `hint`, `shape_points`, `paint_icon` |
-| 82-100 | `icon_button` |
-| 102-112 | `show_panel` |
+| File | Lines | Symbols |
+|---|---:|---|
+| `mod.rs` | 7 | `icon_button` |
+| `tools/mod.rs` | 7-9 | Icon constants: `ICON_BUTTON_SIZE`, `ICON_MARGIN`, `ICON_VERTEX_RADIUS` |
+| | 11-81 | `Tool`: `ALL`, `label`, `hint`, `shape_points`, `paint_icon` |
+| | 83 | `show_panel` |
+| `layout/mod.rs` | 7-8 | Icon constants: `ICON_BUTTON_SIZE`, `ICON_MARGIN` |
+| | 10-47 | `paint_lock`, `paint_trash` |
+| | 48 | `piece_row` |
+| | 99 | `show_panel`, which returns the `ProjectEvent` to send |
 
 ### `preview/mod.rs`
 
@@ -127,18 +134,18 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 21 tests, all inline in the library crate:
+There are 23 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
 | `model` | 4 |
-| `events` | 4 |
+| `events` | 5 |
 | `i18n` | 4 |
 | `exports` | 3 |
-| `persistence` | 2 |
+| `persistence` | 3 |
 | `shapes` | 4 |
 
-`document`, `editor`, `preview`, `settings` and `tools` have no tests, so changes there need `cargo check` and a manual run.
+`document`, `editor`, `preview`, `settings` and `panels` have no tests, so changes there need `cargo check` and a manual run.
 
 ## Docs
 

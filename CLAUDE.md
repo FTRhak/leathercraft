@@ -46,7 +46,7 @@ The UI never writes to the project. It sends a `ProjectEvent` wrapped in `docume
 - **A piece is a closed polygon** stored as an ordered point list without a repeated closing point. Validation treats the last point as connected to the first.
 - **`Project::validate` guards every file boundary:** `save_project`, `load_project`, `to_svg`, and `to_dxf` all call it. New I/O paths should do the same.
 - **The project is always valid:** `Project::apply` validates every edit on a copy, so a rejected event leaves the project untouched.
-- **Format version:** `PROJECT_VERSION` must match exactly on load; there is no migration path yet. Changing the serialized shape of the model means bumping it and deciding how older files are handled.
+- **Format version:** `PROJECT_VERSION` must match exactly on load; there is no migration path yet. Changing the serialized shape of the model means bumping it and deciding how older files are handled. Adding a `#[serde(default)]` field doesn't need a bump, since older files still load.
 - **Round-tripping uses `.leathercraft` only.** SVG and DXF are one-way exports; SVG also shifts geometry so the project's bounding box starts at the origin, while DXF keeps original coordinates.
 - **The 3D preview shows individual flat pieces**, extruded with a leather-like material. It intentionally does not infer seams or assemble finished items.
 

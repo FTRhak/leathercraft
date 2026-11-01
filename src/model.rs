@@ -61,6 +61,9 @@ pub struct PatternPiece {
     pub id: u64,
     pub name: String,
     pub points: Vec<Point>,
+    /// A locked piece cannot be moved, reshaped or deleted. Older files lack the field.
+    #[serde(default)]
+    pub locked: bool,
 }
 
 impl PatternPiece {
@@ -69,6 +72,7 @@ impl PatternPiece {
             id,
             name: name.into(),
             points,
+            locked: false,
         }
     }
 

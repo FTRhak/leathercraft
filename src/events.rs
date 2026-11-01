@@ -13,6 +13,7 @@ pub enum ProjectEvent {
     AddPiece { name: String, points: Vec<Point> },
     RenamePiece { id: u64, name: String },
     SetPiecePoints { id: u64, points: Vec<Point> },
+    SetPieceLocked { id: u64, locked: bool },
     RemovePiece { id: u64 },
 }
 
@@ -61,15 +62,17 @@ impl Project {
                 Ok(ProjectChange::Edited)
             }),
             ProjectEvent::SetPiecePoints { id, points } => self.edit(|project| {
-                project.piece_mut(id)?.points = points;
+                project.unlocked_piece_mut(id)?.points = points;
+                Ok(ProjectChange::Edited)
+            }),
+            ProjectEvent::SetPieceLocked { id, locked } => self.edit(|project| {
+                project.piece_mut(id)?.locked = locked;
                 Ok(ProjectChange::Edited)
             }),
             ProjectEvent::RemovePiece { id } => self.edit(|project| {
-                if project.remove_piece(id) {
-                    Ok(ProjectChange::PieceRemoved(id))
-                } else {
-                    Err(Message::PieceNotFound { id })
-                }
+                project.unlocked_piece_mut(id)?;
+                project.remove_piece(id);
+                Ok(ProjectChange::PieceRemoved(id))
             }),
         }
     }
@@ -91,6 +94,16 @@ impl Project {
             .iter_mut()
             .find(|piece| piece.id == id)
             .ok_or(Message::PieceNotFound { id })
+    }
+
+    fn unlocked_piece_mut(&mut self, id: u64) -> Result<&mut PatternPiece, Message> {
+        let piece = self.piece_mut(id)?;
+        if piece.locked {
+            return Err(Message::PieceLocked {
+                name: piece.name.clone(),
+            });
+        }
+        Ok(piece)
     }
 }
 
@@ -180,6 +193,58 @@ mod tests {
             Ok(ProjectChange::PieceRemoved(1))
         );
         assert!(project.pieces.is_empty());
+    }
+
+    #[test]
+    fn locked_pieces_reject_shape_changes_and_removal() {
+        let mut project = project_with_piece();
+        project.modified = false;
+        project
+            .apply(ProjectEvent::SetPieceLocked {
+                id: 1,
+                locked: true,
+            })
+            .unwrap();
+        assert!(project.pieces[0].locked);
+        assert!(project.modified);
+
+        let before = project.clone();
+        let locked = Err(Message::PieceLocked {
+            name: "Деталь 1".to_owned(),
+        });
+        let moved = vec![
+            Point::new(1.0, 0.0),
+            Point::new(11.0, 0.0),
+            Point::new(1.0, 10.0),
+        ];
+        let set_points = ProjectEvent::SetPiecePoints {
+            id: 1,
+            points: moved.clone(),
+        };
+        assert_eq!(project.apply(set_points.clone()), locked);
+        assert_eq!(project.apply(ProjectEvent::RemovePiece { id: 1 }), locked);
+        assert_eq!(project, before);
+
+        project
+            .apply(ProjectEvent::RenamePiece {
+                id: 1,
+                name: "Flap".to_owned(),
+            })
+            .unwrap();
+        assert_eq!(project.pieces[0].name, "Flap");
+
+        project
+            .apply(ProjectEvent::SetPieceLocked {
+                id: 1,
+                locked: false,
+            })
+            .unwrap();
+        project.apply(set_points).unwrap();
+        assert_eq!(project.pieces[0].points, moved);
+        assert_eq!(
+            project.apply(ProjectEvent::RemovePiece { id: 1 }),
+            Ok(ProjectChange::PieceRemoved(1))
+        );
     }
 
     #[test]
