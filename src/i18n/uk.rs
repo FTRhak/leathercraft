@@ -8,6 +8,9 @@ use crate::model::Units;
 pub(super) fn label(label: Label) -> &'static str {
     match label {
         Label::File => "Файл",
+        Label::View => "Вигляд",
+        Label::Edit => "Редагування",
+        Label::Window => "Вікно",
         Label::New => "Створити",
         Label::Open => "Відкрити…",
         Label::Save => "Зберегти",
@@ -44,6 +47,8 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Layout => "Макет",
         Label::LockPiece => "Заблокувати деталь",
         Label::UnlockPiece => "Розблокувати деталь",
+        Label::Material => "Матеріал",
+        Label::NoPieceSelected => "Деталь не вибрано",
         Label::Camera => "Камера",
         Label::Orbit => "Оберт",
         Label::Tilt => "Нахил",

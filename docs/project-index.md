@@ -25,26 +25,26 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
-| `src/editor.rs` | 993 | 7,900 | bin | egui UI: panels, canvas, tool behavior, drawing |
+| `src/editor.rs` | 1018 | 8,100 | bin | egui UI: panels, canvas, tool behavior, drawing |
 | `src/panels/mod.rs` | 31 | 250 | bin | Shared `icon_button` |
 | `src/panels/tools/mod.rs` | 100 | 800 | bin | `Tool`, painted tool icons, Tools panel |
 | `src/panels/layout/mod.rs` | 127 | 900 | bin | Layout panel: piece tree, lock and delete buttons |
-| `src/panels/material/mod.rs` | 216 | 1,900 | bin | Material form, new-project dialog |
+| `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
 | `src/preview/mod.rs` | 247 | 2,200 | bin | 3D scene, camera, mesh extrusion |
 | `src/model.rs` | 335 | 2,400 | lib | `Project`, `PatternPiece`, `Point`, `Units`, validation |
 | `src/material.rs` | 462 | 2,800 | lib | `Material` and the scales of its properties |
 | `src/events.rs` | 365 | 2,900 | lib | `ProjectEvent`, `ProjectChange`, `Project::apply` |
-| `src/i18n/uk.rs` | 377 | 4,500 | lib | Ukrainian catalog, `plural` helper |
-| `src/i18n/mod.rs` | 220 | 1,500 | lib | `Language`, `Label`, `Message` |
+| `src/i18n/uk.rs` | 382 | 4,500 | lib | Ukrainian catalog, `plural` helper |
+| `src/i18n/mod.rs` | 225 | 1,500 | lib | `Language`, `Label`, `Message` |
 | `src/exports/mod.rs` | 105 | 700 | lib | `ExportError`, shared helpers, tests |
 | `src/exports/svg.rs` | 34 | 300 | lib | `to_svg` |
 | `src/exports/dxf.rs` | 24 | 200 | lib | `to_dxf` |
 | `src/shapes.rs` | 107 | 900 | lib | `rectangle`, `circle` |
-| `src/i18n/en.rs` | 346 | 3,500 | lib | English catalog |
+| `src/i18n/en.rs` | 351 | 3,500 | lib | English catalog |
 | `src/persistence.rs` | 175 | 1,400 | lib | `save_project`, `load_project`, `write_export` |
-| `src/settings.rs` | 52 | 400 | bin | Saved language in the OS config directory |
+| `src/settings.rs` | 89 | 650 | bin | Saved language and `PanelVisibility` in the OS config directory |
 | `src/document.rs` | 32 | 300 | bin | `ActiveProject`, `ProjectMessage`, `apply_project_events` |
-| `src/main.rs` | 33 | 250 | bin | App wiring and system schedule |
+| `src/main.rs` | 36 | 250 | bin | App wiring and system schedule |
 | `src/lib.rs` | 6 | 25 | lib | Module declarations |
 
 ## Library crate (core, no Bevy)
@@ -76,9 +76,9 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `shapes.rs` | 1-39 | `CIRCLE_SEGMENTS`, `rectangle`, `circle` |
 | | 41-107 | Tests |
 | `i18n/mod.rs` | 14-66 | `Language`: `tag`, `from_tag`, `native_name`, `label`, `message`, `unit_symbol` |
-| | 70-135 | `Label`, with nested variants for material values |
-| | 139-166 | `Message` |
-| | 176-220 | Tests |
+| | 70-140 | `Label`, with nested variants for material values |
+| | 144-171 | `Message` |
+| | 181-225 | Tests |
 
 ## Binary crate (desktop)
 
@@ -87,20 +87,20 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Lines | Area | Symbols |
 |---:|---|---|
 | 17-26 | Constants | Zoom limits, grid steps, hit radii |
-| 28-72 | Types | `ViewMode`, `ShapeDraft`, `DragState`, `EditorState` |
-| 74-189 | `EditorState` methods | `report`, `report_error`, `snap`, `on_project_change`, `clear_released_drag`, `displayed` |
-| 191-213 | Helpers | `document_name`, `Viewport` (`to_screen`, `to_world`) |
-| 215-326 | Top-level layout | `editor_ui`, which also shows the new-project dialog |
-| 328-347 | Input | `send`, `handle_delete_key` |
-| 349-458 | File bar | `file_menu`, `language_control`, `confirm_discard`, `save_as`, `project_dialog`, `export` |
-| 460-556 | Sidebar | `view_controls`, `units_control`, `selected_piece_details` |
-| 558-629 | Canvas | `canvas`, `fit_view` |
-| 631-726 | Select tool | `handle_select`, `begin_drag`, `update_drag`, `finish_drag` |
-| 728-767 | Draw tool | `handle_draw`, `finish_draft` |
-| 769-813 | Rectangle and Circle tools | `handle_shape`, `add_piece` |
-| 815-829 | Hit testing | `piece_at`, `vertex_at` |
-| 831-985 | Painting | `draw_grid`, `draw_pieces`, `draw_draft`, `draw_shape_draft` |
-| 987-993 | Formatting | `format_length` |
+| 28-73 | Types | `ViewMode`, `ShapeDraft`, `DragState`, `EditorState` |
+| 75-192 | `EditorState` methods | `report`, `report_error`, `snap`, `on_project_change`, `clear_released_drag`, `displayed` |
+| 194-216 | Helpers | `document_name`, `Viewport` (`to_screen`, `to_world`) |
+| 218-351 | Top-level layout | `editor_ui`, which also shows the new-project dialog and applies panel visibility |
+| 353-372 | Input | `send`, `handle_delete_key` |
+| 374-495 | Menu bar | `file_menu`, `window_menu`, `language_control`, `confirm_discard`, `save_as`, `project_dialog`, `export` |
+| 497-581 | Sidebar | `view_controls`, `units_control`, `selected_piece_details` |
+| 583-654 | Canvas | `canvas`, `fit_view` |
+| 656-751 | Select tool | `handle_select`, `begin_drag`, `update_drag`, `finish_drag` |
+| 753-792 | Draw tool | `handle_draw`, `finish_draft` |
+| 794-838 | Rectangle and Circle tools | `handle_shape`, `add_piece` |
+| 840-854 | Hit testing | `piece_at`, `vertex_at` |
+| 856-1010 | Painting | `draw_grid`, `draw_pieces`, `draw_draft`, `draw_shape_draft` |
+| 1012-1018 | Formatting | `format_length` |
 
 ### `panels/`
 
@@ -114,9 +114,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 10-47 | `paint_lock`, `paint_trash` |
 | | 48 | `piece_row` |
 | | 99 | `show_panel`, which returns the `ProjectEvent` to send |
-| `material/mod.rs` | 14-102 | `DialogResult`, `combo`, `swatch`, `color_combo`, `thickness_row` |
-| | 104 | `material_fields`, shared by the dialog and the sidebar |
-| | 189 | `new_project_dialog` |
+| `material/mod.rs` | 15-103 | `DialogResult`, `combo`, `swatch`, `color_combo`, `thickness_row` |
+| | 105 | `material_fields`, shared by the dialog and the Material panel |
+| | 189 | `show_panel`, which returns the `ProjectEvent` to send |
+| | 214 | `new_project_dialog` |
 
 ### `preview/mod.rs`
 
@@ -137,7 +138,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add a validation rule | `model.rs` 7-11, 173-234 | `validate`, plus a `Message` variant and both catalogs |
 | Add UI text | `i18n/mod.rs` 70-166 | A `Label` or `Message` variant and an arm in `en.rs` and `uk.rs`; the compiler flags missing arms |
 | Add a language | `i18n/mod.rs` 14-66 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
-| Add a canvas tool | `panels/tools/mod.rs`, `editor.rs` 558-613, 769-813 | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`; a predefined shape also goes in `shapes.rs` |
+| Add a canvas tool | `panels/tools/mod.rs`, `editor.rs` 583-638, 794-838 | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`; a predefined shape also goes in `shapes.rs` |
 | Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material` and `material_fields` |
 | Change the file format | `model.rs` 133-146, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |

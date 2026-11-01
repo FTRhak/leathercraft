@@ -23,7 +23,10 @@ fn main() {
         .add_plugins((EguiPlugin::default(), PreviewPlugin))
         .add_message::<ProjectMessage>()
         .init_resource::<ActiveProject>()
-        .insert_resource(EditorState::new(settings::load_language()))
+        .insert_resource(EditorState::new(
+            settings::load_language(),
+            settings::load_panels(),
+        ))
         .init_resource::<ViewMode>()
         .add_systems(
             EguiPrimaryContextPass,

@@ -69,6 +69,9 @@ impl Language {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Label {
     File,
+    View,
+    Edit,
+    Window,
     New,
     Open,
     Save,
@@ -99,6 +102,8 @@ pub enum Label {
     Layout,
     LockPiece,
     UnlockPiece,
+    Material,
+    NoPieceSelected,
     Camera,
     Orbit,
     Tilt,

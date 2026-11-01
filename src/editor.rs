@@ -3,7 +3,7 @@ use crate::panels::layout;
 use crate::panels::material::{self, DialogResult};
 use crate::panels::tools::{self, Tool};
 use crate::preview::{self, PreviewSettings};
-use crate::settings;
+use crate::settings::{self, PanelVisibility};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
 use leathercraft::events::{ProjectChange, ProjectEvent};
@@ -65,6 +65,7 @@ pub struct EditorState {
     /// The material being chosen while the new-project dialog is open.
     new_project_dialog: Option<Material>,
     language: Language,
+    panels: PanelVisibility,
     /// Kept untranslated so that it follows a change of language.
     status: Message,
     status_is_error: bool,
@@ -87,6 +88,7 @@ impl Default for EditorState {
             rename_buffer: None,
             new_project_dialog: None,
             language: Language::default(),
+            panels: PanelVisibility::default(),
             status: Message::Ready,
             status_is_error: false,
             cursor: None,
@@ -95,9 +97,10 @@ impl Default for EditorState {
 }
 
 impl EditorState {
-    pub fn new(language: Language) -> Self {
+    pub fn new(language: Language, panels: PanelVisibility) -> Self {
         Self {
             language,
+            panels,
             ..Self::default()
         }
     }
@@ -230,6 +233,15 @@ pub fn editor_ui(
             ui.menu_button(language.label(Label::File), |ui| {
                 file_menu(ui, project, &mut events, state);
             });
+            ui.menu_button(language.label(Label::View), |_| {});
+            ui.menu_button(language.label(Label::Edit), |_| {});
+            // Stays open on a click, so that the toggled state can be seen.
+            egui::containers::menu::MenuButton::new(language.label(Label::Window))
+                .config(
+                    egui::containers::menu::MenuConfig::new()
+                        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside),
+                )
+                .ui(ui, |ui| window_menu(ui, state));
             ui.separator();
             ui.selectable_value(
                 &mut *view_mode,
@@ -268,7 +280,7 @@ pub fn editor_ui(
         });
     });
 
-    if *view_mode == ViewMode::Editor2d {
+    if *view_mode == ViewMode::Editor2d && state.panels.tools {
         egui::SidePanel::left("tools")
             .default_width(110.0)
             .show(ctx, |ui| {
@@ -293,14 +305,27 @@ pub fn editor_ui(
             });
         });
 
-    egui::SidePanel::right("layout")
-        .default_width(200.0)
-        .show(ctx, |ui| {
-            let event = layout::show_panel(ui, project, &mut state.selected, state.language);
-            if let Some(event) = event {
-                send(&mut events, event);
-            }
-        });
+    if state.panels.layout {
+        egui::SidePanel::right("layout")
+            .default_width(200.0)
+            .show(ctx, |ui| {
+                let event = layout::show_panel(ui, project, &mut state.selected, state.language);
+                if let Some(event) = event {
+                    send(&mut events, event);
+                }
+            });
+    }
+
+    if state.panels.material {
+        egui::SidePanel::right("material")
+            .default_width(300.0)
+            .show(ctx, |ui| {
+                let event = material::show_panel(ui, project, state.selected, state.language);
+                if let Some(event) = event {
+                    send(&mut events, event);
+                }
+            });
+    }
 
     handle_delete_key(ctx, &mut events, state);
 
@@ -380,6 +405,18 @@ fn file_menu(
     }
     if ui.button(language.label(Label::ExportDxf)).clicked() {
         export(project, state, "DXF", "dxf", exports::to_dxf);
+    }
+}
+
+fn window_menu(ui: &mut egui::Ui, state: &mut EditorState) {
+    let language = state.language;
+    let mut panels = state.panels;
+    ui.toggle_value(&mut panels.tools, language.label(Label::Tools));
+    ui.toggle_value(&mut panels.layout, language.label(Label::Layout));
+    ui.toggle_value(&mut panels.material, language.label(Label::Material));
+    if panels != state.panels {
+        state.panels = panels;
+        settings::save_panels(panels);
     }
 }
 
@@ -540,18 +577,6 @@ fn selected_piece_details(
             format_length(language, units, bounds.width()),
             format_length(language, units, bounds.height())
         ));
-    }
-
-    ui.separator();
-    let mut piece_material = piece.material;
-    if material::material_fields(ui, &mut piece_material, language, "selected_piece") {
-        send(
-            events,
-            ProjectEvent::SetPieceMaterial {
-                id: piece.id,
-                material: piece_material,
-            },
-        );
     }
 }
 

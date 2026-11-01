@@ -1,10 +1,11 @@
 use bevy_egui::egui;
+use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::material::{
     ColorGroup, Flexibility, HeatResistance, LeatherColor, MAX_THICKNESS_MM, MIN_THICKNESS_MM,
     Material, Origin, Strength, Texture, Treatment, WaterResistance,
 };
-use leathercraft::model::Units;
+use leathercraft::model::{Project, Units};
 
 const COMBO_WIDTH: f32 = 150.0;
 const COMBO_POPUP_HEIGHT: f32 = 360.0;
@@ -183,6 +184,30 @@ pub fn material_fields(
         });
     });
     *material != before
+}
+
+pub fn show_panel(
+    ui: &mut egui::Ui,
+    project: &Project,
+    selected: Option<u64>,
+    language: Language,
+) -> Option<ProjectEvent> {
+    ui.label(language.label(Label::Material));
+    let Some(piece) = selected.and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
+    else {
+        ui.weak(language.label(Label::NoPieceSelected));
+        return None;
+    };
+    let mut material = piece.material;
+    egui::ScrollArea::vertical()
+        .show(ui, |ui| {
+            material_fields(ui, &mut material, language, "selected_piece")
+        })
+        .inner
+        .then_some(ProjectEvent::SetPieceMaterial {
+            id: piece.id,
+            material,
+        })
 }
 
 /// Clicking outside the dialog does nothing, so a stray click cannot lose the filled-in form.

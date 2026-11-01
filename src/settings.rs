@@ -4,9 +4,32 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-#[derive(Serialize, Deserialize)]
+/// Which panels the Window menu currently shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PanelVisibility {
+    pub tools: bool,
+    pub layout: bool,
+    pub material: bool,
+}
+
+impl Default for PanelVisibility {
+    fn default() -> Self {
+        Self {
+            tools: true,
+            layout: true,
+            material: true,
+        }
+    }
+}
+
+#[derive(Default, Serialize, Deserialize)]
 struct Settings {
-    language: String,
+    /// Absent until the user chooses a language, so that the OS locale keeps applying.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    language: Option<String>,
+    #[serde(default)]
+    panels: PanelVisibility,
 }
 
 fn settings_path() -> Option<PathBuf> {
@@ -25,28 +48,42 @@ pub fn load_language() -> Language {
 }
 
 fn saved_language() -> Option<Language> {
-    let contents = fs::read_to_string(settings_path()?).ok()?;
-    let settings: Settings = serde_json::from_str(&contents).ok()?;
-    Language::from_tag(&settings.language)
+    Language::from_tag(&read_settings()?.language?)
 }
 
-/// The preference is not worth interrupting the user over, so a failure is only logged.
+pub fn load_panels() -> PanelVisibility {
+    read_settings().unwrap_or_default().panels
+}
+
+fn read_settings() -> Option<Settings> {
+    let contents = fs::read_to_string(settings_path()?).ok()?;
+    serde_json::from_str(&contents).ok()
+}
+
 pub fn save_language(language: Language) {
-    if let Err(error) = write_language(language) {
+    update_settings(|settings| settings.language = Some(language.tag().to_owned()));
+}
+
+pub fn save_panels(panels: PanelVisibility) {
+    update_settings(|settings| settings.panels = panels);
+}
+
+/// The preferences are not worth interrupting the user over, so a failure is only logged.
+fn update_settings(change: impl FnOnce(&mut Settings)) {
+    let mut settings = read_settings().unwrap_or_default();
+    change(&mut settings);
+    if let Err(error) = write_settings(&settings) {
         bevy::log::error!("Could not save settings: {error}");
     }
 }
 
-fn write_language(language: Language) -> io::Result<()> {
+fn write_settings(settings: &Settings) -> io::Result<()> {
     let path = settings_path().ok_or_else(|| io::Error::other("no config directory"))?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let settings = Settings {
-        language: language.tag().to_owned(),
-    };
     fs::write(
         path,
-        format!("{}\n", serde_json::to_string_pretty(&settings)?),
+        format!("{}\n", serde_json::to_string_pretty(settings)?),
     )
 }
