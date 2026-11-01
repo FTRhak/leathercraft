@@ -1,10 +1,12 @@
+use crate::document::{ActiveProject, ProjectMessage};
 use crate::preview::{self, PreviewSettings};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
+use leathercraft::events::{ProjectChange, ProjectEvent};
 use leathercraft::exports::{self, ExportError};
 use leathercraft::model::{PatternPiece, Point, Project, Units};
 use leathercraft::persistence;
-use std::path::PathBuf;
+use std::borrow::Cow;
 
 const PROJECT_EXTENSION: &str = "leathercraft";
 const MIN_ZOOM: f32 = 0.05;
@@ -16,10 +18,6 @@ const MIN_GRID_SPACING_PX: f64 = 12.0;
 const VERTEX_HIT_RADIUS_PX: f32 = 8.0;
 const CLOSE_HIT_RADIUS_PX: f32 = 10.0;
 const MAX_POINTS_WITH_EDGE_LABELS: usize = 64;
-
-/// The library stays free of Bevy, so the project becomes a resource through this wrapper.
-#[derive(Resource, Default, Deref, DerefMut)]
-pub struct ActiveProject(pub Project);
 
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ViewMode {
@@ -40,6 +38,10 @@ struct DragState {
     vertex: Option<usize>,
     start: Point,
     original: Vec<Point>,
+    /// The in-progress shape, drawn instead of the project's until the drag is committed.
+    points: Vec<Point>,
+    /// Keeps the drag drawn for the frame in which its event is still being applied.
+    released: bool,
 }
 
 #[derive(Resource)]
@@ -53,8 +55,7 @@ pub struct EditorState {
     fit_requested: bool,
     snap_enabled: bool,
     snap_mm: f64,
-    path: Option<PathBuf>,
-    saved: Project,
+    rename_buffer: Option<String>,
     status: String,
     status_is_error: bool,
     cursor: Option<Point>,
@@ -72,8 +73,7 @@ impl Default for EditorState {
             fit_requested: false,
             snap_enabled: true,
             snap_mm: 1.0,
-            path: None,
-            saved: Project::default(),
+            rename_buffer: None,
             status: "Ready.".to_owned(),
             status_is_error: false,
             cursor: None,
@@ -87,7 +87,7 @@ impl EditorState {
         self.status_is_error = false;
     }
 
-    fn report_error(&mut self, message: impl Into<String>) {
+    pub fn report_error(&mut self, message: impl Into<String>) {
         self.status = message.into();
         self.status_is_error = true;
     }
@@ -104,14 +104,63 @@ impl EditorState {
         Point::new(self.snap(point.x), self.snap(point.y))
     }
 
-    fn replace_document(&mut self, project: &Project, path: Option<PathBuf>) {
+    fn reset_document(&mut self) {
         self.draft.clear();
         self.selected = None;
         self.drag = None;
+        self.rename_buffer = None;
         self.fit_requested = true;
-        self.path = path;
-        self.saved = project.clone();
     }
+
+    pub fn on_project_change(&mut self, change: ProjectChange, project: &Project) {
+        match change {
+            ProjectChange::Created => {
+                self.reset_document();
+                self.report("New project.");
+            }
+            ProjectChange::Opened => {
+                self.reset_document();
+                self.report(format!("Opened {}.", document_name(project)));
+            }
+            ProjectChange::Saved => self.report(format!("Saved {}.", document_name(project))),
+            ProjectChange::Edited => {}
+            ProjectChange::PieceAdded(id) => {
+                self.draft.clear();
+                self.selected = Some(id);
+                self.tool = Tool::Select;
+                self.report(format!("Added Piece {id}."));
+            }
+            ProjectChange::PieceRemoved(_) => {
+                self.selected = None;
+                self.drag = None;
+                self.report("Piece deleted.");
+            }
+        }
+    }
+
+    pub fn clear_released_drag(&mut self) {
+        if self.drag.as_ref().is_some_and(|drag| drag.released) {
+            self.drag = None;
+        }
+    }
+
+    fn displayed<'a>(&self, piece: &'a PatternPiece) -> Cow<'a, PatternPiece> {
+        match &self.drag {
+            Some(drag) if drag.piece_id == piece.id => Cow::Owned(PatternPiece::new(
+                piece.id,
+                piece.name.clone(),
+                drag.points.clone(),
+            )),
+            _ => Cow::Borrowed(piece),
+        }
+    }
+}
+
+fn document_name(project: &Project) -> String {
+    project
+        .path
+        .as_ref()
+        .map_or_else(String::new, |path| path.display().to_string())
 }
 
 #[derive(Clone, Copy)]
@@ -133,17 +182,19 @@ impl Viewport {
 
 pub fn editor_ui(
     mut contexts: EguiContexts,
-    mut project: ResMut<ActiveProject>,
+    project: Res<ActiveProject>,
+    mut events: MessageWriter<ProjectMessage>,
     mut state: ResMut<EditorState>,
     mut view_mode: ResMut<ViewMode>,
     mut settings: ResMut<PreviewSettings>,
 ) -> Result {
     let ctx: &egui::Context = contexts.ctx_mut()?;
+    let project: &Project = &project;
     let state = &mut *state;
 
     egui::TopBottomPanel::top("file_bar").show(ctx, |ui| {
         ui.horizontal(|ui| {
-            file_buttons(ui, &mut project, state);
+            file_buttons(ui, project, &mut events, state);
             ui.separator();
             ui.selectable_value(&mut *view_mode, ViewMode::Editor2d, "2D editor");
             ui.selectable_value(&mut *view_mode, ViewMode::Preview3d, "3D preview");
@@ -179,37 +230,47 @@ pub fn editor_ui(
                 preview::show_controls(ui, &mut settings);
                 ui.separator();
             }
-            units_control(ui, &mut project);
+            units_control(ui, project, &mut events);
             ui.separator();
-            pieces_list(ui, &mut project, state);
+            pieces_list(ui, project, &mut events, state);
         });
 
     // In preview mode no central panel is drawn, so the 3D scene shows through.
     if *view_mode == ViewMode::Editor2d {
-        egui::CentralPanel::default().show(ctx, |ui| canvas(ui, &mut project, state));
+        egui::CentralPanel::default().show(ctx, |ui| canvas(ui, project, &mut events, state));
     } else {
         state.cursor = None;
     }
     Ok(())
 }
 
-fn file_buttons(ui: &mut egui::Ui, project: &mut ResMut<ActiveProject>, state: &mut EditorState) {
-    if ui.button("New").clicked() && confirm_discard(project, state) {
-        project.0 = Project::default();
-        state.replace_document(&project.0, None);
-        state.report("New project.");
+fn send(events: &mut MessageWriter<ProjectMessage>, event: ProjectEvent) {
+    events.write(ProjectMessage(event));
+}
+
+fn file_buttons(
+    ui: &mut egui::Ui,
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
+    state: &mut EditorState,
+) {
+    if ui.button("New").clicked() && confirm_discard(project) {
+        send(events, ProjectEvent::New);
     }
-    if ui.button("Open…").clicked() && confirm_discard(project, state) {
-        open_project(project, state);
+    if ui.button("Open…").clicked()
+        && confirm_discard(project)
+        && let Some(path) = project_dialog().pick_file()
+    {
+        send(events, ProjectEvent::Open { path });
     }
     if ui.button("Save").clicked() {
-        match state.path.clone() {
-            Some(path) => save_to(path, project, state),
-            None => save_as(project, state),
+        match project.path.clone() {
+            Some(path) => send(events, ProjectEvent::Save { path }),
+            None => save_as(events),
         }
     }
     if ui.button("Save as…").clicked() {
-        save_as(project, state);
+        save_as(events);
     }
     ui.separator();
     if ui.button("Export SVG…").clicked() {
@@ -220,8 +281,8 @@ fn file_buttons(ui: &mut egui::Ui, project: &mut ResMut<ActiveProject>, state: &
     }
 }
 
-fn confirm_discard(project: &ActiveProject, state: &EditorState) -> bool {
-    if project.0 == state.saved {
+fn confirm_discard(project: &Project) -> bool {
+    if !project.modified {
         return true;
     }
     rfd::MessageDialog::new()
@@ -232,37 +293,12 @@ fn confirm_discard(project: &ActiveProject, state: &EditorState) -> bool {
         == rfd::MessageDialogResult::Yes
 }
 
-fn open_project(project: &mut ResMut<ActiveProject>, state: &mut EditorState) {
-    let Some(path) = project_dialog().pick_file() else {
-        return;
-    };
-    match persistence::load_project(&path) {
-        Ok(loaded) => {
-            project.0 = loaded;
-            state.report(format!("Opened {}.", path.display()));
-            state.replace_document(&project.0, Some(path));
-        }
-        Err(error) => state.report_error(error),
-    }
-}
-
-fn save_as(project: &ActiveProject, state: &mut EditorState) {
+fn save_as(events: &mut MessageWriter<ProjectMessage>) {
     if let Some(mut path) = project_dialog().save_file() {
         if path.extension().is_none() {
             path.set_extension(PROJECT_EXTENSION);
         }
-        save_to(path, project, state);
-    }
-}
-
-fn save_to(path: PathBuf, project: &ActiveProject, state: &mut EditorState) {
-    match persistence::save_project(&path, &project.0) {
-        Ok(()) => {
-            state.report(format!("Saved {}.", path.display()));
-            state.saved = project.0.clone();
-            state.path = Some(path);
-        }
-        Err(error) => state.report_error(error),
+        send(events, ProjectEvent::Save { path });
     }
 }
 
@@ -271,13 +307,13 @@ fn project_dialog() -> rfd::FileDialog {
 }
 
 fn export(
-    project: &ActiveProject,
+    project: &Project,
     state: &mut EditorState,
     label: &str,
     extension: &str,
     encode: fn(&Project) -> std::result::Result<String, ExportError>,
 ) {
-    let contents = match encode(&project.0) {
+    let contents = match encode(project) {
         Ok(contents) => contents,
         Err(error) => {
             state.report_error(error.to_string());
@@ -327,7 +363,7 @@ fn tool_controls(ui: &mut egui::Ui, state: &mut EditorState) {
     }
 }
 
-fn units_control(ui: &mut egui::Ui, project: &mut ResMut<ActiveProject>) {
+fn units_control(ui: &mut egui::Ui, project: &Project, events: &mut MessageWriter<ProjectMessage>) {
     let mut units = project.units;
     egui::ComboBox::from_label("Display units")
         .selected_text(units.symbol())
@@ -336,11 +372,16 @@ fn units_control(ui: &mut egui::Ui, project: &mut ResMut<ActiveProject>) {
             ui.selectable_value(&mut units, Units::Inches, Units::Inches.symbol());
         });
     if units != project.units {
-        project.units = units;
+        send(events, ProjectEvent::SetUnits(units));
     }
 }
 
-fn pieces_list(ui: &mut egui::Ui, project: &mut ResMut<ActiveProject>, state: &mut EditorState) {
+fn pieces_list(
+    ui: &mut egui::Ui,
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
+    state: &mut EditorState,
+) {
     ui.label("Pieces");
     egui::ScrollArea::vertical()
         .max_height(220.0)
@@ -354,22 +395,35 @@ fn pieces_list(ui: &mut egui::Ui, project: &mut ResMut<ActiveProject>, state: &m
         });
 
     let units = project.units;
-    let Some(index) = state
+    let Some(piece) = state
         .selected
-        .and_then(|id| project.pieces.iter().position(|piece| piece.id == id))
+        .and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
     else {
+        state.rename_buffer = None;
         return;
     };
 
     ui.separator();
-    // Edit a copy so an idle text box does not flag the project as changed every frame.
-    let mut name = project.pieces[index].name.clone();
-    if ui.text_edit_singleline(&mut name).changed() {
-        project.pieces[index].name = name;
+    // The buffer lets the box be empty mid-edit, which the project itself would reject.
+    let mut name = state
+        .rename_buffer
+        .clone()
+        .unwrap_or_else(|| piece.name.clone());
+    let response = ui.text_edit_singleline(&mut name);
+    if response.changed() && !name.trim().is_empty() {
+        send(
+            events,
+            ProjectEvent::RenamePiece {
+                id: piece.id,
+                name: name.clone(),
+            },
+        );
     }
-    let piece = &project.pieces[index];
-    ui.label(format!("{} points", piece.points.len()));
-    if let Some(bounds) = piece.bounds() {
+    state.rename_buffer = response.has_focus().then_some(name);
+
+    let shown = state.displayed(piece);
+    ui.label(format!("{} points", shown.points.len()));
+    if let Some(bounds) = shown.bounds() {
         ui.label(format!(
             "{} × {}",
             format_length(units, bounds.width()),
@@ -377,20 +431,16 @@ fn pieces_list(ui: &mut egui::Ui, project: &mut ResMut<ActiveProject>, state: &m
         ));
     }
     if ui.button("Delete piece").clicked() {
-        let id = piece.id;
-        delete_piece(project, state, id);
+        send(events, ProjectEvent::RemovePiece { id: piece.id });
     }
 }
 
-fn delete_piece(project: &mut ResMut<ActiveProject>, state: &mut EditorState, id: u64) {
-    if project.remove_piece(id) {
-        state.selected = None;
-        state.drag = None;
-        state.report("Piece deleted.");
-    }
-}
-
-fn canvas(ui: &mut egui::Ui, project: &mut ResMut<ActiveProject>, state: &mut EditorState) {
+fn canvas(
+    ui: &mut egui::Ui,
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
+    state: &mut EditorState,
+) {
     let (response, painter) =
         ui.allocate_painter(ui.available_size(), egui::Sense::click_and_drag());
     let rect = response.rect;
@@ -427,9 +477,9 @@ fn canvas(ui: &mut egui::Ui, project: &mut ResMut<ActiveProject>, state: &mut Ed
     match state.tool {
         Tool::Select => {
             state.draft.clear();
-            handle_select(ui, &response, view, project, state);
+            handle_select(ui, &response, view, project, events, state);
         }
-        Tool::Draw => handle_draw(ui, &response, view, project, state),
+        Tool::Draw => handle_draw(ui, &response, view, events, state),
     }
 
     painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
@@ -438,7 +488,7 @@ fn canvas(ui: &mut egui::Ui, project: &mut ResMut<ActiveProject>, state: &mut Ed
     draw_draft(&painter, response.hover_pos(), view, project.units, state);
 }
 
-fn fit_view(rect: egui::Rect, project: &ActiveProject, state: &mut EditorState) {
+fn fit_view(rect: egui::Rect, project: &Project, state: &mut EditorState) {
     let Some(bounds) = project.bounds() else {
         state.pan = egui::Vec2::ZERO;
         return;
@@ -458,7 +508,8 @@ fn handle_select(
     ui: &egui::Ui,
     response: &egui::Response,
     view: Viewport,
-    project: &mut ResMut<ActiveProject>,
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
 ) {
     if response.drag_started_by(egui::PointerButton::Primary) {
@@ -470,10 +521,10 @@ fn handle_select(
     if response.dragged_by(egui::PointerButton::Primary)
         && let Some(position) = response.interact_pointer_pos()
     {
-        update_drag(view.to_world(position), project, state);
+        update_drag(view.to_world(position), state);
     }
     if response.drag_stopped() {
-        finish_drag(project, state);
+        finish_drag(events, state);
     }
     if response.clicked()
         && let Some(position) = response.interact_pointer_pos()
@@ -487,16 +538,11 @@ fn handle_select(
         && !ui.ctx().wants_keyboard_input()
         && let Some(id) = state.selected
     {
-        delete_piece(project, state, id);
+        send(events, ProjectEvent::RemovePiece { id });
     }
 }
 
-fn begin_drag(
-    origin: egui::Pos2,
-    view: Viewport,
-    project: &ActiveProject,
-    state: &mut EditorState,
-) {
+fn begin_drag(origin: egui::Pos2, view: Viewport, project: &Project, state: &mut EditorState) {
     let selected = state
         .selected
         .and_then(|id| project.pieces.iter().find(|piece| piece.id == id));
@@ -518,10 +564,12 @@ fn begin_drag(
         vertex,
         start,
         original: piece.points.clone(),
+        points: piece.points.clone(),
+        released: false,
     });
 }
 
-fn update_drag(cursor: Point, project: &mut ResMut<ActiveProject>, state: &EditorState) {
+fn update_drag(cursor: Point, state: &mut EditorState) {
     let Some(drag) = &state.drag else {
         return;
     };
@@ -538,31 +586,24 @@ fn update_drag(cursor: Point, project: &mut ResMut<ActiveProject>, state: &Edito
             }
         }
     }
-    let Some(index) = project
-        .pieces
-        .iter()
-        .position(|piece| piece.id == drag.piece_id)
-    else {
-        return;
-    };
-    if project.pieces[index].points != points {
-        project.pieces[index].points = points;
+    if let Some(drag) = &mut state.drag {
+        drag.points = points;
     }
 }
 
-fn finish_drag(project: &mut ResMut<ActiveProject>, state: &mut EditorState) {
-    let Some(drag) = state.drag.take() else {
+fn finish_drag(events: &mut MessageWriter<ProjectMessage>, state: &mut EditorState) {
+    let Some(drag) = &mut state.drag else {
         return;
     };
-    if let Err(error) = project.validate() {
-        if let Some(piece) = project
-            .pieces
-            .iter_mut()
-            .find(|piece| piece.id == drag.piece_id)
-        {
-            piece.points = drag.original;
-        }
-        state.report_error(format!("Edit reverted: {error}"));
+    drag.released = true;
+    if drag.points != drag.original {
+        send(
+            events,
+            ProjectEvent::SetPiecePoints {
+                id: drag.piece_id,
+                points: drag.points.clone(),
+            },
+        );
     }
 }
 
@@ -570,7 +611,7 @@ fn handle_draw(
     ui: &egui::Ui,
     response: &egui::Response,
     view: Viewport,
-    project: &mut ResMut<ActiveProject>,
+    events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
 ) {
     if response.clicked()
@@ -579,43 +620,32 @@ fn handle_draw(
         let closes = state.draft.len() >= 3
             && view.to_screen(state.draft[0]).distance(position) <= CLOSE_HIT_RADIUS_PX;
         if closes {
-            finish_draft(project, state);
-        } else {
-            let point = state.snap_point(view.to_world(position));
-            if state.draft.last() != Some(&point) {
-                state.draft.push(point);
-            }
+            finish_draft(events, state);
+            return;
+        }
+        let point = state.snap_point(view.to_world(position));
+        if state.draft.last() != Some(&point) {
+            state.draft.push(point);
         }
     }
     if ui.ctx().wants_keyboard_input() {
         return;
     }
     if ui.input(|input| input.key_pressed(egui::Key::Enter)) {
-        finish_draft(project, state);
+        finish_draft(events, state);
     }
     if ui.input(|input| input.key_pressed(egui::Key::Escape)) {
         state.draft.clear();
     }
 }
 
-fn finish_draft(project: &mut ResMut<ActiveProject>, state: &mut EditorState) {
-    let id = project.next_piece_id();
-    let mut candidate = project.0.clone();
-    candidate.add_piece(PatternPiece::new(
-        id,
-        format!("Piece {id}"),
-        state.draft.clone(),
-    ));
-    match candidate.validate() {
-        Ok(()) => {
-            project.0 = candidate;
-            state.draft.clear();
-            state.selected = Some(id);
-            state.tool = Tool::Select;
-            state.report(format!("Added Piece {id}."));
-        }
-        Err(error) => state.report_error(error),
-    }
+fn finish_draft(events: &mut MessageWriter<ProjectMessage>, state: &EditorState) {
+    send(
+        events,
+        ProjectEvent::AddPiece {
+            points: state.draft.clone(),
+        },
+    );
 }
 
 fn piece_at(project: &Project, point: Point) -> Option<u64> {
@@ -662,6 +692,7 @@ fn draw_grid(painter: &egui::Painter, rect: egui::Rect, view: Viewport) {
 fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state: &EditorState) {
     let text_color = egui::Color32::from_gray(220);
     for piece in &project.pieces {
+        let piece = state.displayed(piece);
         let selected = state.selected == Some(piece.id);
         let stroke = if selected {
             egui::Stroke::new(2.5, egui::Color32::from_rgb(240, 160, 70))

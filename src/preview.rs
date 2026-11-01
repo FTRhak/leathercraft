@@ -1,4 +1,4 @@
-use crate::editor::ActiveProject;
+use crate::document::ActiveProject;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;

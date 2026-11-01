@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use std::path::PathBuf;
 
 pub const PROJECT_VERSION: u32 = 1;
 const MAX_PIECES: usize = 10_000;
@@ -130,6 +131,12 @@ pub struct Project {
     pub version: u32,
     pub units: Units,
     pub pieces: Vec<PatternPiece>,
+    /// Where the document lives on disk; not part of the file format.
+    #[serde(skip)]
+    pub path: Option<PathBuf>,
+    /// Whether there are edits since the last save or load; not part of the file format.
+    #[serde(skip)]
+    pub modified: bool,
 }
 
 impl Default for Project {
@@ -138,6 +145,8 @@ impl Default for Project {
             version: PROJECT_VERSION,
             units: Units::Millimeters,
             pieces: Vec::new(),
+            path: None,
+            modified: false,
         }
     }
 }
