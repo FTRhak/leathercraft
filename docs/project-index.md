@@ -6,7 +6,7 @@ Indexed at commit `5afa155` plus the Tools and Layout panel and material changes
 
 ## How to read this repo cheaply
 
-- **Start with this index, then read a line range.** All of `src/` is about 34k tokens, and `editor/mod.rs` alone is about 7k.
+- **Start with this index, then read a line range.** All of `src/` is about 34k tokens, and `i18n/uk.rs` alone is about 4.5k.
 - **Never open or sweep these:**
   - `target/` (11 GB, about 7,700 files)
   - `.git/`
@@ -25,9 +25,13 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
-| `src/editor/mod.rs` | 686 | 5,300 | bin | `EditorState`, menu helpers, sidebar, canvas, tool behavior, drawing |
+| `src/editor/mod.rs` | 164 | 1,150 | bin | `ViewMode`, `send`, menu helpers, sidebar, `format_length` |
+| `src/editor/editor_state_struct.rs` | 159 | 1,250 | bin | `EditorState` and its methods, `document_name` |
+| `src/editor/drag_state_struct.rs` | 12 | 100 | bin | `DragState` |
+| `src/editor/shape_draft_struct.rs` | 7 | 50 | bin | `ShapeDraft` |
+| `src/editor/canvas.rs` | 373 | 3,000 | bin | `canvas`, `Viewport`, tool behavior, hit testing, painting |
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
-| `src/editor/drag.rs` | 79 | 550 | bin | `begin_drag`, `update_drag`, `finish_drag`: dragging pieces and vertices with the Select tool |
+| `src/editor/drag.rs` | 80 | 600 | bin | `begin_drag`, `update_drag`, `finish_drag`: dragging pieces and vertices with the Select tool |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
 | `src/editor/ui.rs` | 245 | 2,200 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top-level panel layout, menus, Delete key, language picker |
 | `src/panels/mod.rs` | 31 | 250 | bin | Shared `icon_button` |
@@ -90,20 +94,33 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 23-28 | Constants | Zoom limits, hit radii |
-| 30-75 | Types | `ViewMode`, `ShapeDraft`, `DragState`, `EditorState` |
-| 77-194 | `EditorState` methods | `report`, `report_error`, `snap`, `on_project_change`, `clear_released_drag`, `displayed` |
-| 196-218 | Helpers | `document_name`, `Viewport` (`to_screen`, `to_world`) |
-| 220-222 | Events | `send` |
-| 224-256 | Menu bar helpers | `export` |
-| 258-342 | Sidebar | `view_controls`, `units_control`, `selected_piece_details` |
-| 344-415 | Canvas | `canvas`, `fit_view` |
-| 417-444 | Select tool | `handle_select` |
-| 446-485 | Draw tool | `handle_draw`, `finish_draft` |
-| 487-531 | Rectangle and Circle tools | `handle_shape`, `add_piece` |
-| 533-547 | Hit testing | `piece_at`, `vertex_at` |
-| 549-678 | Painting | `draw_pieces`, `draw_draft`, `draw_shape_draft` |
-| 680-686 | Formatting | `format_length` |
+| 27-32 | Types | `ViewMode` |
+| 34-36 | Events | `send` |
+| 38-70 | Menu bar helpers | `export` |
+| 72-156 | Sidebar | `view_controls`, `units_control`, `selected_piece_details` |
+| 158-164 | Formatting | `format_length` |
+
+### `editor/editor_state_struct.rs`
+
+| Lines | Area | Symbols |
+|---:|---|---|
+| 12-33 | Type | `EditorState` |
+| 35-57 | Defaults | `Default` impl |
+| 59-152 | Methods | `new`, `report`, `report_error`, `snap`, `snap_point`, `reset_document`, `on_project_change`, `clear_released_drag`, `displayed` |
+| 154-159 | Helpers | `document_name` |
+
+### `editor/canvas.rs`
+
+| Lines | Area | Symbols |
+|---:|---|---|
+| 12-16 | Constants | Zoom limits, hit radii, edge label limit |
+| 18-33 | Viewport | `Viewport` (`to_screen`, `to_world`) |
+| 35-106 | Canvas | `canvas`, `fit_view` |
+| 108-135 | Select tool | `handle_select` |
+| 137-176 | Draw tool | `handle_draw`, `finish_draft` |
+| 178-222 | Rectangle and Circle tools | `handle_shape`, `add_piece` |
+| 224-242 | Hit testing | `piece_at`, `vertex_at` |
+| 244-373 | Painting | `draw_pieces`, `draw_draft`, `draw_shape_draft` |
 
 ### `editor/ui.rs`
 
@@ -151,7 +168,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add a validation rule | `model.rs` 7-11, 173-234 | `validate`, plus a `Message` variant and both catalogs |
 | Add UI text | `i18n/mod.rs` 70-166 | A `Label` or `Message` variant and an arm in `en.rs` and `uk.rs`; the compiler flags missing arms |
 | Add a language | `i18n/mod.rs` 14-66 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
-| Add a canvas tool | `panels/tools/mod.rs`, `editor/mod.rs` 344-399, 487-531 | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`; a predefined shape also goes in `shapes.rs` |
+| Add a canvas tool | `panels/tools/mod.rs`, `editor/canvas.rs` 35-90, 178-222 | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`; a predefined shape also goes in `shapes.rs` |
 | Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material` and `material_fields` |
 | Change the file format | `model.rs` 133-146, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
@@ -192,4 +209,4 @@ To regenerate the symbol list and line numbers:
 rg -n "^\s*(pub(\(\w+\))? )?(fn|struct|enum|trait|impl|mod|const) " src
 ```
 
-Update it when a file is added, moved or split, or when `editor/mod.rs` is restructured. Small line drift doesn't need a refresh.
+Update it when a file is added, moved or split, or when `editor/mod.rs` or `editor/canvas.rs` is restructured. Small line drift doesn't need a refresh.

@@ -1,4 +1,4 @@
-use super::Viewport;
+use super::canvas::Viewport;
 use bevy_egui::egui;
 use leathercraft::model::Point;
 

@@ -1,4 +1,5 @@
-use super::{DragState, EditorState, Viewport, piece_at, send, vertex_at};
+use super::canvas::{Viewport, piece_at, vertex_at};
+use super::{DragState, EditorState, send};
 use crate::document::ProjectMessage;
 use bevy::prelude::*;
 use bevy_egui::egui;
