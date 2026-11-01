@@ -1,4 +1,5 @@
 use crate::document::{ActiveProject, ProjectMessage};
+use crate::panels::tools::{self, Tool};
 use crate::preview::{self, PreviewSettings};
 use crate::settings;
 use bevy::prelude::*;
@@ -28,11 +29,10 @@ pub enum ViewMode {
     Preview3d,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-enum Tool {
-    #[default]
-    Select,
-    Draw,
+#[derive(Clone, Copy)]
+struct ShapeDraft {
+    start: Point,
+    end: Point,
 }
 
 struct DragState {
@@ -50,6 +50,7 @@ struct DragState {
 pub struct EditorState {
     tool: Tool,
     draft: Vec<Point>,
+    shape_draft: Option<ShapeDraft>,
     selected: Option<u64>,
     drag: Option<DragState>,
     pan: egui::Vec2,
@@ -70,6 +71,7 @@ impl Default for EditorState {
         Self {
             tool: Tool::default(),
             draft: Vec::new(),
+            shape_draft: None,
             selected: None,
             drag: None,
             pan: egui::Vec2::ZERO,
@@ -118,6 +120,7 @@ impl EditorState {
 
     fn reset_document(&mut self) {
         self.draft.clear();
+        self.shape_draft = None;
         self.selected = None;
         self.drag = None;
         self.rename_buffer = None;
@@ -254,11 +257,19 @@ pub fn editor_ui(
         });
     });
 
-    egui::SidePanel::left("tools")
+    if *view_mode == ViewMode::Editor2d {
+        egui::SidePanel::left("tools")
+            .default_width(110.0)
+            .show(ctx, |ui| {
+                tools::show_panel(ui, &mut state.tool, state.language);
+            });
+    }
+
+    egui::SidePanel::left("sidebar")
         .default_width(220.0)
         .show(ctx, |ui| {
             if *view_mode == ViewMode::Editor2d {
-                tool_controls(ui, state);
+                view_controls(ui, state);
                 ui.separator();
             } else {
                 preview::show_controls(ui, &mut settings, state.language);
@@ -390,18 +401,9 @@ fn export(
     }
 }
 
-fn tool_controls(ui: &mut egui::Ui, state: &mut EditorState) {
+fn view_controls(ui: &mut egui::Ui, state: &mut EditorState) {
     let language = state.language;
-    ui.label(language.label(Label::Tool));
-    ui.horizontal(|ui| {
-        ui.selectable_value(&mut state.tool, Tool::Select, language.label(Label::Select));
-        ui.selectable_value(&mut state.tool, Tool::Draw, language.label(Label::Draw));
-    });
-    if state.tool == Tool::Draw {
-        ui.small(language.label(Label::DrawHint));
-    } else {
-        ui.small(language.label(Label::SelectHint));
-    }
+    ui.small(language.label(state.tool.hint()));
     ui.small(language.label(Label::NavigationHint));
     ui.horizontal(|ui| {
         ui.checkbox(
@@ -540,18 +542,22 @@ fn canvas(
         .or_else(|| response.interact_pointer_pos())
         .map(|position| view.to_world(position));
 
+    if state.tool != Tool::Draw {
+        state.draft.clear();
+    }
     match state.tool {
-        Tool::Select => {
-            state.draft.clear();
-            handle_select(ui, &response, view, project, events, state);
-        }
+        Tool::Select => handle_select(ui, &response, view, project, events, state),
         Tool::Draw => handle_draw(ui, &response, view, project, events, state),
+        Tool::Rectangle | Tool::Circle => {
+            handle_shape(ui, &response, view, project, events, state);
+        }
     }
 
     painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
     draw_grid(&painter, rect, view);
     draw_pieces(&painter, view, project, state);
     draw_draft(&painter, response.hover_pos(), view, project.units, state);
+    draw_shape_draft(&painter, view, project.units, state);
 }
 
 fn fit_view(rect: egui::Rect, project: &Project, state: &mut EditorState) {
@@ -711,17 +717,53 @@ fn finish_draft(
     events: &mut MessageWriter<ProjectMessage>,
     state: &EditorState,
 ) {
+    add_piece(project, events, state.language, state.draft.clone());
+}
+
+fn handle_shape(
+    ui: &egui::Ui,
+    response: &egui::Response,
+    view: Viewport,
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
+    state: &mut EditorState,
+) {
+    if response.drag_started_by(egui::PointerButton::Primary)
+        && let Some(origin) = ui.input(|input| input.pointer.press_origin())
+    {
+        let start = state.snap_point(view.to_world(origin));
+        state.shape_draft = Some(ShapeDraft { start, end: start });
+    }
+    if response.dragged_by(egui::PointerButton::Primary)
+        && let Some(position) = response.interact_pointer_pos()
+    {
+        let end = state.snap_point(view.to_world(position));
+        if let Some(draft) = &mut state.shape_draft {
+            draft.end = end;
+        }
+    }
+    if response.drag_stopped_by(egui::PointerButton::Primary)
+        && let Some(draft) = state.shape_draft.take()
+        && let Some(points) = state.tool.shape_points(draft.start, draft.end)
+    {
+        add_piece(project, events, state.language, points);
+    }
+    if !ui.ctx().wants_keyboard_input() && ui.input(|input| input.key_pressed(egui::Key::Escape)) {
+        state.shape_draft = None;
+    }
+}
+
+fn add_piece(
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
+    language: Language,
+    points: Vec<Point>,
+) {
     // The name is document content, so it stays in the language it was created in.
-    let name = state.language.message(&Message::DefaultPieceName {
+    let name = language.message(&Message::DefaultPieceName {
         id: project.next_piece_id(),
     });
-    send(
-        events,
-        ProjectEvent::AddPiece {
-            name,
-            points: state.draft.clone(),
-        },
-    );
+    send(events, ProjectEvent::AddPiece { name, points });
 }
 
 fn piece_at(project: &Project, point: Point) -> Option<u64> {
@@ -858,6 +900,40 @@ fn draw_draft(
             color,
         );
     }
+}
+
+fn draw_shape_draft(painter: &egui::Painter, view: Viewport, units: Units, state: &EditorState) {
+    let Some(draft) = state.shape_draft else {
+        return;
+    };
+    let Some(points) = state.tool.shape_points(draft.start, draft.end) else {
+        return;
+    };
+    let color = egui::Color32::from_rgb(110, 190, 240);
+    let screen: Vec<egui::Pos2> = points.iter().map(|point| view.to_screen(*point)).collect();
+    painter.add(egui::Shape::closed_line(
+        screen,
+        egui::Stroke::new(2.0, color),
+    ));
+    let language = state.language;
+    let dx = draft.end.x - draft.start.x;
+    let dy = draft.end.y - draft.start.y;
+    let size = if state.tool == Tool::Circle {
+        format!("Ø {}", format_length(language, units, dx.hypot(dy) * 2.0))
+    } else {
+        format!(
+            "{} × {}",
+            format_length(language, units, dx.abs()),
+            format_length(language, units, dy.abs())
+        )
+    };
+    painter.text(
+        view.to_screen(draft.end) + egui::vec2(10.0, -10.0),
+        egui::Align2::LEFT_BOTTOM,
+        size,
+        egui::FontId::proportional(12.0),
+        color,
+    );
 }
 
 fn format_length(language: Language, units: Units, millimeters: f64) -> String {

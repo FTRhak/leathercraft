@@ -2,11 +2,11 @@
 
 A map for finding code without reading whole files. It complements `CLAUDE.md`, which holds the architecture rules and invariants and isn't repeated here.
 
-Indexed at commit `833fa36`. Line numbers drift, so treat them as hints and search for the symbol name if one doesn't match.
+Indexed at commit `5afa155` plus the Tools panel change. Line numbers drift, so treat them as hints and search for the symbol name if one doesn't match.
 
 ## How to read this repo cheaply
 
-- **Start with this index, then read a line range.** All of `src/` is about 19k tokens, and `editor.rs` alone is about 7k.
+- **Start with this index, then read a line range.** All of `src/` is about 21k tokens, and `editor.rs` alone is about 7.5k.
 - **Never open or sweep these:**
   - `target/` (11 GB, about 7,700 files)
   - `.git/`
@@ -25,19 +25,23 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
-| `src/editor.rs` | 869 | 6,900 | bin | All egui UI: panels, canvas, tools, drawing |
+| `src/editor.rs` | 945 | 7,500 | bin | egui UI: panels, canvas, tool behavior, drawing |
+| `src/panels/tools/mod.rs` | 53 | 400 | bin | `Tool`, Tools panel |
 | `src/preview/mod.rs` | 247 | 2,100 | bin | 3D scene, camera, mesh extrusion |
 | `src/model.rs` | 314 | 2,200 | lib | `Project`, `PatternPiece`, `Point`, `Units`, validation |
 | `src/events.rs` | 213 | 1,700 | lib | `ProjectEvent`, `ProjectChange`, `Project::apply` |
-| `src/i18n/uk.rs` | 107 | 1,400 | lib | Ukrainian catalog, `plural` helper |
-| `src/i18n/mod.rs` | 170 | 1,200 | lib | `Language`, `Label`, `Message` |
-| `src/exports.rs` | 153 | 1,100 | lib | `to_svg`, `to_dxf`, `ExportError` |
-| `src/i18n/en.rs` | 84 | 1,000 | lib | English catalog |
+| `src/i18n/uk.rs` | 111 | 1,400 | lib | Ukrainian catalog, `plural` helper |
+| `src/i18n/mod.rs` | 174 | 1,200 | lib | `Language`, `Label`, `Message` |
+| `src/exports/mod.rs` | 105 | 700 | lib | `ExportError`, shared helpers, tests |
+| `src/exports/svg.rs` | 34 | 300 | lib | `to_svg` |
+| `src/exports/dxf.rs` | 24 | 200 | lib | `to_dxf` |
+| `src/shapes.rs` | 107 | 900 | lib | `rectangle`, `circle` |
+| `src/i18n/en.rs` | 88 | 1,000 | lib | English catalog |
 | `src/persistence.rs` | 92 | 700 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings.rs` | 52 | 400 | bin | Saved language in the OS config directory |
 | `src/document.rs` | 32 | 300 | bin | `ActiveProject`, `ProjectMessage`, `apply_project_events` |
-| `src/main.rs` | 32 | 250 | bin | App wiring and system schedule |
-| `src/lib.rs` | 5 | 20 | lib | Module declarations |
+| `src/main.rs` | 33 | 250 | bin | App wiring and system schedule |
+| `src/lib.rs` | 6 | 25 | lib | Module declarations |
 
 ## Library crate (core, no Bevy)
 
@@ -54,13 +58,17 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 98-213 | Tests |
 | `persistence.rs` | 7-35 | `save_project`, `load_project`, `write_export` |
 | | 37-92 | Tests |
-| `exports.rs` | 7-30 | `ExportError`, conversion to `Message` |
-| | 32-108 | `to_svg`, `to_dxf`, `validate_export`, `number` |
-| | 110-153 | Tests |
+| `exports/mod.rs` | 13-36 | `ExportError`, conversion to `Message` |
+| | 38-60 | `validate_export`, `number` |
+| | 61-105 | Tests |
+| `exports/svg.rs` | 4 | `to_svg` |
+| `exports/dxf.rs` | 4 | `to_dxf` |
+| `shapes.rs` | 1-39 | `CIRCLE_SEGMENTS`, `rectangle`, `circle` |
+| | 41-107 | Tests |
 | `i18n/mod.rs` | 10-62 | `Language`: `tag`, `from_tag`, `native_name`, `label`, `message`, `unit_symbol` |
-| | 66-97 | `Label` |
-| | 99-123 | `Message` |
-| | 134-170 | Tests |
+| | 66-101 | `Label` |
+| | 103-127 | `Message` |
+| | 137-174 | Tests |
 
 ## Binary crate (desktop)
 
@@ -68,19 +76,27 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 13-22 | Constants | Zoom limits, grid steps, hit radii |
-| 24-66 | Types | `ViewMode`, `Tool`, `DragState`, `EditorState` |
-| 68-177 | `EditorState` methods | `report`, `report_error`, `snap`, `on_project_change`, `clear_released_drag`, `displayed` |
-| 179-201 | Helpers | `document_name`, `Viewport` (`to_screen`, `to_world`) |
-| 203-279 | Top-level layout | `editor_ui` |
-| 281-391 | File bar | `send`, `file_buttons`, `language_control`, `confirm_discard`, `save_as`, `project_dialog`, `export` |
-| 393-502 | Side panel | `tool_controls`, `units_control`, `pieces_list` |
-| 504-571 | Canvas | `canvas`, `fit_view` |
-| 573-674 | Select tool | `handle_select`, `begin_drag`, `update_drag`, `finish_drag` |
-| 676-725 | Draw tool | `handle_draw`, `finish_draft` |
-| 727-741 | Hit testing | `piece_at`, `vertex_at` |
-| 743-861 | Painting | `draw_grid`, `draw_pieces`, `draw_draft` |
-| 863-869 | Formatting | `format_length` |
+| 14-23 | Constants | Zoom limits, grid steps, hit radii |
+| 25-67 | Types | `ViewMode`, `ShapeDraft`, `DragState`, `EditorState` |
+| 69-180 | `EditorState` methods | `report`, `report_error`, `snap`, `on_project_change`, `clear_released_drag`, `displayed` |
+| 182-204 | Helpers | `document_name`, `Viewport` (`to_screen`, `to_world`) |
+| 206-290 | Top-level layout | `editor_ui` |
+| 292-402 | File bar | `send`, `file_buttons`, `language_control`, `confirm_discard`, `save_as`, `project_dialog`, `export` |
+| 404-504 | Sidebar | `view_controls`, `units_control`, `pieces_list` |
+| 506-577 | Canvas | `canvas`, `fit_view` |
+| 579-680 | Select tool | `handle_select`, `begin_drag`, `update_drag`, `finish_drag` |
+| 682-721 | Draw tool | `handle_draw`, `finish_draft` |
+| 723-767 | Rectangle and Circle tools | `handle_shape`, `add_piece` |
+| 769-783 | Hit testing | `piece_at`, `vertex_at` |
+| 785-937 | Painting | `draw_grid`, `draw_pieces`, `draw_draft`, `draw_shape_draft` |
+| 939-945 | Formatting | `format_length` |
+
+### `panels/tools/mod.rs`
+
+| Lines | Symbols |
+|---:|---|
+| 6-44 | `Tool`: `ALL`, `label`, `hint`, `shape_points` |
+| 46-53 | `show_panel` |
 
 ### `preview/mod.rs`
 
@@ -101,15 +117,15 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add a validation rule | `model.rs` 6-10, 160-213 | `validate`, plus a `Message` variant and both catalogs |
 | Add UI text | `i18n/mod.rs` 66-123 | A `Label` or `Message` variant and an arm in `en.rs` and `uk.rs`; the compiler flags missing arms |
 | Add a language | `i18n/mod.rs` 10-62 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
-| Add a canvas tool | `editor.rs` 24-66, 504-556, 676-725 | `Tool`, `tool_controls`, a dispatch arm in `canvas` |
+| Add a canvas tool | `panels/tools/mod.rs`, `editor.rs` 506-561, 723-767 | `Tool` and its `ALL`, `label`, `hint`, a dispatch arm in `canvas`; a predefined shape also goes in `shapes.rs` |
 | Change the file format | `model.rs` 124-134, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
-| Change SVG or DXF output | `exports.rs` 32-108 | `to_svg` or `to_dxf` |
+| Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
 | Change the 3D look or mesh | `preview/mod.rs` 49-119, 155-247 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
 | Change system scheduling | `main.rs`, `document.rs` | Keep the ordering rule in `CLAUDE.md` |
 
 ## Tests
 
-There are 17 tests, all inline in the library crate:
+There are 21 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
@@ -118,8 +134,9 @@ There are 17 tests, all inline in the library crate:
 | `i18n` | 4 |
 | `exports` | 3 |
 | `persistence` | 2 |
+| `shapes` | 4 |
 
-`document`, `editor`, `preview` and `settings` have no tests, so changes there need `cargo check` and a manual run.
+`document`, `editor`, `preview`, `settings` and `tools` have no tests, so changes there need `cargo check` and a manual run.
 
 ## Docs
 
@@ -127,7 +144,8 @@ There are 17 tests, all inline in the library crate:
 |---|---|
 | `CLAUDE.md` | Current. Loaded automatically in every session, so keep it short. |
 | `docs/plan.md` | Historical MVP plan. It still says the repo contains only a license. Its todo 6 asks for build and run docs, and there is no README; `CLAUDE.md` only lists the commands. |
-| `docs/localization.md` | Historical plan for finished work (~1,700 tokens). It refers to `src/preview.rs`, which is now `src/preview/mod.rs`. Read the "Decisions" and "Out of scope" sections only if you need the reasoning. |
+| `docs/plans/localization.md` | Historical plan for finished work (~1,700 tokens). It refers to `src/preview.rs`, which is now `src/preview/mod.rs`. Read the "Decisions" and "Out of scope" sections only if you need the reasoning. |
+| `docs/plans/add-tools-panel-where-harmonic-nautilus.md` | Historical plan for the Tools panel. |
 
 ## Refreshing this index
 

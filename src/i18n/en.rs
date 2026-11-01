@@ -15,15 +15,19 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::UnsavedChanges => "Unsaved changes",
         Label::DiscardChanges => "Discard the unsaved changes to this project?",
         Label::ProjectFileType => "Leathercraft project",
-        Label::Tool => "Tool",
+        Label::Tools => "Tools",
         Label::Select => "Select",
         Label::Draw => "Draw",
+        Label::Rectangle => "Rectangle",
+        Label::Circle => "Circle",
+        Label::RectangleHint => "Drag from corner to corner. Esc cancels.",
+        Label::CircleHint => "Drag from the center outward. Esc cancels.",
         Label::DrawHint => {
             "Click to add points. Click the first point or press Enter to close; Esc cancels."
-        },
+        }
         Label::SelectHint => {
             "Drag a piece or a vertex of the selected piece. Del removes the selected piece."
-        },
+        }
         Label::NavigationHint => "Right or middle drag pans; scroll zooms.",
         Label::SnapMillimeters => "Snap (mm)",
         Label::ZoomToFit => "Zoom to fit",
@@ -52,21 +56,21 @@ pub(super) fn message(message: &Message) -> String {
         Message::PieceNotFound { id } => format!("Piece {id} does not exist."),
         Message::UnsupportedVersion { found, expected } => {
             format!("Project version {found} is not supported (expected {expected}).")
-        },
+        }
         Message::TooManyPieces { max } => format!("A project can contain at most {max} pieces."),
         Message::InvalidPieceId { name } => {
             format!("Piece '{name}' has an invalid or duplicate ID.")
-        },
+        }
         Message::PieceNameRequired { id } => format!("Piece {id} must have a name."),
         Message::PointCountOutOfRange { name, max } => {
             format!("Piece '{name}' must have between 3 and {max} points.")
-        },
+        }
         Message::CoordinateOutOfRange { name } => {
             format!("Piece '{name}' has a point outside the supported coordinate range.")
-        },
+        }
         Message::CoincidentPoints { name } => {
             format!("Piece '{name}' has two consecutive points in the same position.")
-        },
+        }
         Message::ZeroArea { name } => format!("Piece '{name}' must enclose a non-zero area."),
         Message::CouldNotEncode { detail } => format!("Could not encode project: {detail}"),
         Message::CouldNotRead { path, detail } => format!("Could not read '{path}': {detail}"),

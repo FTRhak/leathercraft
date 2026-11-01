@@ -1,5 +1,6 @@
 mod document;
 mod editor;
+mod panels;
 mod preview;
 mod settings;
 

@@ -3,3 +3,4 @@ pub mod exports;
 pub mod i18n;
 pub mod model;
 pub mod persistence;
+pub mod shapes;

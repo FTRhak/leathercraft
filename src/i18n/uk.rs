@@ -15,18 +15,22 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::UnsavedChanges => "Незбережені зміни",
         Label::DiscardChanges => "Відкинути незбережені зміни в цьому проєкті?",
         Label::ProjectFileType => "Проєкт Leathercraft",
-        Label::Tool => "Інструмент",
+        Label::Tools => "Інструменти",
         Label::Select => "Вибір",
         Label::Draw => "Малювання",
+        Label::Rectangle => "Прямокутник",
+        Label::Circle => "Коло",
+        Label::RectangleHint => "Перетягуйте від кута до кута. Esc скасовує.",
+        Label::CircleHint => "Перетягуйте від центру назовні. Esc скасовує.",
         Label::DrawHint => {
             "Клацайте, щоб додавати точки. Клацніть першу точку або натисніть Enter, щоб замкнути контур; Esc скасовує."
-        },
+        }
         Label::SelectHint => {
             "Перетягуйте деталь або вершину вибраної деталі. Del видаляє вибрану деталь."
-        },
+        }
         Label::NavigationHint => {
             "Перетягування правою або середньою кнопкою зсуває вигляд; коліщатко змінює масштаб."
-        },
+        }
         Label::SnapMillimeters => "Прив’язка (мм)",
         Label::ZoomToFit => "Показати все",
         Label::DisplayUnits => "Одиниці виміру",
@@ -51,41 +55,41 @@ pub(super) fn message(message: &Message) -> String {
         Message::PointCount { count } => {
             let noun = plural(*count, "точка", "точки", "точок");
             format!("{count} {noun}")
-        },
+        }
         Message::DefaultPieceName { id } => format!("Деталь {id}"),
         Message::PieceNotFound { id } => format!("Деталь {id} не існує."),
         Message::UnsupportedVersion { found, expected } => {
             format!("Версія проєкту {found} не підтримується (очікується {expected}).")
-        },
+        }
         Message::TooManyPieces { max } => {
             format!("Проєкт може містити не більше ніж {max} деталей.")
-        },
+        }
         Message::InvalidPieceId { name } => {
             format!("Деталь «{name}» має недійсний або повторюваний ідентифікатор.")
-        },
+        }
         Message::PieceNameRequired { id } => format!("Деталь {id} повинна мати назву."),
         Message::PointCountOutOfRange { name, max } => {
             format!("Деталь «{name}» повинна мати від 3 до {max} точок.")
-        },
+        }
         Message::CoordinateOutOfRange { name } => {
             format!("Деталь «{name}» має точку поза підтримуваним діапазоном координат.")
-        },
+        }
         Message::CoincidentPoints { name } => {
             format!("Деталь «{name}» має дві послідовні точки в одному місці.")
-        },
+        }
         Message::ZeroArea { name } => {
             format!("Деталь «{name}» повинна охоплювати ненульову площу.")
-        },
+        }
         Message::CouldNotEncode { detail } => format!("Не вдалося закодувати проєкт: {detail}"),
         Message::CouldNotRead { path, detail } => {
             format!("Не вдалося прочитати «{path}»: {detail}")
-        },
+        }
         Message::CouldNotParse { path, detail } => {
             format!("Не вдалося розібрати «{path}»: {detail}")
         }
         Message::CouldNotWrite { path, detail } => {
             format!("Не вдалося записати «{path}»: {detail}")
-        },
+        }
         Message::ExportEmpty => "Додайте принаймні одну деталь перед експортом.".to_owned(),
     }
 }
