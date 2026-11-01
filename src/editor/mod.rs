@@ -1,5 +1,6 @@
 mod confirm_discard;
 mod drag;
+mod grid;
 mod ui;
 
 pub use ui::editor_ui;
@@ -10,6 +11,7 @@ use crate::settings::PanelVisibility;
 use bevy::prelude::*;
 use bevy_egui::egui;
 use drag::{begin_drag, finish_drag, update_drag};
+use grid::draw_grid;
 use leathercraft::events::{ProjectChange, ProjectEvent};
 use leathercraft::exports::ExportError;
 use leathercraft::i18n::{Label, Language, Message};
@@ -21,10 +23,6 @@ use std::borrow::Cow;
 const PROJECT_EXTENSION: &str = "leathercraft";
 const MIN_ZOOM: f32 = 0.05;
 const MAX_ZOOM: f32 = 100.0;
-const GRID_STEPS_MM: [f64; 9] = [
-    1.0, 5.0, 10.0, 50.0, 100.0, 500.0, 1_000.0, 5_000.0, 10_000.0,
-];
-const MIN_GRID_SPACING_PX: f64 = 12.0;
 const VERTEX_HIT_RADIUS_PX: f32 = 8.0;
 const CLOSE_HIT_RADIUS_PX: f32 = 10.0;
 const MAX_POINTS_WITH_EDGE_LABELS: usize = 64;
@@ -546,31 +544,6 @@ fn vertex_at(piece: &PatternPiece, position: egui::Pos2, view: Viewport) -> Opti
         .points
         .iter()
         .position(|point| view.to_screen(*point).distance(position) <= VERTEX_HIT_RADIUS_PX)
-}
-
-fn draw_grid(painter: &egui::Painter, rect: egui::Rect, view: Viewport) {
-    let zoom = f64::from(view.zoom);
-    let step = GRID_STEPS_MM
-        .into_iter()
-        .find(|step| step * zoom >= MIN_GRID_SPACING_PX)
-        .unwrap_or(GRID_STEPS_MM[GRID_STEPS_MM.len() - 1]);
-    let top_left = view.to_world(rect.left_top());
-    let bottom_right = view.to_world(rect.right_bottom());
-    let line = egui::Stroke::new(1.0, egui::Color32::from_gray(60));
-    let axis = egui::Stroke::new(1.5, egui::Color32::from_gray(110));
-
-    let first_x = (top_left.x / step).floor() as i64;
-    let last_x = (bottom_right.x / step).ceil() as i64;
-    for index in first_x..=last_x {
-        let x = view.to_screen(Point::new(index as f64 * step, 0.0)).x;
-        painter.vline(x, rect.y_range(), if index == 0 { axis } else { line });
-    }
-    let first_y = (top_left.y / step).floor() as i64;
-    let last_y = (bottom_right.y / step).ceil() as i64;
-    for index in first_y..=last_y {
-        let y = view.to_screen(Point::new(0.0, index as f64 * step)).y;
-        painter.hline(rect.x_range(), y, if index == 0 { axis } else { line });
-    }
 }
 
 fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state: &EditorState) {
