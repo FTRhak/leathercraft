@@ -6,7 +6,7 @@ Indexed at commit `5afa155` plus the Tools and Layout panel and material changes
 
 ## How to read this repo cheaply
 
-- **Start with this index, then read a line range.** All of `src/` is about 34k tokens, and `editor.rs` alone is about 8k.
+- **Start with this index, then read a line range.** All of `src/` is about 34k tokens, and `editor/mod.rs` alone is about 7k.
 - **Never open or sweep these:**
   - `target/` (11 GB, about 7,700 files)
   - `.git/`
@@ -25,7 +25,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
-| `src/editor.rs` | 1018 | 8,100 | bin | egui UI: panels, canvas, tool behavior, drawing |
+| `src/editor/mod.rs` | 713 | 5,600 | bin | `EditorState`, menu helpers, sidebar, canvas, tool behavior, drawing |
+| `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
+| `src/editor/drag.rs` | 79 | 550 | bin | `begin_drag`, `update_drag`, `finish_drag`: dragging pieces and vertices with the Select tool |
+| `src/editor/ui.rs` | 245 | 2,200 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top-level panel layout, menus, Delete key, language picker |
 | `src/panels/mod.rs` | 31 | 250 | bin | Shared `icon_button` |
 | `src/panels/tools/mod.rs` | 100 | 800 | bin | `Tool`, painted tool icons, Tools panel |
 | `src/panels/layout/mod.rs` | 127 | 900 | bin | Layout panel: piece tree, lock and delete buttons |
@@ -82,25 +85,34 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Binary crate (desktop)
 
-### `editor.rs`
+### `editor/mod.rs`
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 17-26 | Constants | Zoom limits, grid steps, hit radii |
-| 28-73 | Types | `ViewMode`, `ShapeDraft`, `DragState`, `EditorState` |
-| 75-192 | `EditorState` methods | `report`, `report_error`, `snap`, `on_project_change`, `clear_released_drag`, `displayed` |
-| 194-216 | Helpers | `document_name`, `Viewport` (`to_screen`, `to_world`) |
-| 218-351 | Top-level layout | `editor_ui`, which also shows the new-project dialog and applies panel visibility |
-| 353-372 | Input | `send`, `handle_delete_key` |
-| 374-495 | Menu bar | `file_menu`, `window_menu`, `language_control`, `confirm_discard`, `save_as`, `project_dialog`, `export` |
-| 497-581 | Sidebar | `view_controls`, `units_control`, `selected_piece_details` |
-| 583-654 | Canvas | `canvas`, `fit_view` |
-| 656-751 | Select tool | `handle_select`, `begin_drag`, `update_drag`, `finish_drag` |
-| 753-792 | Draw tool | `handle_draw`, `finish_draft` |
-| 794-838 | Rectangle and Circle tools | `handle_shape`, `add_piece` |
-| 840-854 | Hit testing | `piece_at`, `vertex_at` |
-| 856-1010 | Painting | `draw_grid`, `draw_pieces`, `draw_draft`, `draw_shape_draft` |
-| 1012-1018 | Formatting | `format_length` |
+| 21-30 | Constants | Zoom limits, grid steps, hit radii |
+| 32-77 | Types | `ViewMode`, `ShapeDraft`, `DragState`, `EditorState` |
+| 79-196 | `EditorState` methods | `report`, `report_error`, `snap`, `on_project_change`, `clear_released_drag`, `displayed` |
+| 198-220 | Helpers | `document_name`, `Viewport` (`to_screen`, `to_world`) |
+| 222-224 | Events | `send` |
+| 226-258 | Menu bar helpers | `export` |
+| 260-344 | Sidebar | `view_controls`, `units_control`, `selected_piece_details` |
+| 346-417 | Canvas | `canvas`, `fit_view` |
+| 419-446 | Select tool | `handle_select` |
+| 448-487 | Draw tool | `handle_draw`, `finish_draft` |
+| 489-533 | Rectangle and Circle tools | `handle_shape`, `add_piece` |
+| 535-549 | Hit testing | `piece_at`, `vertex_at` |
+| 551-705 | Painting | `draw_grid`, `draw_pieces`, `draw_draft`, `draw_shape_draft` |
+| 707-713 | Formatting | `format_length` |
+
+### `editor/ui.rs`
+
+| Lines | Area | Symbols |
+|---:|---|---|
+| 18-151 | Top-level layout | `editor_ui`, which also shows the new-project dialog and applies panel visibility |
+| 153-200 | Menus | `file_menu`, `window_menu` |
+| 202-217 | Input | `handle_delete_key` |
+| 219-232 | Language | `language_control` |
+| 234-245 | File dialog | `project_dialog`, `save_as` |
 
 ### `panels/`
 
@@ -134,11 +146,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Task | Read | Change |
 |---|---|---|
-| Add a project edit | `events.rs` 9-121 | Add a `ProjectEvent` variant and handle it in `apply`, then send it from `editor.rs` with `send` |
+| Add a project edit | `events.rs` 9-121 | Add a `ProjectEvent` variant and handle it in `apply`, then send it from `editor/mod.rs` with `send` |
 | Add a validation rule | `model.rs` 7-11, 173-234 | `validate`, plus a `Message` variant and both catalogs |
 | Add UI text | `i18n/mod.rs` 70-166 | A `Label` or `Message` variant and an arm in `en.rs` and `uk.rs`; the compiler flags missing arms |
 | Add a language | `i18n/mod.rs` 14-66 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
-| Add a canvas tool | `panels/tools/mod.rs`, `editor.rs` 583-638, 794-838 | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`; a predefined shape also goes in `shapes.rs` |
+| Add a canvas tool | `panels/tools/mod.rs`, `editor/mod.rs` 346-401, 489-533 | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`; a predefined shape also goes in `shapes.rs` |
 | Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material` and `material_fields` |
 | Change the file format | `model.rs` 133-146, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
@@ -179,4 +191,4 @@ To regenerate the symbol list and line numbers:
 rg -n "^\s*(pub(\(\w+\))? )?(fn|struct|enum|trait|impl|mod|const) " src
 ```
 
-Update it when a file is added, moved or split, or when `editor.rs` is restructured. Small line drift doesn't need a refresh.
+Update it when a file is added, moved or split, or when `editor/mod.rs` is restructured. Small line drift doesn't need a refresh.
