@@ -103,7 +103,6 @@ pub fn show_panel(
     language: Language,
 ) -> Option<ProjectEvent> {
     let mut event = None;
-    ui.label(language.label(Label::Layout));
     egui::ScrollArea::vertical().show(ui, |ui| {
         egui::CollapsingHeader::new(language.label(Label::Pieces))
             .id_salt("layout_pieces")

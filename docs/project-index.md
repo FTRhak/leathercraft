@@ -2,7 +2,7 @@
 
 A map for finding code without reading whole files. It complements `CLAUDE.md`, which holds the architecture rules and invariants and isn't repeated here.
 
-Indexed at commit `5afa155` plus the Tools and Layout panel and material changes. Line numbers drift, so treat them as hints and search for the symbol name if one doesn't match.
+Indexed at commit `5afa155` plus the Tools and Layout panel, material and dockable panel changes. Line numbers drift, so treat them as hints and search for the symbol name if one doesn't match.
 
 ## How to read this repo cheaply
 
@@ -33,8 +33,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
 | `src/editor/drag.rs` | 80 | 600 | bin | `begin_drag`, `update_drag`, `finish_drag`: dragging pieces and vertices with the Select tool |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
-| `src/editor/ui.rs` | 245 | 2,200 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top-level panel layout, menus, Delete key, language picker |
-| `src/panels/mod.rs` | 31 | 250 | bin | Shared `icon_button` |
+| `src/editor/ui.rs` | 219 | 2,000 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete key, language picker |
+| `src/editor/panel_viewer.rs` | 102 | 800 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab |
+| `src/panels/mod.rs` | 32 | 250 | bin | Shared `icon_button` |
+| `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
 | `src/panels/tools/mod.rs` | 100 | 800 | bin | `Tool`, painted tool icons, Tools panel |
 | `src/panels/layout/mod.rs` | 127 | 900 | bin | Layout panel: piece tree, lock and delete buttons |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
@@ -50,7 +52,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/shapes.rs` | 107 | 900 | lib | `rectangle`, `circle` |
 | `src/i18n/en.rs` | 351 | 3,500 | lib | English catalog |
 | `src/persistence.rs` | 175 | 1,400 | lib | `save_project`, `load_project`, `write_export` |
-| `src/settings.rs` | 89 | 650 | bin | Saved language and `PanelVisibility` in the OS config directory |
+| `src/settings.rs` | 71 | 500 | bin | Saved language and panel layout in the OS config directory |
 | `src/document.rs` | 32 | 300 | bin | `ActiveProject`, `ProjectMessage`, `apply_project_events` |
 | `src/main.rs` | 36 | 250 | bin | App wiring and system schedule |
 | `src/lib.rs` | 6 | 25 | lib | Module declarations |
@@ -126,17 +128,20 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 18-151 | Top-level layout | `editor_ui`, which also shows the new-project dialog and applies panel visibility |
-| 153-200 | Menus | `file_menu`, `window_menu` |
-| 202-217 | Input | `handle_delete_key` |
-| 219-232 | Language | `language_control` |
-| 234-245 | File dialog | `project_dialog`, `save_as` |
+| 18-119 | Top-level layout | `editor_ui`, which also shows the dock area and the new-project dialog |
+| 121-173 | Menus | `file_menu`, `window_menu` |
+| 175-190 | Input | `handle_delete_key` |
+| 192-206 | Language | `language_control` |
+| 208-219 | File dialog | `project_dialog`, `save_as` |
 
 ### `panels/`
 
 | File | Lines | Symbols |
 |---|---:|---|
-| `mod.rs` | 7 | `icon_button` |
+| `mod.rs` | 8 | `icon_button` |
+| `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
+| | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
+| | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
 | `tools/mod.rs` | 7-9 | Icon constants: `ICON_BUTTON_SIZE`, `ICON_MARGIN`, `ICON_VERTEX_RADIUS` |
 | | 11-81 | `Tool`: `ALL`, `label`, `hint`, `shape_points`, `paint_icon` |
 | | 83 | `show_panel` |
@@ -173,6 +178,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Change the file format | `model.rs` 133-146, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
 | Change the 3D look or mesh | `preview/mod.rs` 48-118, 154-247 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
+| Add a dockable panel | `panels/dock/mod.rs`, `editor/panel_viewer.rs` | A `PanelTab` variant, its `CLOSEABLE` and `label` entries, `default_state`, and arms in `PanelViewer::ui` and `scroll_bars` |
 | Change system scheduling | `main.rs`, `document.rs` | Keep the ordering rule in `CLAUDE.md` |
 
 ## Tests

@@ -192,7 +192,6 @@ pub fn show_panel(
     selected: Option<u64>,
     language: Language,
 ) -> Option<ProjectEvent> {
-    ui.label(language.label(Label::Material));
     let Some(piece) = selected.and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
     else {
         ui.weak(language.label(Label::NoPieceSelected));

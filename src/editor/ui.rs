@@ -1,15 +1,15 @@
 use super::{
-    EditorState, PROJECT_EXTENSION, ViewMode, canvas, confirm_discard::confirm_discard, export,
-    format_length, selected_piece_details, send, units_control, view_controls,
+    EditorState, PROJECT_EXTENSION, ViewMode, confirm_discard::confirm_discard, export,
+    format_length, panel_viewer::PanelViewer, send,
 };
 use crate::document::{ActiveProject, ProjectMessage};
-use crate::panels::layout;
+use crate::panels::dock::{PanelDock, PanelTab};
 use crate::panels::material::{self, DialogResult};
-use crate::panels::tools;
-use crate::preview::{self, PreviewSettings};
+use crate::preview::PreviewSettings;
 use crate::settings;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
+use egui_dock::DockArea;
 use leathercraft::events::ProjectEvent;
 use leathercraft::exports;
 use leathercraft::i18n::{Label, Language};
@@ -22,10 +22,12 @@ pub fn editor_ui(
     mut state: ResMut<EditorState>,
     mut view_mode: ResMut<ViewMode>,
     mut settings: ResMut<PreviewSettings>,
+    mut dock: ResMut<PanelDock>,
 ) -> Result {
     let ctx: &egui::Context = contexts.ctx_mut()?;
     let project: &Project = &project;
     let state = &mut *state;
+    let dock = &mut *dock;
 
     egui::TopBottomPanel::top("file_bar").show(ctx, |ui| {
         ui.horizontal(|ui| {
@@ -41,7 +43,7 @@ pub fn editor_ui(
                     egui::containers::menu::MenuConfig::new()
                         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside),
                 )
-                .ui(ui, |ui| window_menu(ui, state));
+                .ui(ui, |ui| window_menu(ui, state, dock));
             ui.separator();
             ui.selectable_value(
                 &mut *view_mode,
@@ -54,7 +56,7 @@ pub fn editor_ui(
                 language.label(Label::Preview3d),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                language_control(ui, state);
+                language_control(ui, state, dock);
             });
         });
     });
@@ -80,61 +82,27 @@ pub fn editor_ui(
         });
     });
 
-    if *view_mode == ViewMode::Editor2d && state.panels.tools {
-        egui::SidePanel::left("tools")
-            .default_width(110.0)
-            .show(ctx, |ui| {
-                tools::show_panel(ui, &mut state.tool, state.language);
-            });
-    }
-
-    egui::SidePanel::left("sidebar")
-        .default_width(220.0)
-        .show(ctx, |ui| {
-            if *view_mode == ViewMode::Editor2d {
-                view_controls(ui, state);
-                ui.separator();
-            } else {
-                preview::show_controls(ui, &mut settings, state.language);
-                ui.separator();
-            }
-            units_control(ui, project, &mut events, state.language);
-            ui.separator();
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                selected_piece_details(ui, project, &mut events, state);
-            });
-        });
-
-    if state.panels.layout {
-        egui::SidePanel::right("layout")
-            .default_width(200.0)
-            .show(ctx, |ui| {
-                let event = layout::show_panel(ui, project, &mut state.selected, state.language);
-                if let Some(event) = event {
-                    send(&mut events, event);
-                }
-            });
-    }
-
-    if state.panels.material {
-        egui::SidePanel::right("material")
-            .default_width(300.0)
-            .show(ctx, |ui| {
-                let event = material::show_panel(ui, project, state.selected, state.language);
-                if let Some(event) = event {
-                    send(&mut events, event);
-                }
-            });
-    }
-
     handle_delete_key(ctx, &mut events, state);
 
-    // In preview mode no central panel is drawn, so the 3D scene shows through.
-    if *view_mode == ViewMode::Editor2d {
-        egui::CentralPanel::default().show(ctx, |ui| canvas(ui, project, &mut events, state));
-    } else {
-        state.cursor = None;
-    }
+    // The canvas sets this again if its tab is showing.
+    state.cursor = None;
+    let bounds = ctx.available_rect();
+    // The central panel `show` adds is transparent, so the 3D scene shows through in preview mode.
+    DockArea::new(&mut dock.state)
+        .window_bounds(bounds)
+        .show_leaf_close_all_buttons(false)
+        .show_leaf_collapse_buttons(false)
+        .show(
+            ctx,
+            &mut PanelViewer {
+                project,
+                events: &mut events,
+                state,
+                view_mode: *view_mode,
+                settings: &mut settings,
+            },
+        );
+    dock.save_on_release(ctx);
 
     if let Some(material) = &mut state.new_project_dialog {
         match material::new_project_dialog(ctx, material, state.language) {
@@ -187,15 +155,20 @@ fn file_menu(
     }
 }
 
-fn window_menu(ui: &mut egui::Ui, state: &mut EditorState) {
+fn window_menu(ui: &mut egui::Ui, state: &EditorState, dock: &mut PanelDock) {
     let language = state.language;
-    let mut panels = state.panels;
-    ui.toggle_value(&mut panels.tools, language.label(Label::Tools));
-    ui.toggle_value(&mut panels.layout, language.label(Label::Layout));
-    ui.toggle_value(&mut panels.material, language.label(Label::Material));
-    if panels != state.panels {
-        state.panels = panels;
-        settings::save_panels(panels);
+    for tab in PanelTab::CLOSEABLE {
+        let mut open = dock.is_open(tab);
+        if ui
+            .toggle_value(&mut open, language.label(tab.label()))
+            .changed()
+        {
+            dock.toggle(tab, ui.ctx().content_rect().center());
+        }
+    }
+    ui.separator();
+    if ui.button(language.label(Label::ResetPanels)).clicked() {
+        dock.reset(language);
     }
 }
 
@@ -216,7 +189,7 @@ fn handle_delete_key(
     }
 }
 
-fn language_control(ui: &mut egui::Ui, state: &mut EditorState) {
+fn language_control(ui: &mut egui::Ui, state: &mut EditorState, dock: &mut PanelDock) {
     let mut language = state.language;
     egui::ComboBox::from_label(language.label(Label::Language))
         .selected_text(language.native_name())
@@ -228,6 +201,7 @@ fn language_control(ui: &mut egui::Ui, state: &mut EditorState) {
     if language != state.language {
         state.language = language;
         settings::save_language(language);
+        dock.set_language(language);
     }
 }
 

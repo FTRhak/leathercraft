@@ -9,9 +9,11 @@ use bevy::window::{Window, WindowPlugin};
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 use document::{ActiveProject, ProjectMessage};
 use editor::{EditorState, ViewMode};
+use panels::dock::PanelDock;
 use preview::PreviewPlugin;
 
 fn main() {
+    let language = settings::load_language();
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -23,10 +25,8 @@ fn main() {
         .add_plugins((EguiPlugin::default(), PreviewPlugin))
         .add_message::<ProjectMessage>()
         .init_resource::<ActiveProject>()
-        .insert_resource(EditorState::new(
-            settings::load_language(),
-            settings::load_panels(),
-        ))
+        .insert_resource(EditorState::new(language))
+        .insert_resource(PanelDock::load(language))
         .init_resource::<ViewMode>()
         .add_systems(
             EguiPrimaryContextPass,

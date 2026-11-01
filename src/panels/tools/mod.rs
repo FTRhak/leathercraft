@@ -81,7 +81,6 @@ impl Tool {
 }
 
 pub fn show_panel(ui: &mut egui::Ui, tool: &mut Tool, language: Language) {
-    ui.label(language.label(Label::Tools));
     ui.horizontal_wrapped(|ui| {
         for option in Tool::ALL {
             let name = language.label(option.label());

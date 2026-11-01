@@ -1,6 +1,5 @@
 use super::{DragState, ShapeDraft};
 use crate::panels::tools::Tool;
-use crate::settings::PanelVisibility;
 use bevy::prelude::*;
 use bevy_egui::egui;
 use leathercraft::events::ProjectChange;
@@ -25,7 +24,6 @@ pub struct EditorState {
     /// The material being chosen while the new-project dialog is open.
     pub(super) new_project_dialog: Option<Material>,
     pub(super) language: Language,
-    pub(super) panels: PanelVisibility,
     /// Kept untranslated so that it follows a change of language.
     pub(super) status: Message,
     pub(super) status_is_error: bool,
@@ -48,7 +46,6 @@ impl Default for EditorState {
             rename_buffer: None,
             new_project_dialog: None,
             language: Language::default(),
-            panels: PanelVisibility::default(),
             status: Message::Ready,
             status_is_error: false,
             cursor: None,
@@ -57,10 +54,9 @@ impl Default for EditorState {
 }
 
 impl EditorState {
-    pub fn new(language: Language, panels: PanelVisibility) -> Self {
+    pub fn new(language: Language) -> Self {
         Self {
             language,
-            panels,
             ..Self::default()
         }
     }

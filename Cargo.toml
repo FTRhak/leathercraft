@@ -15,7 +15,7 @@ required-features = ["desktop"]
 
 [features]
 default = ["desktop"]
-desktop = ["dep:bevy", "dep:bevy_egui", "dep:dirs", "dep:earcutr", "dep:rfd", "dep:sys-locale"]
+desktop = ["dep:bevy", "dep:bevy_egui", "dep:dirs", "dep:earcutr", "dep:egui_dock", "dep:rfd", "dep:sys-locale"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -24,5 +24,6 @@ bevy = { version = "0.18.1", optional = true }
 bevy_egui = { version = "0.39.1", optional = true }
 dirs = { version = "6", optional = true }
 earcutr = { version = "0.4", optional = true }
+egui_dock = { version = "0.18", features = ["serde"], optional = true }
 rfd = { version = "0.15", optional = true }
 sys-locale = { version = "0.3", optional = true }
