@@ -4,6 +4,7 @@ use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy_egui::egui;
 use earcutr::earcut;
+use leathercraft::i18n::{Label, Language};
 use leathercraft::model::PatternPiece;
 
 // Scene units per millimeter; the scene is scaled up, so this is not a meters conversion.
@@ -126,11 +127,19 @@ pub fn update_camera(
     }
 }
 
-pub fn show_controls(ui: &mut egui::Ui, settings: &mut PreviewSettings) {
-    ui.label("Camera");
-    ui.add(egui::Slider::new(&mut settings.azimuth, 0.0..=std::f32::consts::TAU).text("Orbit"));
-    ui.add(egui::Slider::new(&mut settings.elevation, 0.12..=1.48).text("Tilt"));
-    ui.add(egui::Slider::new(&mut settings.distance, MIN_DISTANCE..=MAX_DISTANCE).text("Zoom"));
+pub fn show_controls(ui: &mut egui::Ui, settings: &mut PreviewSettings, language: Language) {
+    ui.label(language.label(Label::Camera));
+    ui.add(
+        egui::Slider::new(&mut settings.azimuth, 0.0..=std::f32::consts::TAU)
+            .text(language.label(Label::Orbit)),
+    );
+    ui.add(
+        egui::Slider::new(&mut settings.elevation, 0.12..=1.48).text(language.label(Label::Tilt)),
+    );
+    ui.add(
+        egui::Slider::new(&mut settings.distance, MIN_DISTANCE..=MAX_DISTANCE)
+            .text(language.label(Label::Zoom)),
+    );
 }
 
 fn build_piece_mesh(piece: &PatternPiece, center_x: f32, center_z: f32) -> Result<Mesh, String> {

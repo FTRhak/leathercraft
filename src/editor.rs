@@ -1,9 +1,11 @@
 use crate::document::{ActiveProject, ProjectMessage};
 use crate::preview::{self, PreviewSettings};
+use crate::settings;
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
 use leathercraft::events::{ProjectChange, ProjectEvent};
 use leathercraft::exports::{self, ExportError};
+use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{PatternPiece, Point, Project, Units};
 use leathercraft::persistence;
 use std::borrow::Cow;
@@ -56,7 +58,9 @@ pub struct EditorState {
     snap_enabled: bool,
     snap_mm: f64,
     rename_buffer: Option<String>,
-    status: String,
+    language: Language,
+    /// Kept untranslated so that it follows a change of language.
+    status: Message,
     status_is_error: bool,
     cursor: Option<Point>,
 }
@@ -74,7 +78,8 @@ impl Default for EditorState {
             snap_enabled: true,
             snap_mm: 1.0,
             rename_buffer: None,
-            status: "Ready.".to_owned(),
+            language: Language::default(),
+            status: Message::Ready,
             status_is_error: false,
             cursor: None,
         }
@@ -82,13 +87,20 @@ impl Default for EditorState {
 }
 
 impl EditorState {
-    fn report(&mut self, message: impl Into<String>) {
-        self.status = message.into();
+    pub fn new(language: Language) -> Self {
+        Self {
+            language,
+            ..Self::default()
+        }
+    }
+
+    fn report(&mut self, message: Message) {
+        self.status = message;
         self.status_is_error = false;
     }
 
-    pub fn report_error(&mut self, message: impl Into<String>) {
-        self.status = message.into();
+    pub fn report_error(&mut self, message: Message) {
+        self.status = message;
         self.status_is_error = true;
     }
 
@@ -116,24 +128,32 @@ impl EditorState {
         match change {
             ProjectChange::Created => {
                 self.reset_document();
-                self.report("New project.");
+                self.report(Message::NewProject);
             }
             ProjectChange::Opened => {
                 self.reset_document();
-                self.report(format!("Opened {}.", document_name(project)));
+                self.report(Message::Opened {
+                    path: document_name(project),
+                });
             }
-            ProjectChange::Saved => self.report(format!("Saved {}.", document_name(project))),
+            ProjectChange::Saved => self.report(Message::Saved {
+                path: document_name(project),
+            }),
             ProjectChange::Edited => {}
             ProjectChange::PieceAdded(id) => {
                 self.draft.clear();
                 self.selected = Some(id);
                 self.tool = Tool::Select;
-                self.report(format!("Added Piece {id}."));
+                if let Some(piece) = project.pieces.iter().find(|piece| piece.id == id) {
+                    self.report(Message::PieceAdded {
+                        name: piece.name.clone(),
+                    });
+                }
             }
             ProjectChange::PieceRemoved(_) => {
                 self.selected = None;
                 self.drag = None;
-                self.report("Piece deleted.");
+                self.report(Message::PieceDeleted);
             }
         }
     }
@@ -196,24 +216,38 @@ pub fn editor_ui(
         ui.horizontal(|ui| {
             file_buttons(ui, project, &mut events, state);
             ui.separator();
-            ui.selectable_value(&mut *view_mode, ViewMode::Editor2d, "2D editor");
-            ui.selectable_value(&mut *view_mode, ViewMode::Preview3d, "3D preview");
+            let language = state.language;
+            ui.selectable_value(
+                &mut *view_mode,
+                ViewMode::Editor2d,
+                language.label(Label::Editor2d),
+            );
+            ui.selectable_value(
+                &mut *view_mode,
+                ViewMode::Preview3d,
+                language.label(Label::Preview3d),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                language_control(ui, state);
+            });
         });
     });
 
     egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
         ui.horizontal(|ui| {
+            let language = state.language;
+            let status = language.message(&state.status);
             if state.status_is_error {
-                ui.colored_label(ui.visuals().error_fg_color, &state.status);
+                ui.colored_label(ui.visuals().error_fg_color, status);
             } else {
-                ui.label(&state.status);
+                ui.label(status);
             }
             if let Some(cursor) = state.cursor {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(format!(
                         "{}, {}",
-                        format_length(project.units, cursor.x),
-                        format_length(project.units, cursor.y)
+                        format_length(language, project.units, cursor.x),
+                        format_length(language, project.units, cursor.y)
                     ));
                 });
             }
@@ -227,10 +261,10 @@ pub fn editor_ui(
                 tool_controls(ui, state);
                 ui.separator();
             } else {
-                preview::show_controls(ui, &mut settings);
+                preview::show_controls(ui, &mut settings, state.language);
                 ui.separator();
             }
-            units_control(ui, project, &mut events);
+            units_control(ui, project, &mut events, state.language);
             ui.separator();
             pieces_list(ui, project, &mut events, state);
         });
@@ -254,47 +288,63 @@ fn file_buttons(
     events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
 ) {
-    if ui.button("New").clicked() && confirm_discard(project) {
+    let language = state.language;
+    if ui.button(language.label(Label::New)).clicked() && confirm_discard(project, language) {
         send(events, ProjectEvent::New);
     }
-    if ui.button("Open…").clicked()
-        && confirm_discard(project)
-        && let Some(path) = project_dialog().pick_file()
+    if ui.button(language.label(Label::Open)).clicked()
+        && confirm_discard(project, language)
+        && let Some(path) = project_dialog(language).pick_file()
     {
         send(events, ProjectEvent::Open { path });
     }
-    if ui.button("Save").clicked() {
+    if ui.button(language.label(Label::Save)).clicked() {
         match project.path.clone() {
             Some(path) => send(events, ProjectEvent::Save { path }),
-            None => save_as(events),
+            None => save_as(events, language),
         }
     }
-    if ui.button("Save as…").clicked() {
-        save_as(events);
+    if ui.button(language.label(Label::SaveAs)).clicked() {
+        save_as(events, language);
     }
     ui.separator();
-    if ui.button("Export SVG…").clicked() {
+    if ui.button(language.label(Label::ExportSvg)).clicked() {
         export(project, state, "SVG", "svg", exports::to_svg);
     }
-    if ui.button("Export DXF…").clicked() {
+    if ui.button(language.label(Label::ExportDxf)).clicked() {
         export(project, state, "DXF", "dxf", exports::to_dxf);
     }
 }
 
-fn confirm_discard(project: &Project) -> bool {
+fn language_control(ui: &mut egui::Ui, state: &mut EditorState) {
+    let mut language = state.language;
+    egui::ComboBox::from_label(language.label(Label::Language))
+        .selected_text(language.native_name())
+        .show_ui(ui, |ui| {
+            for option in Language::ALL {
+                ui.selectable_value(&mut language, option, option.native_name());
+            }
+        });
+    if language != state.language {
+        state.language = language;
+        settings::save_language(language);
+    }
+}
+
+fn confirm_discard(project: &Project, language: Language) -> bool {
     if !project.modified {
         return true;
     }
     rfd::MessageDialog::new()
-        .set_title("Unsaved changes")
-        .set_description("Discard the unsaved changes to this project?")
+        .set_title(language.label(Label::UnsavedChanges))
+        .set_description(language.label(Label::DiscardChanges))
         .set_buttons(rfd::MessageButtons::YesNo)
         .show()
         == rfd::MessageDialogResult::Yes
 }
 
-fn save_as(events: &mut MessageWriter<ProjectMessage>) {
-    if let Some(mut path) = project_dialog().save_file() {
+fn save_as(events: &mut MessageWriter<ProjectMessage>, language: Language) {
+    if let Some(mut path) = project_dialog(language).save_file() {
         if path.extension().is_none() {
             path.set_extension(PROJECT_EXTENSION);
         }
@@ -302,8 +352,8 @@ fn save_as(events: &mut MessageWriter<ProjectMessage>) {
     }
 }
 
-fn project_dialog() -> rfd::FileDialog {
-    rfd::FileDialog::new().add_filter("Leathercraft project", &[PROJECT_EXTENSION])
+fn project_dialog(language: Language) -> rfd::FileDialog {
+    rfd::FileDialog::new().add_filter(language.label(Label::ProjectFileType), &[PROJECT_EXTENSION])
 }
 
 fn export(
@@ -316,7 +366,7 @@ fn export(
     let contents = match encode(project) {
         Ok(contents) => contents,
         Err(error) => {
-            state.report_error(error.to_string());
+            state.report_error(error.into());
             return;
         }
     };
@@ -330,27 +380,34 @@ fn export(
         path.set_extension(extension);
     }
     match persistence::write_export(&path, &contents) {
-        Ok(()) => state.report(format!("Exported {}.", path.display())),
-        Err(error) => state.report_error(format!("Could not write '{}': {error}", path.display())),
+        Ok(()) => state.report(Message::Exported {
+            path: path.display().to_string(),
+        }),
+        Err(error) => state.report_error(Message::CouldNotWrite {
+            path: path.display().to_string(),
+            detail: error.to_string(),
+        }),
     }
 }
 
 fn tool_controls(ui: &mut egui::Ui, state: &mut EditorState) {
-    ui.label("Tool");
+    let language = state.language;
+    ui.label(language.label(Label::Tool));
     ui.horizontal(|ui| {
-        ui.selectable_value(&mut state.tool, Tool::Select, "Select");
-        ui.selectable_value(&mut state.tool, Tool::Draw, "Draw");
+        ui.selectable_value(&mut state.tool, Tool::Select, language.label(Label::Select));
+        ui.selectable_value(&mut state.tool, Tool::Draw, language.label(Label::Draw));
     });
     if state.tool == Tool::Draw {
-        ui.small(
-            "Click to add points. Click the first point or press Enter to close; Esc cancels.",
-        );
+        ui.small(language.label(Label::DrawHint));
     } else {
-        ui.small("Drag a piece or a vertex of the selected piece. Del removes the selected piece.");
+        ui.small(language.label(Label::SelectHint));
     }
-    ui.small("Right or middle drag pans; scroll zooms.");
+    ui.small(language.label(Label::NavigationHint));
     ui.horizontal(|ui| {
-        ui.checkbox(&mut state.snap_enabled, "Snap (mm)");
+        ui.checkbox(
+            &mut state.snap_enabled,
+            language.label(Label::SnapMillimeters),
+        );
         ui.add_enabled(
             state.snap_enabled,
             egui::DragValue::new(&mut state.snap_mm)
@@ -358,18 +415,24 @@ fn tool_controls(ui: &mut egui::Ui, state: &mut EditorState) {
                 .speed(0.1),
         );
     });
-    if ui.button("Zoom to fit").clicked() {
+    if ui.button(language.label(Label::ZoomToFit)).clicked() {
         state.fit_requested = true;
     }
 }
 
-fn units_control(ui: &mut egui::Ui, project: &Project, events: &mut MessageWriter<ProjectMessage>) {
+fn units_control(
+    ui: &mut egui::Ui,
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
+    language: Language,
+) {
     let mut units = project.units;
-    egui::ComboBox::from_label("Display units")
-        .selected_text(units.symbol())
+    egui::ComboBox::from_label(language.label(Label::DisplayUnits))
+        .selected_text(language.unit_symbol(units))
         .show_ui(ui, |ui| {
-            ui.selectable_value(&mut units, Units::Millimeters, Units::Millimeters.symbol());
-            ui.selectable_value(&mut units, Units::Inches, Units::Inches.symbol());
+            for option in [Units::Millimeters, Units::Inches] {
+                ui.selectable_value(&mut units, option, language.unit_symbol(option));
+            }
         });
     if units != project.units {
         send(events, ProjectEvent::SetUnits(units));
@@ -382,7 +445,8 @@ fn pieces_list(
     events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
 ) {
-    ui.label("Pieces");
+    let language = state.language;
+    ui.label(language.label(Label::Pieces));
     egui::ScrollArea::vertical()
         .max_height(220.0)
         .show(ui, |ui| {
@@ -422,15 +486,17 @@ fn pieces_list(
     state.rename_buffer = response.has_focus().then_some(name);
 
     let shown = state.displayed(piece);
-    ui.label(format!("{} points", shown.points.len()));
+    ui.label(language.message(&Message::PointCount {
+        count: shown.points.len(),
+    }));
     if let Some(bounds) = shown.bounds() {
         ui.label(format!(
             "{} × {}",
-            format_length(units, bounds.width()),
-            format_length(units, bounds.height())
+            format_length(language, units, bounds.width()),
+            format_length(language, units, bounds.height())
         ));
     }
-    if ui.button("Delete piece").clicked() {
+    if ui.button(language.label(Label::DeletePiece)).clicked() {
         send(events, ProjectEvent::RemovePiece { id: piece.id });
     }
 }
@@ -479,7 +545,7 @@ fn canvas(
             state.draft.clear();
             handle_select(ui, &response, view, project, events, state);
         }
-        Tool::Draw => handle_draw(ui, &response, view, events, state),
+        Tool::Draw => handle_draw(ui, &response, view, project, events, state),
     }
 
     painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
@@ -611,6 +677,7 @@ fn handle_draw(
     ui: &egui::Ui,
     response: &egui::Response,
     view: Viewport,
+    project: &Project,
     events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
 ) {
@@ -620,7 +687,7 @@ fn handle_draw(
         let closes = state.draft.len() >= 3
             && view.to_screen(state.draft[0]).distance(position) <= CLOSE_HIT_RADIUS_PX;
         if closes {
-            finish_draft(events, state);
+            finish_draft(project, events, state);
             return;
         }
         let point = state.snap_point(view.to_world(position));
@@ -632,17 +699,26 @@ fn handle_draw(
         return;
     }
     if ui.input(|input| input.key_pressed(egui::Key::Enter)) {
-        finish_draft(events, state);
+        finish_draft(project, events, state);
     }
     if ui.input(|input| input.key_pressed(egui::Key::Escape)) {
         state.draft.clear();
     }
 }
 
-fn finish_draft(events: &mut MessageWriter<ProjectMessage>, state: &EditorState) {
+fn finish_draft(
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
+    state: &EditorState,
+) {
+    // The name is document content, so it stays in the language it was created in.
+    let name = state.language.message(&Message::DefaultPieceName {
+        id: project.next_piece_id(),
+    });
     send(
         events,
         ProjectEvent::AddPiece {
+            name,
             points: state.draft.clone(),
         },
     );
@@ -734,7 +810,7 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
             painter.text(
                 screen[index].lerp(next, 0.5),
                 egui::Align2::CENTER_BOTTOM,
-                format_length(project.units, (b.x - a.x).hypot(b.y - a.y)),
+                format_length(state.language, project.units, (b.x - a.x).hypot(b.y - a.y)),
                 egui::FontId::proportional(11.0),
                 text_color,
             );
@@ -773,17 +849,21 @@ fn draw_draft(
         painter.text(
             target_screen + egui::vec2(10.0, -10.0),
             egui::Align2::LEFT_BOTTOM,
-            format_length(units, (target.x - last.x).hypot(target.y - last.y)),
+            format_length(
+                state.language,
+                units,
+                (target.x - last.x).hypot(target.y - last.y),
+            ),
             egui::FontId::proportional(12.0),
             color,
         );
     }
 }
 
-fn format_length(units: Units, millimeters: f64) -> String {
+fn format_length(language: Language, units: Units, millimeters: f64) -> String {
     format!(
         "{:.2} {}",
         units.from_millimeters(millimeters),
-        units.symbol()
+        language.unit_symbol(units)
     )
 }

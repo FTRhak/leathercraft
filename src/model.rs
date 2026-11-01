@@ -1,3 +1,4 @@
+use crate::i18n::Message;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -17,13 +18,6 @@ pub enum Units {
 }
 
 impl Units {
-    pub fn symbol(self) -> &'static str {
-        match self {
-            Self::Millimeters => "mm",
-            Self::Inches => "in",
-        }
-    }
-
     pub fn from_millimeters(self, value: f64) -> f64 {
         match self {
             Self::Millimeters => value,
@@ -163,35 +157,32 @@ impl Project {
         }))
     }
 
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> Result<(), Message> {
         if self.version != PROJECT_VERSION {
-            return Err(format!(
-                "Project version {} is not supported (expected {}).",
-                self.version, PROJECT_VERSION
-            ));
+            return Err(Message::UnsupportedVersion {
+                found: self.version,
+                expected: PROJECT_VERSION,
+            });
         }
         if self.pieces.len() > MAX_PIECES {
-            return Err(format!(
-                "A project can contain at most {MAX_PIECES} pieces."
-            ));
+            return Err(Message::TooManyPieces { max: MAX_PIECES });
         }
 
         let mut ids = HashSet::with_capacity(self.pieces.len());
         for piece in &self.pieces {
             if piece.id == 0 || !ids.insert(piece.id) {
-                return Err(format!(
-                    "Piece '{}' has an invalid or duplicate ID.",
-                    piece.name
-                ));
+                return Err(Message::InvalidPieceId {
+                    name: piece.name.clone(),
+                });
             }
             if piece.name.trim().is_empty() {
-                return Err(format!("Piece {} must have a name.", piece.id));
+                return Err(Message::PieceNameRequired { id: piece.id });
             }
             if !(3..=MAX_POINTS_PER_PIECE).contains(&piece.points.len()) {
-                return Err(format!(
-                    "Piece '{}' must have between 3 and {MAX_POINTS_PER_PIECE} points.",
-                    piece.name
-                ));
+                return Err(Message::PointCountOutOfRange {
+                    name: piece.name.clone(),
+                    max: MAX_POINTS_PER_PIECE,
+                });
             }
 
             for (index, point) in piece.points.iter().enumerate() {
@@ -200,25 +191,22 @@ impl Project {
                     || point.x.abs() > MAX_COORDINATE_MM
                     || point.y.abs() > MAX_COORDINATE_MM
                 {
-                    return Err(format!(
-                        "Piece '{}' has a point outside the supported coordinate range.",
-                        piece.name
-                    ));
+                    return Err(Message::CoordinateOutOfRange {
+                        name: piece.name.clone(),
+                    });
                 }
                 let next = piece.points[(index + 1) % piece.points.len()];
                 if (point.x - next.x).hypot(point.y - next.y) < 1.0e-8 {
-                    return Err(format!(
-                        "Piece '{}' has two consecutive points in the same position.",
-                        piece.name
-                    ));
+                    return Err(Message::CoincidentPoints {
+                        name: piece.name.clone(),
+                    });
                 }
             }
 
             if piece.signed_area().abs() < MIN_POLYGON_AREA_MM2 {
-                return Err(format!(
-                    "Piece '{}' must enclose a non-zero area.",
-                    piece.name
-                ));
+                return Err(Message::ZeroArea {
+                    name: piece.name.clone(),
+                });
             }
         }
         Ok(())
@@ -287,7 +275,12 @@ mod tests {
             pieces: vec![rectangle(1), rectangle(1)],
             ..Project::default()
         };
-        assert!(project.validate().unwrap_err().contains("duplicate ID"));
+        assert_eq!(
+            project.validate(),
+            Err(Message::InvalidPieceId {
+                name: "Pocket".to_owned()
+            })
+        );
 
         project.pieces = vec![PatternPiece::new(
             2,
@@ -298,7 +291,12 @@ mod tests {
                 Point::new(4.0, 4.0),
             ],
         )];
-        assert!(project.validate().unwrap_err().contains("non-zero area"));
+        assert_eq!(
+            project.validate(),
+            Err(Message::ZeroArea {
+                name: "Bad".to_owned()
+            })
+        );
     }
 
     #[test]

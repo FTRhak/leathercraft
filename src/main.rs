@@ -1,6 +1,7 @@
 mod document;
 mod editor;
 mod preview;
+mod settings;
 
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin};
@@ -21,7 +22,7 @@ fn main() {
         .add_plugins(EguiPlugin::default())
         .add_message::<ProjectMessage>()
         .init_resource::<ActiveProject>()
-        .init_resource::<EditorState>()
+        .insert_resource(EditorState::new(settings::load_language()))
         .init_resource::<ViewMode>()
         .init_resource::<PreviewSettings>()
         .add_systems(Startup, preview::setup_scene)

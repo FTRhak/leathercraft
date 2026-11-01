@@ -1,3 +1,4 @@
+use crate::i18n::Message;
 use crate::model::Project;
 use std::error::Error;
 use std::fmt;
@@ -5,21 +6,28 @@ use std::fmt;
 #[derive(Debug, PartialEq, Eq)]
 pub enum ExportError {
     EmptyProject,
-    InvalidProject(String),
+    InvalidProject(Message),
 }
 
 impl fmt::Display for ExportError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyProject => {
-                formatter.write_str("Add at least one pattern piece before exporting.")
-            }
-            Self::InvalidProject(message) => formatter.write_str(message),
+            Self::EmptyProject => Message::ExportEmpty.fmt(formatter),
+            Self::InvalidProject(message) => message.fmt(formatter),
         }
     }
 }
 
 impl Error for ExportError {}
+
+impl From<ExportError> for Message {
+    fn from(error: ExportError) -> Self {
+        match error {
+            ExportError::EmptyProject => Self::ExportEmpty,
+            ExportError::InvalidProject(message) => message,
+        }
+    }
+}
 
 pub fn to_svg(project: &Project) -> Result<String, ExportError> {
     validate_export(project)?;

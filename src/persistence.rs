@@ -1,21 +1,30 @@
+use crate::i18n::Message;
 use crate::model::Project;
 use std::fs;
 use std::io;
 use std::path::Path;
 
-pub fn save_project(path: &Path, project: &Project) -> Result<(), String> {
+pub fn save_project(path: &Path, project: &Project) -> Result<(), Message> {
     project.validate()?;
-    let json = serde_json::to_string_pretty(project)
-        .map_err(|error| format!("Could not encode project: {error}"))?;
-    fs::write(path, format!("{json}\n"))
-        .map_err(|error| format!("Could not write '{}': {error}", path.display()))
+    let json = serde_json::to_string_pretty(project).map_err(|error| Message::CouldNotEncode {
+        detail: error.to_string(),
+    })?;
+    fs::write(path, format!("{json}\n")).map_err(|error| Message::CouldNotWrite {
+        path: path.display().to_string(),
+        detail: error.to_string(),
+    })
 }
 
-pub fn load_project(path: &Path) -> Result<Project, String> {
-    let contents = fs::read_to_string(path)
-        .map_err(|error| format!("Could not read '{}': {error}", path.display()))?;
-    let project: Project = serde_json::from_str(&contents)
-        .map_err(|error| format!("Could not parse '{}': {error}", path.display()))?;
+pub fn load_project(path: &Path) -> Result<Project, Message> {
+    let contents = fs::read_to_string(path).map_err(|error| Message::CouldNotRead {
+        path: path.display().to_string(),
+        detail: error.to_string(),
+    })?;
+    let project: Project =
+        serde_json::from_str(&contents).map_err(|error| Message::CouldNotParse {
+            path: path.display().to_string(),
+            detail: error.to_string(),
+        })?;
     project.validate()?;
     Ok(project)
 }
@@ -71,7 +80,13 @@ mod tests {
         ));
         fs::write(&path, r#"{"version":99,"units":"millimeters","pieces":[]}"#).unwrap();
 
-        assert!(load_project(&path).unwrap_err().contains("not supported"));
+        assert_eq!(
+            load_project(&path),
+            Err(Message::UnsupportedVersion {
+                found: 99,
+                expected: crate::model::PROJECT_VERSION
+            })
+        );
         fs::remove_file(path).unwrap();
     }
 }

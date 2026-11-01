@@ -1,3 +1,4 @@
+use crate::i18n::Message;
 use crate::model::{PatternPiece, Point, Project, Units};
 use crate::persistence;
 use std::path::PathBuf;
@@ -9,7 +10,7 @@ pub enum ProjectEvent {
     Open { path: PathBuf },
     Save { path: PathBuf },
     SetUnits(Units),
-    AddPiece { points: Vec<Point> },
+    AddPiece { name: String, points: Vec<Point> },
     RenamePiece { id: u64, name: String },
     SetPiecePoints { id: u64, points: Vec<Point> },
     RemovePiece { id: u64 },
@@ -28,7 +29,7 @@ pub enum ProjectChange {
 
 impl Project {
     /// Applies an event atomically: on error the project is left exactly as it was.
-    pub fn apply(&mut self, event: ProjectEvent) -> Result<ProjectChange, String> {
+    pub fn apply(&mut self, event: ProjectEvent) -> Result<ProjectChange, Message> {
         match event {
             ProjectEvent::New => {
                 *self = Project::default();
@@ -50,9 +51,9 @@ impl Project {
                 project.units = units;
                 Ok(ProjectChange::Edited)
             }),
-            ProjectEvent::AddPiece { points } => self.edit(|project| {
+            ProjectEvent::AddPiece { name, points } => self.edit(|project| {
                 let id = project.next_piece_id();
-                project.add_piece(PatternPiece::new(id, format!("Piece {id}"), points));
+                project.add_piece(PatternPiece::new(id, name, points));
                 Ok(ProjectChange::PieceAdded(id))
             }),
             ProjectEvent::RenamePiece { id, name } => self.edit(|project| {
@@ -67,7 +68,7 @@ impl Project {
                 if project.remove_piece(id) {
                     Ok(ProjectChange::PieceRemoved(id))
                 } else {
-                    Err(format!("Piece {id} does not exist."))
+                    Err(Message::PieceNotFound { id })
                 }
             }),
         }
@@ -75,8 +76,8 @@ impl Project {
 
     fn edit(
         &mut self,
-        change: impl FnOnce(&mut Project) -> Result<ProjectChange, String>,
-    ) -> Result<ProjectChange, String> {
+        change: impl FnOnce(&mut Project) -> Result<ProjectChange, Message>,
+    ) -> Result<ProjectChange, Message> {
         let mut candidate = self.clone();
         let result = change(&mut candidate)?;
         candidate.validate()?;
@@ -85,11 +86,11 @@ impl Project {
         Ok(result)
     }
 
-    fn piece_mut(&mut self, id: u64) -> Result<&mut PatternPiece, String> {
+    fn piece_mut(&mut self, id: u64) -> Result<&mut PatternPiece, Message> {
         self.pieces
             .iter_mut()
             .find(|piece| piece.id == id)
-            .ok_or_else(|| format!("Piece {id} does not exist."))
+            .ok_or(Message::PieceNotFound { id })
     }
 }
 
@@ -107,22 +108,24 @@ mod tests {
         ]
     }
 
+    fn add_piece() -> ProjectEvent {
+        ProjectEvent::AddPiece {
+            name: "Деталь 1".to_owned(),
+            points: triangle(),
+        }
+    }
+
     fn project_with_piece() -> Project {
         let mut project = Project::default();
-        project
-            .apply(ProjectEvent::AddPiece { points: triangle() })
-            .unwrap();
+        project.apply(add_piece()).unwrap();
         project
     }
 
     #[test]
     fn edits_mark_the_project_as_modified() {
         let mut project = Project::default();
-        assert_eq!(
-            project.apply(ProjectEvent::AddPiece { points: triangle() }),
-            Ok(ProjectChange::PieceAdded(1))
-        );
-        assert_eq!(project.pieces[0].name, "Piece 1");
+        assert_eq!(project.apply(add_piece()), Ok(ProjectChange::PieceAdded(1)));
+        assert_eq!(project.pieces[0].name, "Деталь 1");
         assert!(project.modified);
     }
 
@@ -133,7 +136,14 @@ mod tests {
         let before = project.clone();
 
         let invalid = [
-            ProjectEvent::AddPiece { points: Vec::new() },
+            ProjectEvent::AddPiece {
+                name: "Flap".to_owned(),
+                points: Vec::new(),
+            },
+            ProjectEvent::AddPiece {
+                name: " ".to_owned(),
+                points: triangle(),
+            },
             ProjectEvent::RenamePiece {
                 id: 1,
                 name: " ".to_owned(),
