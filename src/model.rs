@@ -1,4 +1,5 @@
 use crate::i18n::Message;
+use crate::material::Material;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -64,6 +65,9 @@ pub struct PatternPiece {
     /// A locked piece cannot be moved, reshaped or deleted. Older files lack the field.
     #[serde(default)]
     pub locked: bool,
+    /// Older files lack the field.
+    #[serde(default)]
+    pub material: Material,
 }
 
 impl PatternPiece {
@@ -73,6 +77,7 @@ impl PatternPiece {
             name: name.into(),
             points,
             locked: false,
+            material: Material::default(),
         }
     }
 
@@ -129,6 +134,9 @@ pub struct Project {
     pub version: u32,
     pub units: Units,
     pub pieces: Vec<PatternPiece>,
+    /// The material given to each new piece. Older files lack the field.
+    #[serde(default)]
+    pub default_material: Material,
     /// Where the document lives on disk; not part of the file format.
     #[serde(skip)]
     pub path: Option<PathBuf>,
@@ -143,6 +151,7 @@ impl Default for Project {
             version: PROJECT_VERSION,
             units: Units::Millimeters,
             pieces: Vec::new(),
+            default_material: Material::default(),
             path: None,
             modified: false,
         }
@@ -171,6 +180,9 @@ impl Project {
         if self.pieces.len() > MAX_PIECES {
             return Err(Message::TooManyPieces { max: MAX_PIECES });
         }
+        if !self.default_material.has_valid_thickness() {
+            return Err(Message::DefaultThicknessOutOfRange);
+        }
 
         let mut ids = HashSet::with_capacity(self.pieces.len());
         for piece in &self.pieces {
@@ -186,6 +198,11 @@ impl Project {
                 return Err(Message::PointCountOutOfRange {
                     name: piece.name.clone(),
                     max: MAX_POINTS_PER_PIECE,
+                });
+            }
+            if !piece.material.has_valid_thickness() {
+                return Err(Message::ThicknessOutOfRange {
+                    name: piece.name.clone(),
                 });
             }
 

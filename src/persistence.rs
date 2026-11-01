@@ -36,6 +36,7 @@ pub fn write_export(path: &Path, contents: &str) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::material::{LeatherColor, Material, Origin, Treatment};
     use crate::model::{PatternPiece, Point, Project};
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -101,6 +102,52 @@ mod tests {
         )
         .unwrap();
         assert!(!load_project(&path).unwrap().pieces[0].locked);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn materials_round_trip_and_default_in_older_files() {
+        let id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "leathercraft-material-{}-{id}.leathercraft",
+            std::process::id()
+        ));
+        let material = Material {
+            origin: Origin::Ostrich,
+            treatment: Treatment::Nubuck,
+            thickness_mm: 2.5,
+            color: LeatherColor::Emerald,
+            ..Material::default()
+        };
+        let mut piece = PatternPiece::new(
+            1,
+            "Flap",
+            vec![
+                Point::new(0.0, 0.0),
+                Point::new(10.0, 0.0),
+                Point::new(0.0, 10.0),
+            ],
+        );
+        piece.material = material;
+        let project = Project {
+            pieces: vec![piece],
+            default_material: material,
+            ..Project::default()
+        };
+        save_project(&path, &project).unwrap();
+        assert_eq!(load_project(&path).unwrap(), project);
+
+        fs::write(
+            &path,
+            r#"{"version":1,"units":"millimeters","pieces":[{"id":1,"name":"Flap","points":[{"x":0.0,"y":0.0},{"x":10.0,"y":0.0},{"x":0.0,"y":10.0}]}]}"#,
+        )
+        .unwrap();
+        let older = load_project(&path).unwrap();
+        assert_eq!(older.default_material, Material::default());
+        assert_eq!(older.pieces[0].material, Material::default());
         fs::remove_file(path).unwrap();
     }
 

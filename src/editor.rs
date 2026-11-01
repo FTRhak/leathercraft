@@ -1,5 +1,6 @@
 use crate::document::{ActiveProject, ProjectMessage};
 use crate::panels::layout;
+use crate::panels::material::{self, DialogResult};
 use crate::panels::tools::{self, Tool};
 use crate::preview::{self, PreviewSettings};
 use crate::settings;
@@ -8,6 +9,7 @@ use bevy_egui::{EguiContexts, egui};
 use leathercraft::events::{ProjectChange, ProjectEvent};
 use leathercraft::exports::{self, ExportError};
 use leathercraft::i18n::{Label, Language, Message};
+use leathercraft::material::Material;
 use leathercraft::model::{PatternPiece, Point, Project, Units};
 use leathercraft::persistence;
 use std::borrow::Cow;
@@ -60,6 +62,8 @@ pub struct EditorState {
     snap_enabled: bool,
     snap_mm: f64,
     rename_buffer: Option<String>,
+    /// The material being chosen while the new-project dialog is open.
+    new_project_dialog: Option<Material>,
     language: Language,
     /// Kept untranslated so that it follows a change of language.
     status: Message,
@@ -81,6 +85,7 @@ impl Default for EditorState {
             snap_enabled: true,
             snap_mm: 1.0,
             rename_buffer: None,
+            new_project_dialog: None,
             language: Language::default(),
             status: Message::Ready,
             status_is_error: false,
@@ -283,7 +288,9 @@ pub fn editor_ui(
             }
             units_control(ui, project, &mut events, state.language);
             ui.separator();
-            selected_piece_details(ui, project, &mut events, state);
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                selected_piece_details(ui, project, &mut events, state);
+            });
         });
 
     egui::SidePanel::right("layout")
@@ -303,6 +310,18 @@ pub fn editor_ui(
     } else {
         state.cursor = None;
     }
+
+    if let Some(material) = &mut state.new_project_dialog {
+        match material::new_project_dialog(ctx, material, state.language) {
+            Some(DialogResult::Create) => {
+                let material = *material;
+                state.new_project_dialog = None;
+                send(&mut events, ProjectEvent::New { material });
+            }
+            Some(DialogResult::Cancel) => state.new_project_dialog = None,
+            None => {}
+        }
+    }
     Ok(())
 }
 
@@ -316,7 +335,7 @@ fn handle_delete_key(
     state: &EditorState,
 ) {
     let drafting = !state.draft.is_empty() || state.shape_draft.is_some();
-    if drafting || ctx.wants_keyboard_input() {
+    if drafting || state.new_project_dialog.is_some() || ctx.wants_keyboard_input() {
         return;
     }
     let delete_pressed = ctx.input(|input| {
@@ -335,7 +354,10 @@ fn file_menu(
 ) {
     let language = state.language;
     if ui.button(language.label(Label::New)).clicked() && confirm_discard(project, language) {
-        send(events, ProjectEvent::New);
+        // A draft would otherwise still react to Enter behind the dialog.
+        state.draft.clear();
+        state.shape_draft = None;
+        state.new_project_dialog = Some(project.default_material);
     }
     if ui.button(language.label(Label::Open)).clicked()
         && confirm_discard(project, language)
@@ -518,6 +540,18 @@ fn selected_piece_details(
             format_length(language, units, bounds.width()),
             format_length(language, units, bounds.height())
         ));
+    }
+
+    ui.separator();
+    let mut piece_material = piece.material;
+    if material::material_fields(ui, &mut piece_material, language, "selected_piece") {
+        send(
+            events,
+            ProjectEvent::SetPieceMaterial {
+                id: piece.id,
+                material: piece_material,
+            },
+        );
     }
 }
 

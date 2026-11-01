@@ -1,6 +1,10 @@
 mod en;
 mod uk;
 
+use crate::material::{
+    ColorGroup, Flexibility, HeatResistance, LeatherColor, Origin, Strength, Texture,
+    ThicknessCategory, Treatment, WaterResistance,
+};
 use crate::model::Units;
 use std::error::Error;
 use std::fmt;
@@ -99,6 +103,34 @@ pub enum Label {
     Orbit,
     Tilt,
     Zoom,
+    NewProjectTitle,
+    Create,
+    Cancel,
+    BasicProperties,
+    PhysicalProperties,
+    OriginField,
+    TreatmentField,
+    ThicknessField,
+    ColorField,
+    TextureField,
+    StrengthField,
+    FlexibilityField,
+    WaterResistanceField,
+    HeatResistanceField,
+    Origin(Origin),
+    OriginHint(Origin),
+    Treatment(Treatment),
+    TreatmentHint(Treatment),
+    Thickness(ThicknessCategory),
+    ColorGroup(ColorGroup),
+    Color(LeatherColor),
+    Texture(Texture),
+    Strength(Strength),
+    Flexibility(Flexibility),
+    FlexibilityHint(Flexibility),
+    WaterResistance(WaterResistance),
+    WaterResistanceHint(WaterResistance),
+    HeatResistance(HeatResistance),
 }
 
 /// Text with arguments, kept structured so it is rendered in the language current when shown.
@@ -124,6 +156,8 @@ pub enum Message {
     CoordinateOutOfRange { name: String },
     CoincidentPoints { name: String },
     ZeroArea { name: String },
+    ThicknessOutOfRange { name: String },
+    DefaultThicknessOutOfRange,
     CouldNotEncode { detail: String },
     CouldNotRead { path: String, detail: String },
     CouldNotParse { path: String, detail: String },
@@ -168,6 +202,13 @@ mod tests {
         assert_eq!(text(11), "11 точок");
         assert_eq!(text(21), "21 точка");
         assert_eq!(text(22), "22 точки");
+    }
+
+    #[test]
+    fn thickness_limits_use_the_decimal_separator_of_the_language() {
+        let message = Message::DefaultThicknessOutOfRange;
+        assert!(Language::English.message(&message).contains("0.3"));
+        assert!(Language::Ukrainian.message(&message).contains("0,3"));
     }
 
     #[test]

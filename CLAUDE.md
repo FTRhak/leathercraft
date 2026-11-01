@@ -27,6 +27,7 @@ The package has two crates with a deliberate boundary: geometry and file-format 
 
 - **Library (`src/lib.rs`), always built, depends only on serde:**
   - `model`: `Project`, `PatternPiece`, `Point`, `Units`, and `Project::validate`.
+  - `material`: `Material` and the scales of its properties. Each piece has its own material; `Project.default_material`, chosen in the new-project dialog, is copied into each new piece.
   - `events`: `ProjectEvent`, `ProjectChange`, and `Project::apply`, the single entry point for changing a project.
   - `persistence`: `.leathercraft` save/load as pretty-printed, versioned JSON.
   - `exports`: `to_svg` and `to_dxf` return strings; `persistence::write_export` writes them to disk.
@@ -48,7 +49,7 @@ The UI never writes to the project. It sends a `ProjectEvent` wrapped in `docume
 - **The project is always valid:** `Project::apply` validates every edit on a copy, so a rejected event leaves the project untouched.
 - **Format version:** `PROJECT_VERSION` must match exactly on load; there is no migration path yet. Changing the serialized shape of the model means bumping it and deciding how older files are handled. Adding a `#[serde(default)]` field doesn't need a bump, since older files still load.
 - **Round-tripping uses `.leathercraft` only.** SVG and DXF are one-way exports; SVG also shifts geometry so the project's bounding box starts at the origin, while DXF keeps original coordinates.
-- **The 3D preview shows individual flat pieces**, extruded with a leather-like material. It intentionally does not infer seams or assemble finished items.
+- **The 3D preview shows individual flat pieces**, extruded to the thickness of their material and shown in its color. It intentionally does not infer seams or assemble finished items.
 
 ## Conventions
 

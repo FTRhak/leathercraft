@@ -1,4 +1,5 @@
 use crate::i18n::Message;
+use crate::material::Material;
 use crate::model::{PatternPiece, Point, Project, Units};
 use crate::persistence;
 use std::path::PathBuf;
@@ -6,7 +7,7 @@ use std::path::PathBuf;
 /// A requested change to the project. `Project::apply` is the only intended way to change one.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProjectEvent {
-    New,
+    New { material: Material },
     Open { path: PathBuf },
     Save { path: PathBuf },
     SetUnits(Units),
@@ -14,6 +15,7 @@ pub enum ProjectEvent {
     RenamePiece { id: u64, name: String },
     SetPiecePoints { id: u64, points: Vec<Point> },
     SetPieceLocked { id: u64, locked: bool },
+    SetPieceMaterial { id: u64, material: Material },
     RemovePiece { id: u64 },
 }
 
@@ -32,8 +34,13 @@ impl Project {
     /// Applies an event atomically: on error the project is left exactly as it was.
     pub fn apply(&mut self, event: ProjectEvent) -> Result<ProjectChange, Message> {
         match event {
-            ProjectEvent::New => {
-                *self = Project::default();
+            ProjectEvent::New { material } => {
+                let created = Project {
+                    default_material: material,
+                    ..Project::default()
+                };
+                created.validate()?;
+                *self = created;
                 Ok(ProjectChange::Created)
             }
             ProjectEvent::Open { path } => {
@@ -54,7 +61,9 @@ impl Project {
             }),
             ProjectEvent::AddPiece { name, points } => self.edit(|project| {
                 let id = project.next_piece_id();
-                project.add_piece(PatternPiece::new(id, name, points));
+                let mut piece = PatternPiece::new(id, name, points);
+                piece.material = project.default_material;
+                project.add_piece(piece);
                 Ok(ProjectChange::PieceAdded(id))
             }),
             ProjectEvent::RenamePiece { id, name } => self.edit(|project| {
@@ -67,6 +76,10 @@ impl Project {
             }),
             ProjectEvent::SetPieceLocked { id, locked } => self.edit(|project| {
                 project.piece_mut(id)?.locked = locked;
+                Ok(ProjectChange::Edited)
+            }),
+            ProjectEvent::SetPieceMaterial { id, material } => self.edit(|project| {
+                project.piece_mut(id)?.material = material;
                 Ok(ProjectChange::Edited)
             }),
             ProjectEvent::RemovePiece { id } => self.edit(|project| {
@@ -110,6 +123,7 @@ impl Project {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::material::{LeatherColor, Origin};
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -272,7 +286,80 @@ mod tests {
         assert_eq!(reopened, project);
         fs::remove_file(path).unwrap();
 
-        assert_eq!(project.apply(ProjectEvent::New), Ok(ProjectChange::Created));
+        assert_eq!(
+            project.apply(ProjectEvent::New {
+                material: Material::default()
+            }),
+            Ok(ProjectChange::Created)
+        );
         assert_eq!(project, Project::default());
+    }
+
+    fn black_goat() -> Material {
+        Material {
+            origin: Origin::Goat,
+            color: LeatherColor::Black,
+            thickness_mm: 0.8,
+            ..Material::default()
+        }
+    }
+
+    #[test]
+    fn new_pieces_take_the_material_chosen_for_the_project() {
+        let mut project = project_with_piece();
+        project
+            .apply(ProjectEvent::New {
+                material: black_goat(),
+            })
+            .unwrap();
+        assert!(project.pieces.is_empty());
+        assert_eq!(project.default_material, black_goat());
+
+        project.apply(add_piece()).unwrap();
+        assert_eq!(project.pieces[0].material, black_goat());
+    }
+
+    #[test]
+    fn setting_a_material_reaches_only_the_named_piece_even_when_locked() {
+        let mut project = project_with_piece();
+        project.apply(add_piece()).unwrap();
+        project
+            .apply(ProjectEvent::SetPieceLocked {
+                id: 1,
+                locked: true,
+            })
+            .unwrap();
+
+        project
+            .apply(ProjectEvent::SetPieceMaterial {
+                id: 1,
+                material: black_goat(),
+            })
+            .unwrap();
+        assert_eq!(project.pieces[0].material, black_goat());
+        assert_eq!(project.pieces[1].material, Material::default());
+        assert_eq!(project.default_material, Material::default());
+    }
+
+    #[test]
+    fn invalid_thickness_leaves_the_project_unchanged() {
+        let mut project = project_with_piece();
+        let before = project.clone();
+        let material = Material {
+            thickness_mm: 0.0,
+            ..Material::default()
+        };
+
+        assert_eq!(
+            project.apply(ProjectEvent::SetPieceMaterial { id: 1, material }),
+            Err(Message::ThicknessOutOfRange {
+                name: "Деталь 1".to_owned()
+            })
+        );
+        assert_eq!(
+            project.apply(ProjectEvent::New { material }),
+            Err(Message::DefaultThicknessOutOfRange)
+        );
+        assert_eq!(project, before);
     }
 }

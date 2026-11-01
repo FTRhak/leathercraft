@@ -1,6 +1,7 @@
 use bevy_egui::egui;
 
 pub mod layout;
+pub mod material;
 pub mod tools;
 
 /// A square button with a painted icon; the closure gets the button's rect and stroke.

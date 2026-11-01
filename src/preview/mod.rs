@@ -9,7 +9,6 @@ use leathercraft::model::PatternPiece;
 
 // Scene units per millimeter; the scene is scaled up, so this is not a meters conversion.
 const MM_TO_SCENE: f64 = 0.01;
-const PIECE_THICKNESS: f32 = 0.035;
 const MIN_DISTANCE: f32 = 1.0;
 const MAX_DISTANCE: f32 = 60.0;
 
@@ -96,18 +95,18 @@ fn rebuild_preview(
     settings.distance = ((bounds.width().max(bounds.height()) * MM_TO_SCENE) as f32 * 2.7)
         .clamp(MIN_DISTANCE, MAX_DISTANCE);
 
-    let leather = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.48, 0.23, 0.105),
-        perceptual_roughness: 0.88,
-        ..default()
-    });
-
     for piece in &project.pieces {
         match build_piece_mesh(piece, center_x, center_z) {
             Ok(mesh) => {
+                let [red, green, blue] = piece.material.color.rgb();
+                let leather = materials.add(StandardMaterial {
+                    base_color: Color::srgb_u8(red, green, blue),
+                    perceptual_roughness: 0.88,
+                    ..default()
+                });
                 commands.spawn((
                     Mesh3d(meshes.add(mesh)),
-                    MeshMaterial3d(leather.clone()),
+                    MeshMaterial3d(leather),
                     PreviewPiece,
                 ));
             }
@@ -154,6 +153,7 @@ pub fn show_controls(ui: &mut egui::Ui, settings: &mut PreviewSettings, language
 
 fn build_piece_mesh(piece: &PatternPiece, center_x: f32, center_z: f32) -> Result<Mesh, String> {
     let points = &piece.points;
+    let thickness = (piece.material.thickness_mm * MM_TO_SCENE) as f32;
     let mut flat_points = Vec::with_capacity(points.len() * 2);
     for point in points {
         flat_points.push(point.x * MM_TO_SCENE - f64::from(center_x));
@@ -174,7 +174,7 @@ fn build_piece_mesh(piece: &PatternPiece, center_x: f32, center_z: f32) -> Resul
     for point in points {
         let x = (point.x * MM_TO_SCENE - f64::from(center_x)) as f32;
         let z = (point.y * MM_TO_SCENE - f64::from(center_z)) as f32;
-        positions.push([x, PIECE_THICKNESS, z]);
+        positions.push([x, thickness, z]);
         normals.push([0.0, 1.0, 0.0]);
     }
 
@@ -224,8 +224,8 @@ fn build_piece_mesh(piece: &PatternPiece, center_x: f32, center_z: f32) -> Resul
         let bz = (b.y * MM_TO_SCENE - f64::from(center_z)) as f32;
         positions.extend_from_slice(&[
             [ax, 0.0, az],
-            [ax, PIECE_THICKNESS, az],
-            [bx, PIECE_THICKNESS, bz],
+            [ax, thickness, az],
+            [bx, thickness, bz],
             [bx, 0.0, bz],
         ]);
         normals.extend_from_slice(&[normal; 4]);
