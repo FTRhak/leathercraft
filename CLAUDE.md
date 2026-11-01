@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Desktop CAD-style leather pattern editor in Rust (edition 2024), built on Bevy 0.18 and `bevy_egui`. `docs/plan.md` holds the MVP plan and scope.
 
+Project structure `docs/project-index.md` should be updated after any changes
+
 ## Commands
 
 ```sh
