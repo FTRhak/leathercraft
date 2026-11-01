@@ -3,6 +3,10 @@ use leathercraft::i18n::{Label, Language};
 use leathercraft::model::Point;
 use leathercraft::shapes;
 
+const ICON_BUTTON_SIZE: f32 = 32.0;
+const ICON_MARGIN: f32 = 8.0;
+const ICON_VERTEX_RADIUS: f32 = 2.0;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Tool {
     #[default]
@@ -41,13 +45,68 @@ impl Tool {
             Self::Select | Self::Draw => None,
         }
     }
+
+    fn paint_icon(self, painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+        let rect = rect.shrink(ICON_MARGIN);
+        let at = |x: f32, y: f32| rect.lerp_inside(egui::vec2(x, y));
+        match self {
+            Self::Select => {
+                let arrow = vec![
+                    at(0.1, 0.0),
+                    at(0.1, 0.8),
+                    at(0.35, 0.6),
+                    at(0.55, 1.0),
+                    at(0.7, 0.92),
+                    at(0.5, 0.52),
+                    at(0.85, 0.52),
+                ];
+                painter.add(egui::Shape::closed_line(arrow, stroke));
+            }
+            Self::Draw => {
+                let vertices = vec![at(0.0, 1.0), at(0.3, 0.2), at(0.7, 0.7), at(1.0, 0.0)];
+                for vertex in &vertices {
+                    painter.circle_filled(*vertex, ICON_VERTEX_RADIUS, stroke.color);
+                }
+                painter.add(egui::Shape::line(vertices, stroke));
+            }
+            Self::Rectangle => {
+                painter.rect_stroke(rect, 0.0, stroke, egui::StrokeKind::Middle);
+            }
+            Self::Circle => {
+                painter.circle_stroke(rect.center(), rect.width() / 2.0, stroke);
+            }
+        }
+    }
+}
+
+fn icon_button(ui: &mut egui::Ui, tool: Tool, selected: bool, name: &str) -> egui::Response {
+    let (rect, response) =
+        ui.allocate_exact_size(egui::Vec2::splat(ICON_BUTTON_SIZE), egui::Sense::click());
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), selected, name)
+    });
+    if ui.is_rect_visible(rect) {
+        let visuals = ui.style().interact_selectable(&response, selected);
+        ui.painter().rect(
+            rect,
+            visuals.corner_radius,
+            visuals.weak_bg_fill,
+            visuals.bg_stroke,
+            egui::StrokeKind::Inside,
+        );
+        tool.paint_icon(ui.painter(), rect, visuals.fg_stroke);
+    }
+    response.on_hover_text(name)
 }
 
 pub fn show_panel(ui: &mut egui::Ui, tool: &mut Tool, language: Language) {
     ui.label(language.label(Label::Tools));
-    ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
+    ui.horizontal_wrapped(|ui| {
         for option in Tool::ALL {
-            ui.selectable_value(tool, option, language.label(option.label()));
+            let name = language.label(option.label());
+            if icon_button(ui, option, *tool == option, name).clicked() {
+                *tool = option;
+            }
         }
     });
 }

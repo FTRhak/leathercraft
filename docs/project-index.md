@@ -26,7 +26,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
 | `src/editor.rs` | 945 | 7,500 | bin | egui UI: panels, canvas, tool behavior, drawing |
-| `src/panels/tools/mod.rs` | 53 | 400 | bin | `Tool`, Tools panel |
+| `src/panels/tools/mod.rs` | 112 | 900 | bin | `Tool`, painted tool icons, Tools panel |
 | `src/preview/mod.rs` | 247 | 2,100 | bin | 3D scene, camera, mesh extrusion |
 | `src/model.rs` | 314 | 2,200 | lib | `Project`, `PatternPiece`, `Point`, `Units`, validation |
 | `src/events.rs` | 213 | 1,700 | lib | `ProjectEvent`, `ProjectChange`, `Project::apply` |
@@ -95,8 +95,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Symbols |
 |---:|---|
-| 6-44 | `Tool`: `ALL`, `label`, `hint`, `shape_points` |
-| 46-53 | `show_panel` |
+| 6-8 | Icon constants: `ICON_BUTTON_SIZE`, `ICON_MARGIN`, `ICON_VERTEX_RADIUS` |
+| 10-80 | `Tool`: `ALL`, `label`, `hint`, `shape_points`, `paint_icon` |
+| 82-100 | `icon_button` |
+| 102-112 | `show_panel` |
 
 ### `preview/mod.rs`
 
@@ -117,7 +119,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add a validation rule | `model.rs` 6-10, 160-213 | `validate`, plus a `Message` variant and both catalogs |
 | Add UI text | `i18n/mod.rs` 66-123 | A `Label` or `Message` variant and an arm in `en.rs` and `uk.rs`; the compiler flags missing arms |
 | Add a language | `i18n/mod.rs` 10-62 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
-| Add a canvas tool | `panels/tools/mod.rs`, `editor.rs` 506-561, 723-767 | `Tool` and its `ALL`, `label`, `hint`, a dispatch arm in `canvas`; a predefined shape also goes in `shapes.rs` |
+| Add a canvas tool | `panels/tools/mod.rs`, `editor.rs` 506-561, 723-767 | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`; a predefined shape also goes in `shapes.rs` |
 | Change the file format | `model.rs` 124-134, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
 | Change the 3D look or mesh | `preview/mod.rs` 49-119, 155-247 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
@@ -146,6 +148,7 @@ There are 21 tests, all inline in the library crate:
 | `docs/plan.md` | Historical MVP plan. It still says the repo contains only a license. Its todo 6 asks for build and run docs, and there is no README; `CLAUDE.md` only lists the commands. |
 | `docs/plans/localization.md` | Historical plan for finished work (~1,700 tokens). It refers to `src/preview.rs`, which is now `src/preview/mod.rs`. Read the "Decisions" and "Out of scope" sections only if you need the reasoning. |
 | `docs/plans/add-tools-panel-where-harmonic-nautilus.md` | Historical plan for the Tools panel. |
+| `docs/plans/render-icons-instend-text-peppy-hejlsberg.md` | Historical plan for the Tools panel icons. |
 
 ## Refreshing this index
 
