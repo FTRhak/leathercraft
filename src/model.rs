@@ -7,6 +7,7 @@ use std::path::PathBuf;
 pub const PROJECT_VERSION: u32 = 1;
 const MAX_PIECES: usize = 10_000;
 const MAX_POINTS_PER_PIECE: usize = 2_048;
+const MAX_HOLES_PER_PIECE: usize = 512;
 const MAX_COORDINATE_MM: f64 = 1_000_000.0;
 const MIN_POLYGON_AREA_MM2: f64 = 1.0e-6;
 
@@ -55,6 +56,89 @@ impl Bounds {
     pub fn height(self) -> f64 {
         self.max_y - self.min_y
     }
+
+    fn overlaps(self, other: Self) -> bool {
+        self.min_x <= other.max_x
+            && other.min_x <= self.max_x
+            && self.min_y <= other.max_y
+            && other.min_y <= self.max_y
+    }
+}
+
+fn ring_bounds(ring: &[Point]) -> Option<Bounds> {
+    let first = *ring.first()?;
+    let mut bounds = Bounds {
+        min_x: first.x,
+        min_y: first.y,
+        max_x: first.x,
+        max_y: first.y,
+    };
+    for point in &ring[1..] {
+        bounds.min_x = bounds.min_x.min(point.x);
+        bounds.min_y = bounds.min_y.min(point.y);
+        bounds.max_x = bounds.max_x.max(point.x);
+        bounds.max_y = bounds.max_y.max(point.y);
+    }
+    Some(bounds)
+}
+
+fn ring_contains(ring: &[Point], point: Point) -> bool {
+    if ring.len() < 3 {
+        return false;
+    }
+
+    let mut inside = false;
+    let mut previous = ring.len() - 1;
+    for current in 0..ring.len() {
+        let a = ring[current];
+        let b = ring[previous];
+        let crosses = (a.y > point.y) != (b.y > point.y)
+            && point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x;
+        if crosses {
+            inside = !inside;
+        }
+        previous = current;
+    }
+    inside
+}
+
+/// Positive when `c` lies to one side of the line through `a` and `b`, zero when on it.
+fn orientation(a: Point, b: Point, c: Point) -> f64 {
+    (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+}
+
+fn within_segment(a: Point, b: Point, c: Point) -> bool {
+    c.x >= a.x.min(b.x) && c.x <= a.x.max(b.x) && c.y >= a.y.min(b.y) && c.y <= a.y.max(b.y)
+}
+
+fn segments_touch(a: Point, b: Point, c: Point, d: Point) -> bool {
+    let (ab_c, ab_d) = (orientation(a, b, c), orientation(a, b, d));
+    let (cd_a, cd_b) = (orientation(c, d, a), orientation(c, d, b));
+    if ab_c * ab_d < 0.0 && cd_a * cd_b < 0.0 {
+        return true;
+    }
+    (ab_c == 0.0 && within_segment(a, b, c))
+        || (ab_d == 0.0 && within_segment(a, b, d))
+        || (cd_a == 0.0 && within_segment(c, d, a))
+        || (cd_b == 0.0 && within_segment(c, d, b))
+}
+
+/// Whether the outlines of two closed rings cross or touch.
+fn rings_cross(first: &[Point], second: &[Point]) -> bool {
+    (0..first.len()).any(|i| {
+        let (a, b) = (first[i], first[(i + 1) % first.len()]);
+        (0..second.len()).any(|j| segments_touch(a, b, second[j], second[(j + 1) % second.len()]))
+    })
+}
+
+pub fn signed_area(ring: &[Point]) -> f64 {
+    let mut area = 0.0;
+    for index in 0..ring.len() {
+        let a = ring[index];
+        let b = ring[(index + 1) % ring.len()];
+        area += a.x * b.y - b.x * a.y;
+    }
+    area * 0.5
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -68,6 +152,9 @@ pub struct PatternPiece {
     /// Older files lack the field.
     #[serde(default)]
     pub material: Material,
+    /// Closed rings cut out of the piece, stored like `points`. Older files lack the field.
+    #[serde(default)]
+    pub holes: Vec<Vec<Point>>,
 }
 
 impl PatternPiece {
@@ -78,54 +165,118 @@ impl PatternPiece {
             points,
             locked: false,
             material: Material::default(),
+            holes: Vec::new(),
         }
     }
 
     pub fn bounds(&self) -> Option<Bounds> {
-        let first = *self.points.first()?;
-        let mut bounds = Bounds {
-            min_x: first.x,
-            min_y: first.y,
-            max_x: first.x,
-            max_y: first.y,
-        };
-        for point in &self.points[1..] {
-            bounds.min_x = bounds.min_x.min(point.x);
-            bounds.min_y = bounds.min_y.min(point.y);
-            bounds.max_x = bounds.max_x.max(point.x);
-            bounds.max_y = bounds.max_y.max(point.y);
-        }
-        Some(bounds)
+        ring_bounds(&self.points)
     }
 
+    /// Whether the point is on the leather: inside the outline and not inside a hole.
     pub fn contains(&self, point: Point) -> bool {
-        if self.points.len() < 3 {
-            return false;
-        }
+        ring_contains(&self.points, point) && self.hole_at(point).is_none()
+    }
 
-        let mut inside = false;
-        let mut previous = self.points.len() - 1;
-        for current in 0..self.points.len() {
-            let a = self.points[current];
-            let b = self.points[previous];
-            let crosses = (a.y > point.y) != (b.y > point.y)
-                && point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x;
-            if crosses {
-                inside = !inside;
-            }
-            previous = current;
-        }
-        inside
+    pub fn hole_at(&self, point: Point) -> Option<usize> {
+        self.holes
+            .iter()
+            .position(|hole| ring_contains(hole, point))
     }
 
     pub fn signed_area(&self) -> f64 {
-        let mut area = 0.0;
-        for index in 0..self.points.len() {
-            let a = self.points[index];
-            let b = self.points[(index + 1) % self.points.len()];
-            area += a.x * b.y - b.x * a.y;
+        signed_area(&self.points)
+    }
+
+    /// The outline followed by each hole.
+    pub fn rings(&self) -> impl Iterator<Item = &[Point]> {
+        std::iter::once(self.points.as_slice()).chain(self.holes.iter().map(Vec::as_slice))
+    }
+
+    /// Every point of `rings`, in order, as triangulation expects them.
+    pub fn vertices(&self) -> impl Iterator<Item = &Point> {
+        self.rings().flatten()
+    }
+
+    /// Where each hole starts within `vertices`.
+    pub fn hole_indices(&self) -> Vec<usize> {
+        let mut start = self.points.len();
+        self.holes
+            .iter()
+            .map(|hole| {
+                let index = start;
+                start += hole.len();
+                index
+            })
+            .collect()
+    }
+
+    fn validate_ring(&self, ring: &[Point]) -> Result<(), Message> {
+        if !(3..=MAX_POINTS_PER_PIECE).contains(&ring.len()) {
+            return Err(Message::PointCountOutOfRange {
+                name: self.name.clone(),
+                max: MAX_POINTS_PER_PIECE,
+            });
         }
-        area * 0.5
+        for (index, point) in ring.iter().enumerate() {
+            if !point.x.is_finite()
+                || !point.y.is_finite()
+                || point.x.abs() > MAX_COORDINATE_MM
+                || point.y.abs() > MAX_COORDINATE_MM
+            {
+                return Err(Message::CoordinateOutOfRange {
+                    name: self.name.clone(),
+                });
+            }
+            let next = ring[(index + 1) % ring.len()];
+            if (point.x - next.x).hypot(point.y - next.y) < 1.0e-8 {
+                return Err(Message::CoincidentPoints {
+                    name: self.name.clone(),
+                });
+            }
+        }
+        if signed_area(ring).abs() < MIN_POLYGON_AREA_MM2 {
+            return Err(Message::ZeroArea {
+                name: self.name.clone(),
+            });
+        }
+        Ok(())
+    }
+
+    fn validate_holes(&self) -> Result<(), Message> {
+        if self.holes.len() > MAX_HOLES_PER_PIECE {
+            return Err(Message::TooManyHoles {
+                name: self.name.clone(),
+                max: MAX_HOLES_PER_PIECE,
+            });
+        }
+        let mut checked: Vec<(&[Point], Option<Bounds>)> = Vec::with_capacity(self.holes.len());
+        for hole in &self.holes {
+            self.validate_ring(hole)?;
+            if !ring_contains(&self.points, hole[0]) || rings_cross(&self.points, hole) {
+                return Err(Message::HoleOutsidePiece {
+                    name: self.name.clone(),
+                });
+            }
+            let bounds = ring_bounds(hole);
+            for (other, other_bounds) in &checked {
+                let near = matches!(
+                    (bounds, *other_bounds),
+                    (Some(a), Some(b)) if a.overlaps(b)
+                );
+                if near
+                    && (rings_cross(hole, other)
+                        || ring_contains(hole, other[0])
+                        || ring_contains(other, hole[0]))
+                {
+                    return Err(Message::HolesOverlap {
+                        name: self.name.clone(),
+                    });
+                }
+            }
+            checked.push((hole, bounds));
+        }
+        Ok(())
     }
 }
 
@@ -194,41 +345,13 @@ impl Project {
             if piece.name.trim().is_empty() {
                 return Err(Message::PieceNameRequired { id: piece.id });
             }
-            if !(3..=MAX_POINTS_PER_PIECE).contains(&piece.points.len()) {
-                return Err(Message::PointCountOutOfRange {
-                    name: piece.name.clone(),
-                    max: MAX_POINTS_PER_PIECE,
-                });
-            }
             if !piece.material.has_valid_thickness() {
                 return Err(Message::ThicknessOutOfRange {
                     name: piece.name.clone(),
                 });
             }
-
-            for (index, point) in piece.points.iter().enumerate() {
-                if !point.x.is_finite()
-                    || !point.y.is_finite()
-                    || point.x.abs() > MAX_COORDINATE_MM
-                    || point.y.abs() > MAX_COORDINATE_MM
-                {
-                    return Err(Message::CoordinateOutOfRange {
-                        name: piece.name.clone(),
-                    });
-                }
-                let next = piece.points[(index + 1) % piece.points.len()];
-                if (point.x - next.x).hypot(point.y - next.y) < 1.0e-8 {
-                    return Err(Message::CoincidentPoints {
-                        name: piece.name.clone(),
-                    });
-                }
-            }
-
-            if piece.signed_area().abs() < MIN_POLYGON_AREA_MM2 {
-                return Err(Message::ZeroArea {
-                    name: piece.name.clone(),
-                });
-            }
+            piece.validate_ring(&piece.points)?;
+            piece.validate_holes()?;
         }
         Ok(())
     }
@@ -325,6 +448,84 @@ mod tests {
         let piece = rectangle(1);
         assert!(piece.contains(Point::new(40.0, 60.0)));
         assert!(!piece.contains(Point::new(100.0, 60.0)));
+    }
+
+    fn square(x: f64, y: f64, size: f64) -> Vec<Point> {
+        vec![
+            Point::new(x, y),
+            Point::new(x + size, y),
+            Point::new(x + size, y + size),
+            Point::new(x, y + size),
+        ]
+    }
+
+    fn project_with_holes(holes: Vec<Vec<Point>>) -> Project {
+        let mut piece = rectangle(1);
+        piece.holes = holes;
+        Project {
+            pieces: vec![piece],
+            ..Project::default()
+        }
+    }
+
+    #[test]
+    fn points_inside_a_hole_are_not_on_the_piece() {
+        let mut piece = rectangle(1);
+        piece.holes = vec![square(10.0, 10.0, 10.0), square(40.0, 40.0, 10.0)];
+
+        assert!(!piece.contains(Point::new(45.0, 45.0)));
+        assert!(piece.contains(Point::new(30.0, 30.0)));
+        assert_eq!(piece.hole_at(Point::new(45.0, 45.0)), Some(1));
+        assert_eq!(piece.hole_at(Point::new(30.0, 30.0)), None);
+        assert_eq!(piece.hole_indices(), vec![4, 8]);
+        assert_eq!(piece.vertices().count(), 12);
+    }
+
+    #[test]
+    fn accepts_separate_holes_inside_the_piece() {
+        let holes = vec![square(10.0, 10.0, 10.0), square(40.0, 40.0, 10.0)];
+        assert_eq!(project_with_holes(holes).validate(), Ok(()));
+    }
+
+    #[test]
+    fn rejects_holes_outside_or_crossing_the_outline() {
+        let outside = Err(Message::HoleOutsidePiece {
+            name: "Pocket".to_owned(),
+        });
+        let beyond = vec![square(200.0, 200.0, 10.0)];
+        assert_eq!(project_with_holes(beyond).validate(), outside);
+        let crossing = vec![square(75.0, 10.0, 10.0)];
+        assert_eq!(project_with_holes(crossing).validate(), outside);
+        let touching = vec![square(70.0, 10.0, 10.0)];
+        assert_eq!(project_with_holes(touching).validate(), outside);
+    }
+
+    #[test]
+    fn rejects_overlapping_and_nested_holes() {
+        let overlap = Err(Message::HolesOverlap {
+            name: "Pocket".to_owned(),
+        });
+        let crossing = vec![square(10.0, 10.0, 10.0), square(15.0, 15.0, 10.0)];
+        assert_eq!(project_with_holes(crossing).validate(), overlap);
+        let nested = vec![square(10.0, 10.0, 30.0), square(15.0, 15.0, 5.0)];
+        assert_eq!(project_with_holes(nested).validate(), overlap);
+        let enclosing = vec![square(15.0, 15.0, 5.0), square(10.0, 10.0, 30.0)];
+        assert_eq!(project_with_holes(enclosing).validate(), overlap);
+    }
+
+    #[test]
+    fn holes_follow_the_same_ring_rules_as_outlines() {
+        let flat = vec![
+            Point::new(10.0, 10.0),
+            Point::new(20.0, 20.0),
+            Point::new(30.0, 30.0),
+        ];
+        assert_eq!(
+            project_with_holes(vec![flat]).validate(),
+            Err(Message::ZeroArea {
+                name: "Pocket".to_owned()
+            })
+        );
     }
 
     #[test]

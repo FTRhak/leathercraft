@@ -19,15 +19,22 @@ pub fn to_svg(project: &Project) -> Result<String, ExportError> {
     );
     for piece in &project.pieces {
         svg.push_str(&format!("    <path data-piece=\"{}\" d=\"", piece.id));
-        for (index, point) in piece.points.iter().enumerate() {
-            let command = if index == 0 { 'M' } else { 'L' };
-            svg.push_str(&format!(
-                "{command} {} {} ",
-                number(point.x - min_x),
-                number(point.y - min_y)
-            ));
+        let mut rings = Vec::new();
+        for ring in piece.rings() {
+            let mut path = String::new();
+            for (index, point) in ring.iter().enumerate() {
+                let command = if index == 0 { 'M' } else { 'L' };
+                path.push_str(&format!(
+                    "{command} {} {} ",
+                    number(point.x - min_x),
+                    number(point.y - min_y)
+                ));
+            }
+            path.push('Z');
+            rings.push(path);
         }
-        svg.push_str("Z\" />\n");
+        svg.push_str(&rings.join(" "));
+        svg.push_str("\" />\n");
     }
     svg.push_str("  </g>\n</svg>\n");
     Ok(svg)

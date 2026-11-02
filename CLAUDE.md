@@ -44,12 +44,12 @@ The UI never writes to the project. It sends a `ProjectEvent` wrapped in `docume
 ## Invariants
 
 - **Internal geometry is always millimeters.** `Project.units` is a display preference only; convert explicitly with `Units::from_millimeters`. SVG and DXF exports are always written in mm, regardless of `Project.units`.
-- **A piece is a closed polygon** stored as an ordered point list without a repeated closing point. Validation treats the last point as connected to the first.
+- **A piece is a closed polygon** stored as an ordered point list without a repeated closing point. Validation treats the last point as connected to the first. Its holes are stored the same way and must lie inside the outline, without touching it or each other.
 - **`Project::validate` guards every file boundary:** `save_project`, `load_project`, `to_svg`, and `to_dxf` all call it. New I/O paths should do the same.
 - **The project is always valid:** `Project::apply` validates every edit on a copy, so a rejected event leaves the project untouched.
 - **Format version:** `PROJECT_VERSION` must match exactly on load; there is no migration path yet. Changing the serialized shape of the model means bumping it and deciding how older files are handled. Adding a `#[serde(default)]` field doesn't need a bump, since older files still load.
 - **Round-tripping uses `.leathercraft` only.** SVG and DXF are one-way exports; SVG also shifts geometry so the project's bounding box starts at the origin, while DXF keeps original coordinates.
-- **The 3D preview shows individual flat pieces**, extruded to the thickness of their material and shown in its color. It intentionally does not infer seams or assemble finished items.
+- **The 3D preview shows individual flat pieces**, extruded to the thickness of their material, with their holes cut through, and shown in its color. It intentionally does not infer seams or assemble finished items.
 
 ## Conventions
 

@@ -97,6 +97,32 @@ mod tests {
         assert!(dxf.ends_with("0\nEOF\n"));
     }
 
+    fn project_with_hole() -> Project {
+        let mut project = project();
+        project.pieces[0].holes = vec![vec![
+            Point::new(0.0, 15.0),
+            Point::new(10.0, 15.0),
+            Point::new(10.0, 25.0),
+        ]];
+        project
+    }
+
+    #[test]
+    fn svg_exports_holes_as_subpaths_of_their_piece() {
+        let svg = to_svg(&project_with_hole()).unwrap();
+
+        assert!(svg.contains("L 0 80 Z M 10 10 L 20 10 L 20 20 Z\""));
+        assert_eq!(svg.matches("<path").count(), 1);
+    }
+
+    #[test]
+    fn dxf_exports_holes_as_separate_polylines() {
+        let dxf = to_dxf(&project_with_hole()).unwrap();
+
+        assert_eq!(dxf.matches("LWPOLYLINE").count(), 2);
+        assert!(dxf.contains("0\nLWPOLYLINE\n8\nPATTERN\n90\n3\n70\n1"));
+    }
+
     #[test]
     fn empty_projects_are_not_exported() {
         assert_eq!(to_svg(&Project::default()), Err(ExportError::EmptyProject));

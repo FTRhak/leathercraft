@@ -80,7 +80,13 @@ impl Tool {
     }
 }
 
-pub fn show_panel(ui: &mut egui::Ui, tool: &mut Tool, language: Language) {
+fn paint_hole_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+    let rect = rect.shrink(ICON_MARGIN);
+    painter.circle_stroke(rect.center(), rect.width() / 2.0, stroke);
+    painter.circle_stroke(rect.center(), rect.width() / 4.0, stroke);
+}
+
+pub fn show_panel(ui: &mut egui::Ui, tool: &mut Tool, hole_mode: &mut bool, language: Language) {
     ui.horizontal_wrapped(|ui| {
         for option in Tool::ALL {
             let name = language.label(option.label());
@@ -94,6 +100,17 @@ pub fn show_panel(ui: &mut egui::Ui, tool: &mut Tool, language: Language) {
             if response.clicked() {
                 *tool = option;
             }
+        }
+        ui.separator();
+        let response = icon_button(
+            ui,
+            ICON_BUTTON_SIZE,
+            *hole_mode,
+            language.label(Label::HoleMode),
+            paint_hole_icon,
+        );
+        if response.clicked() {
+            *hole_mode = !*hole_mode;
         }
     });
 }

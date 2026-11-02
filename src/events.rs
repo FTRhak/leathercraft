@@ -7,16 +7,49 @@ use std::path::PathBuf;
 /// A requested change to the project. `Project::apply` is the only intended way to change one.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProjectEvent {
-    New { material: Material },
-    Open { path: PathBuf },
-    Save { path: PathBuf },
+    New {
+        material: Material,
+    },
+    Open {
+        path: PathBuf,
+    },
+    Save {
+        path: PathBuf,
+    },
     SetUnits(Units),
-    AddPiece { name: String, points: Vec<Point> },
-    RenamePiece { id: u64, name: String },
-    SetPiecePoints { id: u64, points: Vec<Point> },
-    SetPieceLocked { id: u64, locked: bool },
-    SetPieceMaterial { id: u64, material: Material },
-    RemovePiece { id: u64 },
+    AddPiece {
+        name: String,
+        points: Vec<Point>,
+    },
+    RenamePiece {
+        id: u64,
+        name: String,
+    },
+    /// Replaces the outline and holes together, since moving them apart would fail validation.
+    SetPieceGeometry {
+        id: u64,
+        points: Vec<Point>,
+        holes: Vec<Vec<Point>>,
+    },
+    SetPieceLocked {
+        id: u64,
+        locked: bool,
+    },
+    SetPieceMaterial {
+        id: u64,
+        material: Material,
+    },
+    RemovePiece {
+        id: u64,
+    },
+    AddHole {
+        id: u64,
+        points: Vec<Point>,
+    },
+    RemoveHole {
+        id: u64,
+        index: usize,
+    },
 }
 
 /// What an applied event did, so that listeners can react without inspecting the project.
@@ -28,6 +61,8 @@ pub enum ProjectChange {
     Edited,
     PieceAdded(u64),
     PieceRemoved(u64),
+    HoleAdded { id: u64, index: usize },
+    HoleRemoved { id: u64 },
 }
 
 impl Project {
@@ -70,8 +105,10 @@ impl Project {
                 project.piece_mut(id)?.name = name;
                 Ok(ProjectChange::Edited)
             }),
-            ProjectEvent::SetPiecePoints { id, points } => self.edit(|project| {
-                project.unlocked_piece_mut(id)?.points = points;
+            ProjectEvent::SetPieceGeometry { id, points, holes } => self.edit(|project| {
+                let piece = project.unlocked_piece_mut(id)?;
+                piece.points = points;
+                piece.holes = holes;
                 Ok(ProjectChange::Edited)
             }),
             ProjectEvent::SetPieceLocked { id, locked } => self.edit(|project| {
@@ -86,6 +123,24 @@ impl Project {
                 project.unlocked_piece_mut(id)?;
                 project.remove_piece(id);
                 Ok(ProjectChange::PieceRemoved(id))
+            }),
+            ProjectEvent::AddHole { id, points } => self.edit(|project| {
+                let piece = project.unlocked_piece_mut(id)?;
+                piece.holes.push(points);
+                Ok(ProjectChange::HoleAdded {
+                    id,
+                    index: piece.holes.len() - 1,
+                })
+            }),
+            ProjectEvent::RemoveHole { id, index } => self.edit(|project| {
+                let piece = project.unlocked_piece_mut(id)?;
+                if index >= piece.holes.len() {
+                    return Err(Message::HoleNotFound {
+                        name: piece.name.clone(),
+                    });
+                }
+                piece.holes.remove(index);
+                Ok(ProjectChange::HoleRemoved { id })
             }),
         }
     }
@@ -135,6 +190,14 @@ mod tests {
         ]
     }
 
+    fn small_hole() -> Vec<Point> {
+        vec![
+            Point::new(1.0, 1.0),
+            Point::new(3.0, 1.0),
+            Point::new(1.0, 3.0),
+        ]
+    }
+
     fn add_piece() -> ProjectEvent {
         ProjectEvent::AddPiece {
             name: "Деталь 1".to_owned(),
@@ -175,15 +238,30 @@ mod tests {
                 id: 1,
                 name: " ".to_owned(),
             },
-            ProjectEvent::SetPiecePoints {
+            ProjectEvent::SetPieceGeometry {
                 id: 1,
                 points: vec![Point::new(0.0, 0.0); 3],
+                holes: Vec::new(),
             },
-            ProjectEvent::SetPiecePoints {
+            ProjectEvent::SetPieceGeometry {
                 id: 9,
                 points: triangle(),
+                holes: Vec::new(),
             },
             ProjectEvent::RemovePiece { id: 9 },
+            ProjectEvent::AddHole {
+                id: 9,
+                points: small_hole(),
+            },
+            ProjectEvent::AddHole {
+                id: 1,
+                points: vec![
+                    Point::new(50.0, 50.0),
+                    Point::new(51.0, 50.0),
+                    Point::new(50.0, 51.0),
+                ],
+            },
+            ProjectEvent::RemoveHole { id: 1, index: 0 },
         ];
         for event in invalid {
             assert!(project.apply(event).is_err());
@@ -231,9 +309,10 @@ mod tests {
             Point::new(11.0, 0.0),
             Point::new(1.0, 10.0),
         ];
-        let set_points = ProjectEvent::SetPiecePoints {
+        let set_points = ProjectEvent::SetPieceGeometry {
             id: 1,
             points: moved.clone(),
+            holes: Vec::new(),
         };
         assert_eq!(project.apply(set_points.clone()), locked);
         assert_eq!(project.apply(ProjectEvent::RemovePiece { id: 1 }), locked);
@@ -259,6 +338,87 @@ mod tests {
             project.apply(ProjectEvent::RemovePiece { id: 1 }),
             Ok(ProjectChange::PieceRemoved(1))
         );
+    }
+
+    #[test]
+    fn holes_can_be_added_and_removed() {
+        let mut project = project_with_piece();
+        assert_eq!(
+            project.apply(ProjectEvent::AddHole {
+                id: 1,
+                points: small_hole(),
+            }),
+            Ok(ProjectChange::HoleAdded { id: 1, index: 0 })
+        );
+        assert_eq!(project.pieces[0].holes, vec![small_hole()]);
+
+        assert_eq!(
+            project.apply(ProjectEvent::RemoveHole { id: 1, index: 0 }),
+            Ok(ProjectChange::HoleRemoved { id: 1 })
+        );
+        assert!(project.pieces[0].holes.is_empty());
+    }
+
+    #[test]
+    fn locked_pieces_reject_hole_changes() {
+        let mut project = project_with_piece();
+        project
+            .apply(ProjectEvent::AddHole {
+                id: 1,
+                points: small_hole(),
+            })
+            .unwrap();
+        project
+            .apply(ProjectEvent::SetPieceLocked {
+                id: 1,
+                locked: true,
+            })
+            .unwrap();
+
+        let before = project.clone();
+        let locked = Err(Message::PieceLocked {
+            name: "Деталь 1".to_owned(),
+        });
+        assert_eq!(
+            project.apply(ProjectEvent::RemoveHole { id: 1, index: 0 }),
+            locked
+        );
+        assert_eq!(
+            project.apply(ProjectEvent::AddHole {
+                id: 1,
+                points: small_hole(),
+            }),
+            locked
+        );
+        assert_eq!(project, before);
+    }
+
+    #[test]
+    fn geometry_that_leaves_a_hole_outside_is_rejected() {
+        let mut project = project_with_piece();
+        project
+            .apply(ProjectEvent::AddHole {
+                id: 1,
+                points: small_hole(),
+            })
+            .unwrap();
+        let before = project.clone();
+
+        let shifted: Vec<Point> = triangle()
+            .iter()
+            .map(|point| Point::new(point.x + 100.0, point.y))
+            .collect();
+        assert_eq!(
+            project.apply(ProjectEvent::SetPieceGeometry {
+                id: 1,
+                points: shifted,
+                holes: vec![small_hole()],
+            }),
+            Err(Message::HoleOutsidePiece {
+                name: "Деталь 1".to_owned()
+            })
+        );
+        assert_eq!(project, before);
     }
 
     #[test]

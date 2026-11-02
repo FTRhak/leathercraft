@@ -15,7 +15,7 @@ use crate::document::ProjectMessage;
 use bevy::prelude::*;
 use bevy_egui::egui;
 use canvas::canvas;
-use drag_state_struct::DragState;
+use drag_state_struct::{DragState, DragTarget};
 use leathercraft::events::ProjectEvent;
 use leathercraft::exports::ExportError;
 use leathercraft::i18n::{Label, Language, Message};

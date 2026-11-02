@@ -30,6 +30,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Circle => "Коло",
         Label::RectangleHint => "Перетягуйте від кута до кута. Esc скасовує.",
         Label::CircleHint => "Перетягуйте від центру назовні. Esc скасовує.",
+        Label::HoleMode => "Отвір: Малювання, Прямокутник і Коло вирізають у вибраній деталі",
         Label::DrawHint => {
             "Клацайте, щоб додавати точки. Клацніть першу точку або натисніть Enter, щоб замкнути контур; Esc скасовує."
         }
@@ -320,6 +321,19 @@ pub(super) fn message(message: &Message) -> String {
         Message::DefaultPieceName { id } => format!("Деталь {id}"),
         Message::PieceNotFound { id } => format!("Деталь {id} не існує."),
         Message::PieceLocked { name } => format!("Деталь «{name}» заблоковано."),
+        Message::HoleAdded { name } => format!("Додано отвір у деталь «{name}»."),
+        Message::HoleDeleted => "Отвір видалено.".to_owned(),
+        Message::SelectPieceForHole => "Виберіть деталь, у якій треба вирізати отвір.".to_owned(),
+        Message::HoleNotFound { name } => format!("У деталі «{name}» немає такого отвору."),
+        Message::TooManyHoles { name, max } => {
+            format!("Деталь «{name}» може мати не більше {max} отворів.")
+        }
+        Message::HoleOutsidePiece { name } => {
+            format!("Отвори деталі «{name}» мають лежати всередині контуру й не торкатися його.")
+        }
+        Message::HolesOverlap { name } => {
+            format!("Отвори деталі «{name}» не повинні перетинатися чи торкатися один одного.")
+        }
         Message::UnsupportedVersion { found, expected } => {
             format!("Версія проєкту {found} не підтримується (очікується {expected}).")
         }

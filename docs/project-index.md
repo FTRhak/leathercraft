@@ -27,11 +27,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 |---|---:|---:|---|---|
 | `src/editor/mod.rs` | 164 | 1,150 | bin | `ViewMode`, `send`, menu helpers, sidebar, `format_length` |
 | `src/editor/editor_state_struct.rs` | 159 | 1,250 | bin | `EditorState` and its methods, `document_name` |
-| `src/editor/drag_state_struct.rs` | 12 | 100 | bin | `DragState` |
+| `src/editor/drag_state_struct.rs` | 23 | 150 | bin | `DragState`, `DragTarget` |
 | `src/editor/shape_draft_struct.rs` | 7 | 50 | bin | `ShapeDraft` |
 | `src/editor/canvas.rs` | 395 | 3,200 | bin | `canvas`, `Viewport`, tool behavior, hit testing, painting |
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
-| `src/editor/drag.rs` | 80 | 600 | bin | `begin_drag`, `update_drag`, `finish_drag`: dragging pieces and vertices with the Select tool |
+| `src/editor/drag.rs` | 118 | 850 | bin | `begin_drag`, `update_drag`, `finish_drag`: dragging pieces, holes and vertices with the Select tool |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
 | `src/editor/ui.rs` | 219 | 2,000 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete key, language picker |
 | `src/editor/panel_viewer.rs` | 102 | 800 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab |
@@ -69,7 +69,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 421-462 | Tests |
 | `model.rs` | 7-11 | `PROJECT_VERSION` and validation limits (`MAX_PIECES`, `MAX_POINTS_PER_PIECE`, `MAX_COORDINATE_MM`, `MIN_POLYGON_AREA_MM2`) |
 | | 15-59 | `Units`, `Point`, `Bounds` |
-| | 61-130 | `PatternPiece`: `bounds`, `contains`, `signed_area` |
+| | 50-150 | `Bounds::overlaps`; ring helpers: `ring_bounds`, `ring_contains`, `segments_touch`, `rings_cross`, `signed_area` |
+| | 150-290 | `PatternPiece`: `bounds`, `contains`, `hole_at`, `signed_area`, `rings`, `vertices`, `hole_indices`, `validate_ring`, `validate_holes` |
 | | 133-254 | `Project`: `bounds`, `validate` (173), `next_piece_id`, `add_piece`, `remove_piece` |
 | | 256-335 | Tests |
 | `events.rs` | 9-31 | `ProjectEvent`, `ProjectChange` |
@@ -121,8 +122,9 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | 109-136 | Select tool | `handle_select` |
 | 138-177 | Draw tool | `handle_draw`, `finish_draft` |
 | 179-223 | Rectangle and Circle tools | `handle_shape`, `add_piece` |
-| 225-243 | Hit testing | `piece_at`, `vertex_at` |
-| 245-395 | Painting | `draw_pieces`, `fill_polygon`, `draw_draft`, `draw_shape_draft` |
+| Search by name | Holes | `select_at`, `commit_shape`, `hole_vertex_at` |
+| Search by name | Hit testing | `piece_at`, `vertex_at` |
+| Search by name | Painting | `draw_pieces`, `draw_edge_labels`, `fill_polygon`, `draw_draft`, `draw_shape_draft` |
 
 ### `editor/ui.rs`
 
@@ -183,16 +185,16 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 31 tests, all inline in the library crate:
+There are 42 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
-| `model` | 4 |
+| `model` | 9 |
 | `material` | 3 |
-| `events` | 8 |
+| `events` | 11 |
 | `i18n` | 5 |
-| `exports` | 3 |
-| `persistence` | 4 |
+| `exports` | 5 |
+| `persistence` | 5 |
 | `shapes` | 4 |
 
 `document`, `editor`, `preview`, `settings` and `panels` have no tests, so changes there need `cargo check` and a manual run.

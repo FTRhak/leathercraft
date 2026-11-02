@@ -49,7 +49,12 @@ impl TabViewer for PanelViewer<'_, '_, '_> {
             // Disabled rather than removed in preview mode, so that the layout doesn't jump.
             PanelTab::Tools => {
                 ui.add_enabled_ui(editing, |ui| {
-                    tools::show_panel(ui, &mut self.state.tool, language);
+                    tools::show_panel(
+                        ui,
+                        &mut self.state.tool,
+                        &mut self.state.hole_mode,
+                        language,
+                    );
                 });
             }
             PanelTab::Properties => {

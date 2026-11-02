@@ -13,7 +13,12 @@ pub struct EditorState {
     pub(super) tool: Tool,
     pub(super) draft: Vec<Point>,
     pub(super) shape_draft: Option<ShapeDraft>,
+    /// Draw, Rectangle and Circle cut a hole in the selected piece instead of adding a piece.
+    pub(super) hole_mode: bool,
     pub(super) selected: Option<u64>,
+    /// Piece id and hole index. Read through `selected_hole_index`, since it only counts
+    /// while that piece is the selected one.
+    pub(super) selected_hole: Option<(u64, usize)>,
     pub(super) drag: Option<DragState>,
     pub(super) pan: egui::Vec2,
     pub(super) zoom: f32,
@@ -36,7 +41,9 @@ impl Default for EditorState {
             tool: Tool::default(),
             draft: Vec::new(),
             shape_draft: None,
+            hole_mode: false,
             selected: None,
+            selected_hole: None,
             drag: None,
             pan: egui::Vec2::ZERO,
             zoom: 2.0,
@@ -87,6 +94,7 @@ impl EditorState {
         self.draft.clear();
         self.shape_draft = None;
         self.selected = None;
+        self.selected_hole = None;
         self.drag = None;
         self.rename_buffer = None;
         self.fit_requested = true;
@@ -122,12 +130,36 @@ impl EditorState {
                 if self.selected == Some(id) {
                     self.selected = None;
                 }
+                // The id can be given to the next new piece.
+                self.selected_hole = None;
                 if self.drag.as_ref().is_some_and(|drag| drag.piece_id == id) {
                     self.drag = None;
                 }
                 self.report(Message::PieceDeleted);
             }
+            // The tool and hole mode stay, so that several holes can be cut in a row.
+            ProjectChange::HoleAdded { id, index } => {
+                self.draft.clear();
+                self.selected_hole = Some((id, index));
+                if let Some(piece) = project.pieces.iter().find(|piece| piece.id == id) {
+                    self.report(Message::HoleAdded {
+                        name: piece.name.clone(),
+                    });
+                }
+            }
+            ProjectChange::HoleRemoved { id } => {
+                if self.selected_hole.is_some_and(|(piece, _)| piece == id) {
+                    self.selected_hole = None;
+                }
+                self.report(Message::HoleDeleted);
+            }
         }
+    }
+
+    pub(super) fn selected_hole_index(&self) -> Option<usize> {
+        self.selected_hole
+            .filter(|(id, _)| self.selected == Some(*id))
+            .map(|(_, index)| index)
     }
 
     pub fn clear_released_drag(&mut self) {
@@ -140,6 +172,7 @@ impl EditorState {
         match &self.drag {
             Some(drag) if drag.piece_id == piece.id => Cow::Owned(PatternPiece {
                 points: drag.points.clone(),
+                holes: drag.holes.clone(),
                 ..piece.clone()
             }),
             _ => Cow::Borrowed(piece),

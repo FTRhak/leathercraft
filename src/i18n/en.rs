@@ -30,6 +30,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Circle => "Circle",
         Label::RectangleHint => "Drag from corner to corner. Esc cancels.",
         Label::CircleHint => "Drag from the center outward. Esc cancels.",
+        Label::HoleMode => "Hole: Draw, Rectangle and Circle cut into the selected piece",
         Label::DrawHint => {
             "Click to add points. Click the first point or press Enter to close; Esc cancels."
         }
@@ -316,6 +317,19 @@ pub(super) fn message(message: &Message) -> String {
         Message::DefaultPieceName { id } => format!("Piece {id}"),
         Message::PieceNotFound { id } => format!("Piece {id} does not exist."),
         Message::PieceLocked { name } => format!("Piece '{name}' is locked."),
+        Message::HoleAdded { name } => format!("Added a hole to '{name}'."),
+        Message::HoleDeleted => "Hole deleted.".to_owned(),
+        Message::SelectPieceForHole => "Select a piece to cut the hole in.".to_owned(),
+        Message::HoleNotFound { name } => format!("Piece '{name}' has no such hole."),
+        Message::TooManyHoles { name, max } => {
+            format!("Piece '{name}' can have at most {max} holes.")
+        }
+        Message::HoleOutsidePiece { name } => {
+            format!("Holes of piece '{name}' must lie inside its outline without touching it.")
+        }
+        Message::HolesOverlap { name } => {
+            format!("Holes of piece '{name}' must not overlap or touch each other.")
+        }
         Message::UnsupportedVersion { found, expected } => {
             format!("Project version {found} is not supported (expected {expected}).")
         }

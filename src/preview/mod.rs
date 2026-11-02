@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy_egui::egui;
 use earcutr::earcut;
 use leathercraft::i18n::{Label, Language};
-use leathercraft::model::PatternPiece;
+use leathercraft::model::{PatternPiece, Point, signed_area};
 
 // Scene units per millimeter; the scene is scaled up, so this is not a meters conversion.
 const MM_TO_SCENE: f64 = 0.01;
@@ -152,26 +152,26 @@ pub fn show_controls(ui: &mut egui::Ui, settings: &mut PreviewSettings, language
 }
 
 fn build_piece_mesh(piece: &PatternPiece, center_x: f32, center_z: f32) -> Result<Mesh, String> {
-    let points = &piece.points;
+    let points: Vec<Point> = piece.vertices().copied().collect();
     let thickness = (piece.material.thickness_mm * MM_TO_SCENE) as f32;
     let mut flat_points = Vec::with_capacity(points.len() * 2);
-    for point in points {
+    for point in &points {
         flat_points.push(point.x * MM_TO_SCENE - f64::from(center_x));
         flat_points.push(point.y * MM_TO_SCENE - f64::from(center_z));
     }
-    let triangles =
-        earcut(&flat_points, &[], 2).map_err(|error| format!("triangulation failed: {error}"))?;
+    let triangles = earcut(&flat_points, &piece.hole_indices(), 2)
+        .map_err(|error| format!("triangulation failed: {error}"))?;
 
     let mut positions = Vec::<[f32; 3]>::with_capacity(points.len() * 2 + points.len() * 4);
     let mut normals = Vec::<[f32; 3]>::with_capacity(points.len() * 2 + points.len() * 4);
     let mut indices = Vec::<u32>::new();
-    for point in points {
+    for point in &points {
         let x = (point.x * MM_TO_SCENE - f64::from(center_x)) as f32;
         let z = (point.y * MM_TO_SCENE - f64::from(center_z)) as f32;
         positions.push([x, 0.0, z]);
         normals.push([0.0, -1.0, 0.0]);
     }
-    for point in points {
+    for point in &points {
         let x = (point.x * MM_TO_SCENE - f64::from(center_x)) as f32;
         let z = (point.y * MM_TO_SCENE - f64::from(center_z)) as f32;
         positions.push([x, thickness, z]);
@@ -203,36 +203,40 @@ fn build_piece_mesh(piece: &PatternPiece, center_x: f32, center_z: f32) -> Resul
         }
     }
 
-    // Pieces can be wound either way; walls must still face away from the interior.
-    let outward: f32 = if piece.signed_area() >= 0.0 {
-        1.0
-    } else {
-        -1.0
-    };
-    for index in 0..points.len() {
-        let next = (index + 1) % points.len();
-        let a = points[index];
-        let b = points[next];
-        let dx = ((b.x - a.x) * MM_TO_SCENE) as f32;
-        let dz = ((b.y - a.y) * MM_TO_SCENE) as f32;
-        let length = dx.hypot(dz).max(f32::EPSILON);
-        let normal = [outward * dz / length, 0.0, -outward * dx / length];
-        let base = positions.len() as u32;
-        let ax = (a.x * MM_TO_SCENE - f64::from(center_x)) as f32;
-        let az = (a.y * MM_TO_SCENE - f64::from(center_z)) as f32;
-        let bx = (b.x * MM_TO_SCENE - f64::from(center_x)) as f32;
-        let bz = (b.y * MM_TO_SCENE - f64::from(center_z)) as f32;
-        positions.extend_from_slice(&[
-            [ax, 0.0, az],
-            [ax, thickness, az],
-            [bx, thickness, bz],
-            [bx, 0.0, bz],
-        ]);
-        normals.extend_from_slice(&[normal; 4]);
-        if outward > 0.0 {
-            indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+    // Rings can be wound either way; walls must still face away from the leather,
+    // which for a hole means toward its own center.
+    for (ring_index, ring) in piece.rings().enumerate() {
+        let is_hole = ring_index > 0;
+        let outward: f32 = if (signed_area(ring) >= 0.0) != is_hole {
+            1.0
         } else {
-            indices.extend_from_slice(&[base, base + 2, base + 1, base, base + 3, base + 2]);
+            -1.0
+        };
+        for index in 0..ring.len() {
+            let next = (index + 1) % ring.len();
+            let a = ring[index];
+            let b = ring[next];
+            let dx = ((b.x - a.x) * MM_TO_SCENE) as f32;
+            let dz = ((b.y - a.y) * MM_TO_SCENE) as f32;
+            let length = dx.hypot(dz).max(f32::EPSILON);
+            let normal = [outward * dz / length, 0.0, -outward * dx / length];
+            let base = positions.len() as u32;
+            let ax = (a.x * MM_TO_SCENE - f64::from(center_x)) as f32;
+            let az = (a.y * MM_TO_SCENE - f64::from(center_z)) as f32;
+            let bx = (b.x * MM_TO_SCENE - f64::from(center_x)) as f32;
+            let bz = (b.y * MM_TO_SCENE - f64::from(center_z)) as f32;
+            positions.extend_from_slice(&[
+                [ax, 0.0, az],
+                [ax, thickness, az],
+                [bx, thickness, bz],
+                [bx, 0.0, bz],
+            ]);
+            normals.extend_from_slice(&[normal; 4]);
+            if outward > 0.0 {
+                indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+            } else {
+                indices.extend_from_slice(&[base, base + 2, base + 1, base, base + 3, base + 2]);
+            }
         }
     }
 

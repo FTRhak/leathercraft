@@ -131,7 +131,19 @@ fn handle_select(
     if response.clicked()
         && let Some(position) = response.interact_pointer_pos()
     {
-        state.selected = piece_at(project, view.to_world(position));
+        select_at(project, view.to_world(position), state);
+    }
+}
+
+/// A hole of the selected piece takes the click; otherwise it selects a piece.
+fn select_at(project: &Project, point: Point, state: &mut EditorState) {
+    let hole = state
+        .selected
+        .and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
+        .and_then(|piece| piece.hole_at(point).map(|index| (piece.id, index)));
+    state.selected_hole = hole;
+    if hole.is_none() {
+        state.selected = piece_at(project, point);
     }
 }
 
@@ -171,9 +183,27 @@ fn handle_draw(
 fn finish_draft(
     project: &Project,
     events: &mut MessageWriter<ProjectMessage>,
-    state: &EditorState,
+    state: &mut EditorState,
 ) {
-    add_piece(project, events, state.language, state.draft.clone());
+    let points = state.draft.clone();
+    commit_shape(project, events, state, points);
+}
+
+/// A finished shape becomes a hole in the selected piece in hole mode, otherwise a new piece.
+fn commit_shape(
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
+    state: &mut EditorState,
+    points: Vec<Point>,
+) {
+    if !state.hole_mode {
+        add_piece(project, events, state.language, points);
+        return;
+    }
+    match state.selected {
+        Some(id) => send(events, ProjectEvent::AddHole { id, points }),
+        None => state.report_error(Message::SelectPieceForHole),
+    }
 }
 
 fn handle_shape(
@@ -202,7 +232,7 @@ fn handle_shape(
         && let Some(draft) = state.shape_draft.take()
         && let Some(points) = state.tool.shape_points(draft.start, draft.end)
     {
-        add_piece(project, events, state.language, points);
+        commit_shape(project, events, state, points);
     }
     if !ui.ctx().wants_keyboard_input() && ui.input(|input| input.key_pressed(egui::Key::Escape)) {
         state.shape_draft = None;
@@ -242,8 +272,21 @@ pub(super) fn vertex_at(
         .position(|point| view.to_screen(*point).distance(position) <= VERTEX_HIT_RADIUS_PX)
 }
 
+pub(super) fn hole_vertex_at(
+    piece: &PatternPiece,
+    position: egui::Pos2,
+    view: Viewport,
+) -> Option<(usize, usize)> {
+    piece.holes.iter().enumerate().find_map(|(index, hole)| {
+        hole.iter()
+            .position(|point| view.to_screen(*point).distance(position) <= VERTEX_HIT_RADIUS_PX)
+            .map(|vertex| (index, vertex))
+    })
+}
+
 fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state: &EditorState) {
     let text_color = egui::Color32::from_gray(220);
+    let selected_hole_color = egui::Color32::from_rgb(110, 190, 240);
     let fill_color = egui::Color32::from_rgba_unmultiplied(128, 128, 128, 80);
     for piece in &project.pieces {
         let piece = state.displayed(piece);
@@ -258,8 +301,30 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
             .iter()
             .map(|point| view.to_screen(*point))
             .collect();
-        fill_polygon(painter, &screen, fill_color);
+        let holes: Vec<Vec<egui::Pos2>> = piece
+            .holes
+            .iter()
+            .map(|hole| hole.iter().map(|point| view.to_screen(*point)).collect())
+            .collect();
+        let selected_hole = if selected {
+            state.selected_hole_index()
+        } else {
+            None
+        };
+        let vertices: Vec<egui::Pos2> = piece
+            .vertices()
+            .map(|point| view.to_screen(*point))
+            .collect();
+        fill_polygon(painter, &vertices, &piece.hole_indices(), fill_color);
         painter.add(egui::Shape::closed_line(screen.clone(), stroke));
+        for (index, hole) in holes.iter().enumerate() {
+            let hole_stroke = if selected_hole == Some(index) {
+                egui::Stroke::new(stroke.width, selected_hole_color)
+            } else {
+                stroke
+            };
+            painter.add(egui::Shape::closed_line(hole.clone(), hole_stroke));
+        }
         if let Some(bounds) = piece.bounds() {
             let center = Point::new(
                 (bounds.min_x + bounds.max_x) * 0.5,
@@ -277,35 +342,56 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
             continue;
         }
         if !piece.locked {
-            for position in &screen {
+            for position in &vertices {
                 painter.circle_filled(*position, 4.0, stroke.color);
             }
         }
-        if piece.points.len() > MAX_POINTS_WITH_EDGE_LABELS {
-            continue;
-        }
-        for index in 0..piece.points.len() {
-            let a = piece.points[index];
-            let b = piece.points[(index + 1) % piece.points.len()];
-            let next = screen[(index + 1) % screen.len()];
-            painter.text(
-                screen[index].lerp(next, 0.5),
-                egui::Align2::CENTER_BOTTOM,
-                format_length(state.language, project.units, (b.x - a.x).hypot(b.y - a.y)),
-                egui::FontId::proportional(11.0),
-                text_color,
-            );
+        draw_edge_labels(painter, &piece.points, &screen, project.units, state);
+        if let Some(index) = selected_hole
+            && let (Some(hole), Some(hole_screen)) = (piece.holes.get(index), holes.get(index))
+        {
+            draw_edge_labels(painter, hole, hole_screen, project.units, state);
         }
     }
 }
 
-// Triangulated because pieces can be concave, which `Shape::convex_polygon` doesn't fill correctly.
-fn fill_polygon(painter: &egui::Painter, screen: &[egui::Pos2], color: egui::Color32) {
+fn draw_edge_labels(
+    painter: &egui::Painter,
+    ring: &[Point],
+    screen: &[egui::Pos2],
+    units: Units,
+    state: &EditorState,
+) {
+    if ring.len() > MAX_POINTS_WITH_EDGE_LABELS {
+        return;
+    }
+    for index in 0..ring.len() {
+        let a = ring[index];
+        let b = ring[(index + 1) % ring.len()];
+        let next = screen[(index + 1) % screen.len()];
+        painter.text(
+            screen[index].lerp(next, 0.5),
+            egui::Align2::CENTER_BOTTOM,
+            format_length(state.language, units, (b.x - a.x).hypot(b.y - a.y)),
+            egui::FontId::proportional(11.0),
+            egui::Color32::from_gray(220),
+        );
+    }
+}
+
+// Triangulated because pieces can be concave or have holes, which `Shape::convex_polygon`
+// doesn't fill correctly.
+fn fill_polygon(
+    painter: &egui::Painter,
+    screen: &[egui::Pos2],
+    hole_indices: &[usize],
+    color: egui::Color32,
+) {
     let flat: Vec<f64> = screen
         .iter()
         .flat_map(|position| [f64::from(position.x), f64::from(position.y)])
         .collect();
-    let Ok(triangles) = earcut(&flat, &[], 2) else {
+    let Ok(triangles) = earcut(&flat, hole_indices, 2) else {
         return;
     };
     let mut mesh = egui::Mesh::default();
