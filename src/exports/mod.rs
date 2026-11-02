@@ -1,3 +1,4 @@
+use crate::boolean::Region;
 use crate::i18n::Message;
 use crate::model::Project;
 use std::error::Error;
@@ -35,12 +36,18 @@ impl From<ExportError> for Message {
     }
 }
 
-pub(super) fn validate_export(project: &Project) -> Result<(), ExportError> {
+/// Checks the project and computes each piece's region, in piece order. A piece whose
+/// shapes don't combine into one outline can't be cut, so it stops the export.
+pub(super) fn validate_export(project: &Project) -> Result<Vec<Region>, ExportError> {
     project.validate().map_err(ExportError::InvalidProject)?;
     if project.pieces.is_empty() {
         return Err(ExportError::EmptyProject);
     }
-    Ok(())
+    project
+        .pieces
+        .iter()
+        .map(|piece| piece.region().map_err(ExportError::InvalidProject))
+        .collect()
 }
 
 pub(super) fn number(value: f64) -> String {
@@ -61,22 +68,37 @@ pub(super) fn number(value: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{PatternPiece, Point};
+    use crate::model::{BooleanOp, ChildShape, PatternPiece, Point};
+    use crate::shapes::Shape;
 
     fn project() -> Project {
         Project {
             pieces: vec![PatternPiece::new(
                 1,
                 "Pocket",
-                vec![
-                    Point::new(-10.0, 5.0),
-                    Point::new(40.0, 5.0),
-                    Point::new(40.0, 85.0),
-                    Point::new(-10.0, 85.0),
-                ],
+                Shape::rectangle_from_corners(Point::new(-10.0, 5.0), Point::new(40.0, 85.0))
+                    .unwrap(),
             )],
             ..Project::default()
         }
+    }
+
+    fn project_with_child(op: BooleanOp, a: Point, b: Point) -> Project {
+        let mut project = project();
+        project.pieces[0].children.push(ChildShape {
+            id: 1,
+            op,
+            shape: Shape::rectangle_from_corners(a, b).unwrap(),
+        });
+        project
+    }
+
+    fn project_with_hole() -> Project {
+        project_with_child(
+            BooleanOp::Subtract,
+            Point::new(0.0, 15.0),
+            Point::new(10.0, 25.0),
+        )
     }
 
     #[test]
@@ -85,34 +107,55 @@ mod tests {
 
         assert!(svg.contains("width=\"50mm\" height=\"80mm\""));
         assert!(svg.contains("viewBox=\"0 0 50 80\""));
-        assert!(svg.contains("M 0 0 L 50 0 L 50 80 L 0 80 Z"));
+        assert_eq!(svg.matches(" L ").count(), 3);
+        for corner in ["0 0", "50 0", "50 80", "0 80"] {
+            assert!(svg.contains(corner), "missing {corner}");
+        }
     }
 
     #[test]
     fn dxf_exports_closed_millimeter_polylines() {
         let dxf = to_dxf(&project()).unwrap();
 
-        assert!(dxf.contains("$INSUNITS\n70\n4"));
-        assert!(dxf.contains("0\nLWPOLYLINE\n8\nPATTERN\n90\n4\n70\n1"));
-        assert!(dxf.ends_with("0\nEOF\n"));
-    }
-
-    fn project_with_hole() -> Project {
-        let mut project = project();
-        project.pieces[0].holes = vec![vec![
-            Point::new(0.0, 15.0),
-            Point::new(10.0, 15.0),
-            Point::new(10.0, 25.0),
-        ]];
-        project
+        assert!(dxf.contains(
+            "$INSUNITS
+70
+4"
+        ));
+        assert!(dxf.contains(
+            "0
+LWPOLYLINE
+8
+PATTERN
+90
+4
+70
+1"
+        ));
+        assert!(dxf.ends_with(
+            "0
+EOF
+"
+        ));
     }
 
     #[test]
     fn svg_exports_holes_as_subpaths_of_their_piece() {
         let svg = to_svg(&project_with_hole()).unwrap();
 
-        assert!(svg.contains("L 0 80 Z M 10 10 L 20 10 L 20 20 Z\""));
+        assert_eq!(svg.matches('M').count(), 2);
         assert_eq!(svg.matches("<path").count(), 1);
+    }
+
+    #[test]
+    fn svg_size_follows_the_combined_outline() {
+        let svg = to_svg(&project_with_child(
+            BooleanOp::Union,
+            Point::new(30.0, 15.0),
+            Point::new(60.0, 25.0),
+        ))
+        .unwrap();
+        assert!(svg.contains("width=\"70mm\" height=\"80mm\""));
     }
 
     #[test]
@@ -120,7 +163,20 @@ mod tests {
         let dxf = to_dxf(&project_with_hole()).unwrap();
 
         assert_eq!(dxf.matches("LWPOLYLINE").count(), 2);
-        assert!(dxf.contains("0\nLWPOLYLINE\n8\nPATTERN\n90\n3\n70\n1"));
+    }
+
+    #[test]
+    fn pieces_that_do_not_combine_into_one_outline_are_not_exported() {
+        let split = project_with_child(
+            BooleanOp::Subtract,
+            Point::new(-20.0, 40.0),
+            Point::new(50.0, 50.0),
+        );
+        let error = Err(ExportError::InvalidProject(Message::ResultSplit {
+            name: "Pocket".to_owned(),
+        }));
+        assert_eq!(to_svg(&split), error);
+        assert_eq!(to_dxf(&split), error);
     }
 
     #[test]

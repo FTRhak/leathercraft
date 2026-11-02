@@ -52,12 +52,7 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
             // Disabled rather than removed in preview mode, so that the layout doesn't jump.
             PanelTab::Tools => {
                 ui.add_enabled_ui(editing, |ui| {
-                    tools::show_panel(
-                        ui,
-                        &mut self.state.tool,
-                        &mut self.state.hole_mode,
-                        language,
-                    );
+                    tools::show_panel(ui, &mut self.state.tool, &mut self.state.op_mode, language);
                 });
             }
             PanelTab::Properties => {
@@ -72,8 +67,11 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                 selected_piece_details(ui, self.project, self.events, self.state);
             }
             PanelTab::Layout => {
-                let event =
-                    layout::show_panel(ui, self.project, &mut self.state.selected, language);
+                let selection = layout::Selection {
+                    piece: &mut self.state.selected,
+                    child: &mut self.state.selected_child,
+                };
+                let event = layout::show_panel(ui, self.project, selection, language);
                 if let Some(event) = event {
                     send(self.events, event);
                 }

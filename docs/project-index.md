@@ -2,11 +2,11 @@
 
 A map for finding code without reading whole files. It complements `CLAUDE.md`, which holds the architecture rules and invariants and isn't repeated here.
 
-Indexed at commit `5afa155` plus the Tools and Layout panel, material, dockable panel and history changes. Line numbers drift, so treat them as hints and search for the symbol name if one doesn't match.
+Indexed at commit `12d841a` plus the change to pieces built from a base shape and boolean child shapes. Line numbers drift, so treat them as hints and search for the symbol name if one doesn't match.
 
 ## How to read this repo cheaply
 
-- **Start with this index, then read a line range.** All of `src/` is about 34k tokens, and `i18n/uk.rs` alone is about 4.5k.
+- **Start with this index, then read a line range.** All of `src/` is about 50k tokens, and `i18n/uk.rs` alone is about 6k.
 - **Never open or sweep these:**
   - `target/` (11 GB, about 7,700 files)
   - `.git/`
@@ -25,39 +25,40 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
-| `src/editor/mod.rs` | 164 | 1,150 | bin | `ViewMode`, `send`, menu helpers, sidebar, `format_length` |
-| `src/editor/editor_state_struct.rs` | 159 | 1,250 | bin | `EditorState` and its methods, `document_name` |
-| `src/editor/drag_state_struct.rs` | 23 | 150 | bin | `DragState`, `DragTarget` |
-| `src/editor/shape_draft_struct.rs` | 7 | 50 | bin | `ShapeDraft` |
-| `src/editor/canvas.rs` | 395 | 3,200 | bin | `canvas`, `Viewport`, tool behavior, hit testing, painting |
+| `src/editor/mod.rs` | 266 | 2,050 | bin | `ViewMode`, `send`, menu helpers, sidebar, `shape_fields`, `format_length` |
+| `src/editor/editor_state_struct.rs` | 216 | 1,800 | bin | `EditorState` and its methods, `document_name` |
+| `src/editor/drag_state_struct.rs` | 51 | 400 | bin | `ShapeRef`, `DragTarget`, `DragState` |
+| `src/editor/shape_draft_struct.rs` | 9 | 60 | bin | `ShapeDraft` |
+| `src/editor/canvas.rs` | 568 | 4,800 | bin | `canvas`, `Viewport`, tool behavior, hit testing, painting |
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
-| `src/editor/drag.rs` | 118 | 850 | bin | `begin_drag`, `update_drag`, `finish_drag`: dragging pieces, holes and vertices with the Select tool |
+| `src/editor/drag.rs` | 125 | 1,000 | bin | `begin_drag`, `update_drag`, `finish_drag`: dragging pieces, children and shape handles with the Select tool |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
-| `src/editor/ui.rs` | 219 | 2,000 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete key, language picker |
+| `src/editor/ui.rs` | 286 | 2,650 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete key, language picker |
 | `src/editor/panel_viewer.rs` | 102 | 800 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab |
 | `src/panels/mod.rs` | 32 | 250 | bin | Shared `icon_button` |
 | `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
-| `src/panels/tools/mod.rs` | 100 | 800 | bin | `Tool`, painted tool icons, Tools panel |
-| `src/panels/layout/mod.rs` | 127 | 900 | bin | Layout panel: piece tree, lock and delete buttons |
+| `src/panels/tools/mod.rs` | 201 | 1,750 | bin | `Tool`, painted tool and operation icons, Tools panel |
+| `src/panels/layout/mod.rs` | 242 | 2,100 | bin | Layout panel: pieces with their children, lock, delete, reorder and operation controls |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
-| `src/preview/mod.rs` | 247 | 2,200 | bin | 3D scene, camera, mesh extrusion |
-| `src/model.rs` | 335 | 2,400 | lib | `Project`, `PatternPiece`, `Point`, `Units`, validation |
+| `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion |
+| `src/model.rs` | 476 | 3,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation |
+| `src/boolean.rs` | 221 | 1,900 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes |
 | `src/material.rs` | 462 | 2,800 | lib | `Material` and the scales of its properties |
-| `src/events.rs` | 365 | 2,900 | lib | `ProjectEvent`, `ProjectChange`, `Project::apply` |
-| `src/i18n/uk.rs` | 382 | 4,500 | lib | Ukrainian catalog, `plural` helper |
-| `src/i18n/mod.rs` | 225 | 1,500 | lib | `Language`, `Label`, `Message` |
-| `src/exports/mod.rs` | 105 | 700 | lib | `ExportError`, shared helpers, tests |
-| `src/exports/svg.rs` | 34 | 300 | lib | `to_svg` |
-| `src/exports/dxf.rs` | 24 | 200 | lib | `to_dxf` |
-| `src/shapes.rs` | 107 | 900 | lib | `rectangle`, `circle` |
-| `src/i18n/en.rs` | 351 | 3,500 | lib | English catalog |
-| `src/history.rs` | 445 | 3,600 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
-| `src/persistence.rs` | 175 | 1,400 | lib | `save_project`, `load_project`, `write_export` |
+| `src/events.rs` | 631 | 4,850 | lib | `ProjectEvent`, `ProjectChange`, `Project::apply` |
+| `src/i18n/uk.rs` | 459 | 5,900 | lib | Ukrainian catalog, `plural` helper |
+| `src/i18n/mod.rs` | 279 | 2,000 | lib | `Language`, `Label`, `Message` |
+| `src/exports/mod.rs` | 187 | 1,200 | lib | `ExportError`, shared helpers, tests |
+| `src/exports/svg.rs` | 45 | 430 | lib | `to_svg` |
+| `src/exports/dxf.rs` | 25 | 200 | lib | `to_dxf` |
+| `src/shapes.rs` | 364 | 3,050 | lib | `Shape`: rings, handles, constructors from a drag |
+| `src/i18n/en.rs` | 428 | 4,550 | lib | English catalog |
+| `src/history.rs` | 508 | 4,350 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
+| `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings.rs` | 71 | 500 | bin | Saved language and panel layout in the OS config directory |
 | `src/document.rs` | 64 | 500 | bin | `ActiveProject` (project and history), `ProjectMessage`, `HistoryMessage`, `apply_project_events` |
 | `src/main.rs` | 36 | 250 | bin | App wiring and system schedule |
-| `src/lib.rs` | 6 | 25 | lib | Module declarations |
+| `src/lib.rs` | 9 | 40 | lib | Module declarations |
 
 ## Library crate (core, no Bevy)
 
@@ -69,32 +70,37 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 258-380 | `Texture`, `Strength`, `Flexibility`, `WaterResistance`, `HeatResistance` |
 | | 383-420 | `Material`: `thickness_category`, `has_valid_thickness` |
 | | 421-462 | Tests |
-| `model.rs` | 7-11 | `PROJECT_VERSION` and validation limits (`MAX_PIECES`, `MAX_POINTS_PER_PIECE`, `MAX_COORDINATE_MM`, `MIN_POLYGON_AREA_MM2`) |
-| | 15-59 | `Units`, `Point`, `Bounds` |
-| | 50-150 | `Bounds::overlaps`; ring helpers: `ring_bounds`, `ring_contains`, `segments_touch`, `rings_cross`, `signed_area` |
-| | 150-290 | `PatternPiece`: `bounds`, `contains`, `hole_at`, `signed_area`, `rings`, `vertices`, `hole_indices`, `cut`, `outline_without`, `validate_ring`, `validate_holes` |
-| | 133-254 | `Project`: `bounds`, `validate` (173), `next_piece_id`, `add_piece`, `remove_piece` |
-| | 256-335 | Tests |
-| `events.rs` | 9-31 | `ProjectEvent`, `ProjectChange` |
-| | 35-91 | `Project::apply` |
-| | 93-121 | `edit` (validates a copy), `piece_mut`, `unlocked_piece_mut` |
-| | 123-365 | Tests |
-| `history.rs` | 6-46 | `MAX_HISTORY`, `HistoryCommand`, `MergeKey`, `Entry`, `History` |
-| | 48-205 | `new`, `record`, `apply`, `actions`, `position`, `can_undo`, `can_redo`, `describe` |
-| | 207-445 | Tests |
+| `model.rs` | 8-13 | `PROJECT_VERSION` (2) and validation limits (`MAX_PIECES`, `MAX_POINTS_PER_PIECE`, `MAX_CHILDREN_PER_PIECE`, `MAX_COORDINATE_MM`, `MIN_POLYGON_AREA_MM2`) |
+| | 17-70 | `Units`, `Point`, `Bounds` (`union`) |
+| | 71-117 | Ring helpers: `ring_bounds`, `ring_contains`, `signed_area` |
+| | 119-140 | `BooleanOp`, `ChildShape` |
+| | 143-262 | `PatternPiece`: `bounds`, `child`, `child_index`, `next_child_id`, `translate`, `validate_shape`, `validate_ring`, `validate_shapes` |
+| | 265-353 | `Project`: `bounds`, `validate` (301), `next_piece_id`, `add_piece`, `remove_piece` |
+| | 355-476 | Tests |
+| `shapes.rs` | 6-43 | `CIRCLE_SEGMENTS`, `Shape`, `to_world`, `to_local` |
+| | 45-232 | `rectangle_from_corners`, `ellipse_from_center`, `ring`, `bounds`, `contains`, `center`, `translate`, `handles`, `with_handle_at`, `has_valid_size` |
+| | 234-364 | Tests |
+| `boolean.rs` | 11-53 | `ROUND_PRECISION_MM`, `Region`: `rings`, `vertices`, `hole_indices`, `bounds`, `contains` |
+| | 67-96 | `PatternPiece::region` |
+| | 98-221 | Tests |
+| `events.rs` | 10-88 | `ProjectEvent`, `ProjectChange` |
+| | 92-185 | `Project::apply` |
+| | 187-229 | `edit` (validates a copy), `piece_mut`, `unlocked_piece_mut`, `child_mut`, `child_index` |
+| | 231-631 | Tests |
+| `history.rs` | 6-48 | `MAX_HISTORY`, `HistoryCommand`, `MergeKey`, `Entry`, `History` |
+| | 50-220 | `new`, `record`, `apply`, `actions`, `position`, `can_undo`, `can_redo`, `describe` |
+| | 222-508 | Tests |
 | `persistence.rs` | 7-34 | `save_project`, `load_project`, `write_export` |
-| | 36-175 | Tests |
-| `exports/mod.rs` | 13-36 | `ExportError`, conversion to `Message` |
-| | 38-60 | `validate_export`, `number` |
-| | 61-105 | Tests |
+| | 36-169 | Tests |
+| `exports/mod.rs` | 14-38 | `ExportError`, conversion to `Message` |
+| | 41-66 | `validate_export` (returns each piece's `Region`), `number` |
+| | 68-187 | Tests |
 | `exports/svg.rs` | 4 | `to_svg` |
-| `exports/dxf.rs` | 4 | `to_dxf` |
-| `shapes.rs` | 1-39 | `CIRCLE_SEGMENTS`, `rectangle`, `circle` |
-| | 41-107 | Tests |
+| `exports/dxf.rs` | 5 | `to_dxf` |
 | `i18n/mod.rs` | 14-66 | `Language`: `tag`, `from_tag`, `native_name`, `label`, `message`, `unit_symbol` |
-| | 70-140 | `Label`, with nested variants for material values |
-| | 144-171 | `Message` |
-| | 181-225 | Tests |
+| | 70-165 | `Label`, with nested variants for material values and `Operation(BooleanOp)` |
+| | 169-226 | `Message` |
+| | 235-279 | Tests |
 
 ## Binary crate (desktop)
 
@@ -102,34 +108,33 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 27-32 | Types | `ViewMode` |
-| 34-36 | Events | `send` |
-| 38-70 | Menu bar helpers | `export` |
-| 72-156 | Sidebar | `view_controls`, `units_control`, `selected_piece_details` |
-| 158-164 | Formatting | `format_length` |
+| 29-34 | Types | `ViewMode` |
+| 36-38 | Events | `send` |
+| 40-72 | Menu bar helpers | `export` |
+| 74-193 | Sidebar | `view_controls`, `units_control`, `selected_piece_details` (name, size or result error, fields of the selected base or child) |
+| 195-258 | Shape fields | `shape_fields`: center, size and rotation of a primitive in display units |
+| 260-266 | Formatting | `format_length` |
 
 ### `editor/editor_state_struct.rs`
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 12-33 | Type | `EditorState` |
-| 35-57 | Defaults | `Default` impl |
-| 59-152 | Methods | `new`, `report`, `report_error`, `snap`, `snap_point`, `reset_document`, `on_project_change`, `clear_released_drag`, `displayed` |
-| 154-159 | Helpers | `document_name` |
+| 12-37 | Type | `EditorState`, with `op_mode` and `selected_child` |
+| 39-62 | Defaults | `Default` impl |
+| 64-209 | Methods | `new`, `report`, `report_error`, `snap`, `snap_point`, `reset_document`, `on_project_change`, `on_history_restore`, `selected_child_id`, `select`, `clear_released_drag`, `displayed` |
+| 211-216 | Helpers | `document_name` |
 
 ### `editor/canvas.rs`
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 13-17 | Constants | Zoom limits, hit radii, edge label limit |
-| 19-34 | Viewport | `Viewport` (`to_screen`, `to_world`) |
-| 36-107 | Canvas | `canvas`, `fit_view` |
-| 109-136 | Select tool | `handle_select` |
-| 138-177 | Draw tool | `handle_draw`, `finish_draft` |
-| 179-223 | Rectangle and Circle tools | `handle_shape`, `add_piece` |
-| Search by name | Holes | `select_at`, `commit_shape`, `hole_vertex_at` |
-| Search by name | Hit testing | `piece_at`, `vertex_at` |
-| Search by name | Painting | `draw_pieces`, `draw_edge_labels`, `fill_polygon`, `draw_draft`, `draw_shape_draft` |
+| 15-19 | Constants | Zoom limits, hit radii, edge label limit |
+| 21-36 | Viewport | `Viewport` (`to_screen`, `to_world`) |
+| 38-109 | Canvas | `canvas`, `fit_view` |
+| 111-150 | Select tool | `handle_select`, `select_at` |
+| 152-262 | Drawing tools | `handle_draw`, `finish_draft`, `commit_shape` (new piece or `AddChild`), `handle_shape`, `add_piece` |
+| 265-314 | Hit testing | `piece_hit`, `piece_at`, `child_at`, `handle_at` |
+| 316-568 | Painting | `op_color`, `draft_color`, `dashed_ring`, `draw_handles`, `draw_pieces`, `draw_edge_labels`, `fill_polygon`, `draw_draft`, `draw_shape_draft` |
 
 ### `editor/ui.rs`
 
@@ -149,13 +154,16 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
 | | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
 | | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
-| `tools/mod.rs` | 7-9 | Icon constants: `ICON_BUTTON_SIZE`, `ICON_MARGIN`, `ICON_VERTEX_RADIUS` |
-| | 11-81 | `Tool`: `ALL`, `label`, `hint`, `shape_points`, `paint_icon` |
-| | 83 | `show_panel` |
-| `layout/mod.rs` | 7-8 | Icon constants: `ICON_BUTTON_SIZE`, `ICON_MARGIN` |
-| | 10-47 | `paint_lock`, `paint_trash` |
-| | 48 | `piece_row` |
-| | 99 | `show_panel`, which returns the `ProjectEvent` to send |
+| `tools/mod.rs` | 8-11 | Icon constants |
+| | 14-95 | `Tool`: `ALL`, `label`, `hint`, `shape`, `paint_icon` |
+| | 99-155 | `arc`, `paint_operation_icon`, `paint_new_piece_icon` |
+| | 157 | `show_panel`: tools, then the new-piece and operation modes |
+| `layout/mod.rs` | 8-10 | Constants |
+| | 12-67 | `paint_lock`, `paint_trash`, `paint_arrow`, `shape_label` |
+| | 69 | `Selection` |
+| | 75 | `child_row`: delete, reorder, operation picker, select |
+| | 150 | `piece_row` |
+| | 203 | `show_panel`, which returns the `ProjectEvent` to send |
 | `history/mod.rs` | 6 | `show_panel`, which returns the `HistoryCommand` to send |
 | `material/mod.rs` | 15-103 | `DialogResult`, `combo`, `swatch`, `color_combo`, `thickness_row` |
 | | 105 | `material_fields`, shared by the dialog and the Material panel |
@@ -168,41 +176,43 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 |---:|---|
 | 11-46 | Scene constants, `PreviewPlugin`, `PreviewSettings` |
 | 48-70 | `setup_scene` |
-| 72-118 | `rebuild_preview` |
-| 120-137 | `update_camera` |
-| 139-152 | `show_controls` |
-| 154-247 | `build_piece_mesh` |
+| 73-123 | `rebuild_preview`, which skips pieces without a valid region |
+| 125-142 | `update_camera` |
+| 144-157 | `show_controls` |
+| 159-261 | `build_piece_mesh` (from a `Region`) |
 
 ## Where to look for common tasks
 
 | Task | Read | Change |
 |---|---|---|
-| Add a project edit | `events.rs` 9-121, `history.rs` `describe` | Add a `ProjectEvent` variant and handle it in `apply`, give it an entry label in `History::describe` (an `Action…` `Message`), then send it from `editor/mod.rs` with `send` |
-| Add a validation rule | `model.rs` 7-11, 173-234 | `validate`, plus a `Message` variant and both catalogs |
+| Add a project edit | `events.rs` 10-229, `history.rs` `describe` | Add a `ProjectEvent` variant and handle it in `apply`, give it an entry label in `History::describe` (an `Action…` `Message`), then send it from `editor/mod.rs` with `send` |
+| Add a validation rule | `model.rs` 8-13, 200-262, 301-333 | `validate`, plus a `Message` variant and both catalogs |
 | Add UI text | `i18n/mod.rs` 70-166 | A `Label` or `Message` variant and an arm in `en.rs` and `uk.rs`; the compiler flags missing arms |
 | Add a language | `i18n/mod.rs` 14-66 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
-| Add a canvas tool | `panels/tools/mod.rs`, `editor/canvas.rs` 36-91, 179-223 | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`; a predefined shape also goes in `shapes.rs` |
+| Add a canvas tool | `panels/tools/mod.rs`, `editor/canvas.rs` 38-93, 152-262 | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`; a new primitive also goes in `Shape` (`ring`, `handles`, `with_handle_at`, `has_valid_size`), `shape_label` and `shape_fields` |
+| Add a boolean operation | `model.rs` `BooleanOp`, `boolean.rs` `region` | A `BooleanOp` variant and its `ALL`, its `OverlayRule`, catalog arms, `op_color` and `paint_operation_icon` |
 | Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material` and `material_fields` |
-| Change the file format | `model.rs` 133-146, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
+| Change the file format | `model.rs` 119-160, 265-278, `shapes.rs` 12-30, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
-| Change the 3D look or mesh | `preview/mod.rs` 48-118, 154-247 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
+| Change the 3D look or mesh | `preview/mod.rs` 49-123, 159-261 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
 | Add a dockable panel | `panels/dock/mod.rs`, `editor/panel_viewer.rs` | A `PanelTab` variant, its `CLOSEABLE` and `label` entries, `default_state`, and arms in `PanelViewer::ui` and `scroll_bars` |
 | Change system scheduling | `main.rs`, `document.rs` | Keep the ordering rule in `CLAUDE.md` |
 
 ## Tests
 
-There are 58 tests, all inline in the library crate:
+There are 60 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
-| `model` | 14 |
+| `model` | 6 |
+| `shapes` | 7 |
+| `boolean` | 7 |
 | `material` | 3 |
-| `events` | 13 |
-| `history` | 9 |
+| `events` | 11 |
+| `history` | 10 |
 | `i18n` | 5 |
-| `exports` | 5 |
-| `persistence` | 5 |
-| `shapes` | 4 |
+| `exports` | 7 |
+| `persistence` | 4 |
 
 `document`, `editor`, `preview`, `settings` and `panels` have no tests, so changes there need `cargo check` and a manual run.
 

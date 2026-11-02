@@ -1,7 +1,8 @@
 use crate::i18n::Message;
 use crate::material::Material;
-use crate::model::{Cut, PatternPiece, Point, Project, Units};
+use crate::model::{BooleanOp, ChildShape, PatternPiece, Project, Units};
 use crate::persistence;
+use crate::shapes::Shape;
 use std::path::PathBuf;
 
 /// A requested change to the project. `Project::apply` is the only intended way to change one.
@@ -19,17 +20,21 @@ pub enum ProjectEvent {
     SetUnits(Units),
     AddPiece {
         name: String,
-        points: Vec<Point>,
+        base: Shape,
     },
     RenamePiece {
         id: u64,
         name: String,
     },
-    /// Replaces the outline and holes together, since moving them apart would fail validation.
-    SetPieceGeometry {
+    SetBaseShape {
         id: u64,
-        points: Vec<Point>,
-        holes: Vec<Vec<Point>>,
+        shape: Shape,
+    },
+    /// Moves the base and every child together.
+    MovePiece {
+        id: u64,
+        dx: f64,
+        dy: f64,
     },
     SetPieceLocked {
         id: u64,
@@ -42,13 +47,30 @@ pub enum ProjectEvent {
     RemovePiece {
         id: u64,
     },
-    AddHole {
+    AddChild {
         id: u64,
-        points: Vec<Point>,
+        op: BooleanOp,
+        shape: Shape,
     },
-    RemoveHole {
+    SetChildShape {
         id: u64,
+        child: u64,
+        shape: Shape,
+    },
+    SetChildOp {
+        id: u64,
+        child: u64,
+        op: BooleanOp,
+    },
+    /// Moves a child to `index` in the list, which changes the order its operation applies in.
+    ReorderChild {
+        id: u64,
+        child: u64,
         index: usize,
+    },
+    RemoveChild {
+        id: u64,
+        child: u64,
     },
 }
 
@@ -61,9 +83,8 @@ pub enum ProjectChange {
     Edited,
     PieceAdded(u64),
     PieceRemoved(u64),
-    HoleAdded { id: u64, index: usize },
-    HoleRemoved { id: u64 },
-    EdgeCut { id: u64 },
+    ChildAdded { id: u64, child: u64 },
+    ChildRemoved { id: u64 },
 }
 
 impl Project {
@@ -95,9 +116,9 @@ impl Project {
                 project.units = units;
                 Ok(ProjectChange::Edited)
             }),
-            ProjectEvent::AddPiece { name, points } => self.edit(|project| {
+            ProjectEvent::AddPiece { name, base } => self.edit(|project| {
                 let id = project.next_piece_id();
-                let mut piece = PatternPiece::new(id, name, points);
+                let mut piece = PatternPiece::new(id, name, base);
                 piece.material = project.default_material;
                 project.add_piece(piece);
                 Ok(ProjectChange::PieceAdded(id))
@@ -106,10 +127,12 @@ impl Project {
                 project.piece_mut(id)?.name = name;
                 Ok(ProjectChange::Edited)
             }),
-            ProjectEvent::SetPieceGeometry { id, points, holes } => self.edit(|project| {
-                let piece = project.unlocked_piece_mut(id)?;
-                piece.points = points;
-                piece.holes = holes;
+            ProjectEvent::SetBaseShape { id, shape } => self.edit(|project| {
+                project.unlocked_piece_mut(id)?.base = shape;
+                Ok(ProjectChange::Edited)
+            }),
+            ProjectEvent::MovePiece { id, dx, dy } => self.edit(|project| {
+                project.unlocked_piece_mut(id)?.translate(dx, dy);
                 Ok(ProjectChange::Edited)
             }),
             ProjectEvent::SetPieceLocked { id, locked } => self.edit(|project| {
@@ -125,21 +148,38 @@ impl Project {
                 project.remove_piece(id);
                 Ok(ProjectChange::PieceRemoved(id))
             }),
-            ProjectEvent::AddHole { id, points } => self.edit(|project| {
-                Ok(match project.unlocked_piece_mut(id)?.cut(points)? {
-                    Cut::Hole(index) => ProjectChange::HoleAdded { id, index },
-                    Cut::Edge => ProjectChange::EdgeCut { id },
-                })
-            }),
-            ProjectEvent::RemoveHole { id, index } => self.edit(|project| {
+            ProjectEvent::AddChild { id, op, shape } => self.edit(|project| {
                 let piece = project.unlocked_piece_mut(id)?;
-                if index >= piece.holes.len() {
-                    return Err(Message::HoleNotFound {
-                        name: piece.name.clone(),
-                    });
-                }
-                piece.holes.remove(index);
-                Ok(ProjectChange::HoleRemoved { id })
+                let child = piece.next_child_id();
+                piece.children.push(ChildShape {
+                    id: child,
+                    op,
+                    shape,
+                });
+                Ok(ProjectChange::ChildAdded { id, child })
+            }),
+            ProjectEvent::SetChildShape { id, child, shape } => self.edit(|project| {
+                project.child_mut(id, child)?.shape = shape;
+                Ok(ProjectChange::Edited)
+            }),
+            ProjectEvent::SetChildOp { id, child, op } => self.edit(|project| {
+                project.child_mut(id, child)?.op = op;
+                Ok(ProjectChange::Edited)
+            }),
+            ProjectEvent::ReorderChild { id, child, index } => self.edit(|project| {
+                let piece = project.unlocked_piece_mut(id)?;
+                let from = child_index(piece, child)?;
+                let moved = piece.children.remove(from);
+                piece
+                    .children
+                    .insert(index.min(piece.children.len()), moved);
+                Ok(ProjectChange::Edited)
+            }),
+            ProjectEvent::RemoveChild { id, child } => self.edit(|project| {
+                let piece = project.unlocked_piece_mut(id)?;
+                let index = child_index(piece, child)?;
+                piece.children.remove(index);
+                Ok(ProjectChange::ChildRemoved { id })
             }),
         }
     }
@@ -172,35 +212,56 @@ impl Project {
         }
         Ok(piece)
     }
+
+    fn child_mut(&mut self, id: u64, child: u64) -> Result<&mut ChildShape, Message> {
+        let piece = self.unlocked_piece_mut(id)?;
+        let index = child_index(piece, child)?;
+        Ok(&mut piece.children[index])
+    }
+}
+
+fn child_index(piece: &PatternPiece, child: u64) -> Result<usize, Message> {
+    piece
+        .child_index(child)
+        .ok_or_else(|| Message::ChildNotFound {
+            name: piece.name.clone(),
+        })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::material::{LeatherColor, Origin};
+    use crate::model::Point;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn triangle() -> Vec<Point> {
-        vec![
-            Point::new(0.0, 0.0),
-            Point::new(10.0, 0.0),
-            Point::new(0.0, 10.0),
-        ]
+    fn triangle() -> Shape {
+        Shape::Polygon {
+            points: vec![
+                Point::new(0.0, 0.0),
+                Point::new(10.0, 0.0),
+                Point::new(0.0, 10.0),
+            ],
+        }
     }
 
-    fn small_hole() -> Vec<Point> {
-        vec![
-            Point::new(1.0, 1.0),
-            Point::new(3.0, 1.0),
-            Point::new(1.0, 3.0),
-        ]
+    fn small_square() -> Shape {
+        Shape::rectangle_from_corners(Point::new(1.0, 1.0), Point::new(3.0, 3.0)).unwrap()
     }
 
     fn add_piece() -> ProjectEvent {
         ProjectEvent::AddPiece {
             name: "Деталь 1".to_owned(),
-            points: triangle(),
+            base: triangle(),
+        }
+    }
+
+    fn add_child(op: BooleanOp) -> ProjectEvent {
+        ProjectEvent::AddChild {
+            id: 1,
+            op,
+            shape: small_square(),
         }
     }
 
@@ -208,6 +269,12 @@ mod tests {
         let mut project = Project::default();
         project.apply(add_piece()).unwrap();
         project
+    }
+
+    fn locked() -> Result<ProjectChange, Message> {
+        Err(Message::PieceLocked {
+            name: "Деталь 1".to_owned(),
+        })
     }
 
     #[test]
@@ -221,49 +288,63 @@ mod tests {
     #[test]
     fn rejected_events_leave_the_project_unchanged() {
         let mut project = project_with_piece();
+        project.apply(add_child(BooleanOp::Subtract)).unwrap();
         project.modified = false;
         let before = project.clone();
 
         let invalid = [
             ProjectEvent::AddPiece {
                 name: "Flap".to_owned(),
-                points: Vec::new(),
+                base: Shape::Polygon { points: Vec::new() },
             },
             ProjectEvent::AddPiece {
                 name: " ".to_owned(),
-                points: triangle(),
+                base: triangle(),
             },
             ProjectEvent::RenamePiece {
                 id: 1,
                 name: " ".to_owned(),
             },
-            ProjectEvent::SetPieceGeometry {
+            ProjectEvent::SetBaseShape {
                 id: 1,
-                points: vec![Point::new(0.0, 0.0); 3],
-                holes: Vec::new(),
+                shape: Shape::Polygon {
+                    points: vec![Point::new(0.0, 0.0); 3],
+                },
             },
-            ProjectEvent::SetPieceGeometry {
+            ProjectEvent::SetBaseShape {
                 id: 9,
-                points: triangle(),
-                holes: Vec::new(),
+                shape: triangle(),
+            },
+            ProjectEvent::MovePiece {
+                id: 1,
+                dx: f64::NAN,
+                dy: 0.0,
             },
             ProjectEvent::RemovePiece { id: 9 },
-            ProjectEvent::AddHole {
+            ProjectEvent::AddChild {
                 id: 9,
-                points: small_hole(),
+                op: BooleanOp::Union,
+                shape: small_square(),
             },
-            ProjectEvent::AddHole {
+            ProjectEvent::SetChildShape {
                 id: 1,
-                points: vec![
-                    Point::new(50.0, 50.0),
-                    Point::new(51.0, 50.0),
-                    Point::new(50.0, 51.0),
-                ],
+                child: 1,
+                shape: Shape::Rectangle {
+                    center: Point::new(2.0, 2.0),
+                    width: -1.0,
+                    height: 2.0,
+                    rotation: 0.0,
+                },
             },
-            ProjectEvent::RemoveHole { id: 1, index: 0 },
+            ProjectEvent::SetChildOp {
+                id: 1,
+                child: 9,
+                op: BooleanOp::Union,
+            },
+            ProjectEvent::RemoveChild { id: 1, child: 9 },
         ];
         for event in invalid {
-            assert!(project.apply(event).is_err());
+            assert!(project.apply(event.clone()).is_err(), "{event:?}");
             assert_eq!(project, before);
         }
     }
@@ -287,8 +368,101 @@ mod tests {
     }
 
     #[test]
+    fn children_can_be_added_edited_reordered_and_removed() {
+        let mut project = project_with_piece();
+        assert_eq!(
+            project.apply(add_child(BooleanOp::Subtract)),
+            Ok(ProjectChange::ChildAdded { id: 1, child: 1 })
+        );
+        assert_eq!(
+            project.apply(add_child(BooleanOp::Union)),
+            Ok(ProjectChange::ChildAdded { id: 1, child: 2 })
+        );
+
+        let mut moved = small_square();
+        moved.translate(1.0, 0.0);
+        project
+            .apply(ProjectEvent::SetChildShape {
+                id: 1,
+                child: 1,
+                shape: moved.clone(),
+            })
+            .unwrap();
+        project
+            .apply(ProjectEvent::SetChildOp {
+                id: 1,
+                child: 1,
+                op: BooleanOp::Intersect,
+            })
+            .unwrap();
+        let first = &project.pieces[0].children[0];
+        assert_eq!(
+            (first.shape.clone(), first.op),
+            (moved, BooleanOp::Intersect)
+        );
+
+        project
+            .apply(ProjectEvent::ReorderChild {
+                id: 1,
+                child: 2,
+                index: 0,
+            })
+            .unwrap();
+        let order: Vec<u64> = project.pieces[0]
+            .children
+            .iter()
+            .map(|child| child.id)
+            .collect();
+        assert_eq!(order, vec![2, 1]);
+
+        assert_eq!(
+            project.apply(ProjectEvent::RemoveChild { id: 1, child: 2 }),
+            Ok(ProjectChange::ChildRemoved { id: 1 })
+        );
+        assert_eq!(project.pieces[0].children.len(), 1);
+        assert_eq!(project.pieces[0].next_child_id(), 2);
+    }
+
+    #[test]
+    fn moving_a_piece_moves_its_children() {
+        let mut project = project_with_piece();
+        project.apply(add_child(BooleanOp::Subtract)).unwrap();
+        project
+            .apply(ProjectEvent::MovePiece {
+                id: 1,
+                dx: 5.0,
+                dy: -2.0,
+            })
+            .unwrap();
+        let piece = &project.pieces[0];
+        assert_eq!(piece.base.ring()[0], Point::new(5.0, -2.0));
+        assert_eq!(piece.children[0].shape.center(), Point::new(7.0, 0.0));
+    }
+
+    #[test]
+    fn a_child_that_splits_the_piece_is_accepted() {
+        let mut project = project_with_piece();
+        let band =
+            Shape::rectangle_from_corners(Point::new(-1.0, 4.0), Point::new(20.0, 5.0)).unwrap();
+        project
+            .apply(ProjectEvent::AddChild {
+                id: 1,
+                op: BooleanOp::Subtract,
+                shape: band,
+            })
+            .unwrap();
+        assert_eq!(
+            project.pieces[0].region(),
+            Err(Message::ResultSplit {
+                name: "Деталь 1".to_owned()
+            })
+        );
+    }
+
+    #[test]
     fn locked_pieces_reject_shape_changes_and_removal() {
         let mut project = project_with_piece();
+        project.apply(add_child(BooleanOp::Subtract)).unwrap();
         project.modified = false;
         project
             .apply(ProjectEvent::SetPieceLocked {
@@ -300,22 +474,39 @@ mod tests {
         assert!(project.modified);
 
         let before = project.clone();
-        let locked = Err(Message::PieceLocked {
-            name: "Деталь 1".to_owned(),
-        });
-        let moved = vec![
-            Point::new(1.0, 0.0),
-            Point::new(11.0, 0.0),
-            Point::new(1.0, 10.0),
+        let shape_edits = [
+            ProjectEvent::SetBaseShape {
+                id: 1,
+                shape: small_square(),
+            },
+            ProjectEvent::MovePiece {
+                id: 1,
+                dx: 1.0,
+                dy: 0.0,
+            },
+            ProjectEvent::RemovePiece { id: 1 },
+            add_child(BooleanOp::Union),
+            ProjectEvent::SetChildShape {
+                id: 1,
+                child: 1,
+                shape: small_square(),
+            },
+            ProjectEvent::SetChildOp {
+                id: 1,
+                child: 1,
+                op: BooleanOp::Union,
+            },
+            ProjectEvent::ReorderChild {
+                id: 1,
+                child: 1,
+                index: 0,
+            },
+            ProjectEvent::RemoveChild { id: 1, child: 1 },
         ];
-        let set_points = ProjectEvent::SetPieceGeometry {
-            id: 1,
-            points: moved.clone(),
-            holes: Vec::new(),
-        };
-        assert_eq!(project.apply(set_points.clone()), locked);
-        assert_eq!(project.apply(ProjectEvent::RemovePiece { id: 1 }), locked);
-        assert_eq!(project, before);
+        for event in shape_edits {
+            assert_eq!(project.apply(event), locked());
+            assert_eq!(project, before);
+        }
 
         project
             .apply(ProjectEvent::RenamePiece {
@@ -331,142 +522,10 @@ mod tests {
                 locked: false,
             })
             .unwrap();
-        project.apply(set_points).unwrap();
-        assert_eq!(project.pieces[0].points, moved);
         assert_eq!(
             project.apply(ProjectEvent::RemovePiece { id: 1 }),
             Ok(ProjectChange::PieceRemoved(1))
         );
-    }
-
-    #[test]
-    fn holes_can_be_added_and_removed() {
-        let mut project = project_with_piece();
-        assert_eq!(
-            project.apply(ProjectEvent::AddHole {
-                id: 1,
-                points: small_hole(),
-            }),
-            Ok(ProjectChange::HoleAdded { id: 1, index: 0 })
-        );
-        assert_eq!(project.pieces[0].holes, vec![small_hole()]);
-
-        assert_eq!(
-            project.apply(ProjectEvent::RemoveHole { id: 1, index: 0 }),
-            Ok(ProjectChange::HoleRemoved { id: 1 })
-        );
-        assert!(project.pieces[0].holes.is_empty());
-    }
-
-    #[test]
-    fn a_hole_drawn_across_the_edge_reshapes_the_piece() {
-        let mut project = project_with_piece();
-        let area = project.pieces[0].signed_area().abs();
-        let across = vec![
-            Point::new(-1.0, 1.0),
-            Point::new(2.0, 1.0),
-            Point::new(2.0, 3.0),
-            Point::new(-1.0, 3.0),
-        ];
-        assert_eq!(
-            project.apply(ProjectEvent::AddHole {
-                id: 1,
-                points: across,
-            }),
-            Ok(ProjectChange::EdgeCut { id: 1 })
-        );
-        assert!(project.pieces[0].holes.is_empty());
-        assert!(project.pieces[0].signed_area().abs() < area);
-    }
-
-    #[test]
-    fn an_edge_cut_through_an_existing_hole_is_rejected() {
-        let mut project = project_with_piece();
-        project
-            .apply(ProjectEvent::AddHole {
-                id: 1,
-                points: small_hole(),
-            })
-            .unwrap();
-        let before = project.clone();
-        let across = vec![
-            Point::new(-1.0, 1.5),
-            Point::new(2.0, 1.5),
-            Point::new(2.0, 2.0),
-            Point::new(-1.0, 2.0),
-        ];
-        assert_eq!(
-            project.apply(ProjectEvent::AddHole {
-                id: 1,
-                points: across,
-            }),
-            Err(Message::HoleOutsidePiece {
-                name: "Деталь 1".to_owned()
-            })
-        );
-        assert_eq!(project, before);
-    }
-
-    #[test]
-    fn locked_pieces_reject_hole_changes() {
-        let mut project = project_with_piece();
-        project
-            .apply(ProjectEvent::AddHole {
-                id: 1,
-                points: small_hole(),
-            })
-            .unwrap();
-        project
-            .apply(ProjectEvent::SetPieceLocked {
-                id: 1,
-                locked: true,
-            })
-            .unwrap();
-
-        let before = project.clone();
-        let locked = Err(Message::PieceLocked {
-            name: "Деталь 1".to_owned(),
-        });
-        assert_eq!(
-            project.apply(ProjectEvent::RemoveHole { id: 1, index: 0 }),
-            locked
-        );
-        assert_eq!(
-            project.apply(ProjectEvent::AddHole {
-                id: 1,
-                points: small_hole(),
-            }),
-            locked
-        );
-        assert_eq!(project, before);
-    }
-
-    #[test]
-    fn geometry_that_leaves_a_hole_outside_is_rejected() {
-        let mut project = project_with_piece();
-        project
-            .apply(ProjectEvent::AddHole {
-                id: 1,
-                points: small_hole(),
-            })
-            .unwrap();
-        let before = project.clone();
-
-        let shifted: Vec<Point> = triangle()
-            .iter()
-            .map(|point| Point::new(point.x + 100.0, point.y))
-            .collect();
-        assert_eq!(
-            project.apply(ProjectEvent::SetPieceGeometry {
-                id: 1,
-                points: shifted,
-                holes: vec![small_hole()],
-            }),
-            Err(Message::HoleOutsidePiece {
-                name: "Деталь 1".to_owned()
-            })
-        );
-        assert_eq!(project, before);
     }
 
     #[test]
@@ -557,7 +616,6 @@ mod tests {
             thickness_mm: 0.0,
             ..Material::default()
         };
-
         assert_eq!(
             project.apply(ProjectEvent::SetPieceMaterial { id: 1, material }),
             Err(Message::ThicknessOutOfRange {

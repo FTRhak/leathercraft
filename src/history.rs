@@ -18,6 +18,8 @@ pub enum HistoryCommand {
 enum MergeKey {
     Rename(u64),
     Material(u64),
+    Base(u64),
+    Child(u64, u64),
 }
 
 #[derive(Clone, Debug)]
@@ -80,7 +82,7 @@ impl History {
                 self.mergeable = false;
                 return;
             }
-            _ => self.describe(event, change),
+            _ => self.describe(event),
         };
 
         self.entries.truncate(self.position + 1);
@@ -155,7 +157,7 @@ impl History {
     }
 
     /// Names come from the project before the event, so a removed piece is still found.
-    fn describe(&self, event: &ProjectEvent, change: ProjectChange) -> (Message, Option<MergeKey>) {
+    fn describe(&self, event: &ProjectEvent) -> (Message, Option<MergeKey>) {
         let before = &self.entries[self.position].snapshot;
         let name = |id: u64| {
             before
@@ -173,8 +175,12 @@ impl History {
                 Message::ActionRenamePiece { name: name.clone() },
                 Some(MergeKey::Rename(*id)),
             ),
-            ProjectEvent::SetPieceGeometry { id, .. } => {
-                (Message::ActionReshapePiece { name: name(*id) }, None)
+            ProjectEvent::SetBaseShape { id, .. } => (
+                Message::ActionEditBase { name: name(*id) },
+                Some(MergeKey::Base(*id)),
+            ),
+            ProjectEvent::MovePiece { id, .. } => {
+                (Message::ActionMovePiece { name: name(*id) }, None)
             }
             ProjectEvent::SetPieceLocked { id, locked: true } => {
                 (Message::ActionLockPiece { name: name(*id) }, None)
@@ -189,12 +195,21 @@ impl History {
             ProjectEvent::RemovePiece { id } => {
                 (Message::ActionRemovePiece { name: name(*id) }, None)
             }
-            ProjectEvent::AddHole { id, .. } => match change {
-                ProjectChange::EdgeCut { .. } => (Message::ActionCutEdge { name: name(*id) }, None),
-                _ => (Message::ActionAddHole { name: name(*id) }, None),
-            },
-            ProjectEvent::RemoveHole { id, .. } => {
-                (Message::ActionRemoveHole { name: name(*id) }, None)
+            ProjectEvent::AddChild { id, .. } => {
+                (Message::ActionAddChild { name: name(*id) }, None)
+            }
+            ProjectEvent::SetChildShape { id, child, .. } => (
+                Message::ActionEditChild { name: name(*id) },
+                Some(MergeKey::Child(*id, *child)),
+            ),
+            ProjectEvent::SetChildOp { id, .. } => {
+                (Message::ActionSetChildOp { name: name(*id) }, None)
+            }
+            ProjectEvent::ReorderChild { id, .. } => {
+                (Message::ActionReorderChild { name: name(*id) }, None)
+            }
+            ProjectEvent::RemoveChild { id, .. } => {
+                (Message::ActionRemoveChild { name: name(*id) }, None)
             }
             // These are handled by their `ProjectChange` before describing.
             ProjectEvent::New { .. } | ProjectEvent::Open { .. } | ProjectEvent::Save { .. } => {
@@ -207,21 +222,24 @@ impl History {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::Point;
+    use crate::model::{BooleanOp, Point};
+    use crate::shapes::Shape;
     use std::path::PathBuf;
 
-    fn triangle() -> Vec<Point> {
-        vec![
-            Point::new(0.0, 0.0),
-            Point::new(10.0, 0.0),
-            Point::new(0.0, 10.0),
-        ]
+    fn triangle() -> Shape {
+        Shape::Polygon {
+            points: vec![
+                Point::new(0.0, 0.0),
+                Point::new(10.0, 0.0),
+                Point::new(0.0, 10.0),
+            ],
+        }
     }
 
     fn add_piece(name: &str) -> ProjectEvent {
         ProjectEvent::AddPiece {
             name: name.to_owned(),
-            points: triangle(),
+            base: triangle(),
         }
     }
 
@@ -441,5 +459,50 @@ mod tests {
         );
         assert_eq!(actions(&history), vec![Message::ActionNewProject]);
         assert!(!history.can_undo());
+    }
+
+    #[test]
+    fn consecutive_edits_of_one_child_share_an_entry() {
+        let mut project = Project::default();
+        let mut history = History::default();
+        run(&mut project, &mut history, add_piece("Flap"));
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::AddChild {
+                id: 1,
+                op: BooleanOp::Subtract,
+                shape: Shape::rectangle_from_corners(Point::new(1.0, 1.0), Point::new(2.0, 2.0))
+                    .unwrap(),
+            },
+        );
+        for size in [2.0, 3.0, 4.0] {
+            let shape =
+                Shape::rectangle_from_corners(Point::new(1.0, 1.0), Point::new(size, 2.0)).unwrap();
+            run(
+                &mut project,
+                &mut history,
+                ProjectEvent::SetChildShape {
+                    id: 1,
+                    child: 1,
+                    shape,
+                },
+            );
+        }
+        assert_eq!(history.actions().count(), 4);
+        assert_eq!(
+            history.actions().last(),
+            Some(&Message::ActionEditChild {
+                name: "Flap".to_owned()
+            })
+        );
+        history.apply(HistoryCommand::Undo, &mut project);
+        assert_eq!(
+            project.pieces[0].children[0]
+                .shape
+                .bounds()
+                .map(|b| b.max_x),
+            Some(2.0)
+        );
     }
 }

@@ -3,7 +3,7 @@ use crate::material::{
     ColorGroup, Flexibility, HeatResistance, LeatherColor, MAX_THICKNESS_MM, MIN_THICKNESS_MM,
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
 };
-use crate::model::Units;
+use crate::model::{BooleanOp, Units};
 
 pub(super) fn label(label: Label) -> &'static str {
     match label {
@@ -27,10 +27,24 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Select => "Вибір",
         Label::Draw => "Малювання",
         Label::Rectangle => "Прямокутник",
-        Label::Circle => "Коло",
+        Label::Ellipse => "Овал",
+        Label::Polygon => "Полігон",
         Label::RectangleHint => "Перетягуйте від кута до кута. Esc скасовує.",
-        Label::CircleHint => "Перетягуйте від центру назовні. Esc скасовує.",
-        Label::HoleMode => "Отвір: Малювання, Прямокутник і Коло вирізають у вибраній деталі",
+        Label::EllipseHint => "Перетягуйте від центру назовні. Shift — коло. Esc скасовує.",
+        Label::NewPieceMode => "Нова деталь: Малювання, Прямокутник і Овал створюють деталь",
+        Label::Operation(op) => operation(op),
+        Label::OperationHint(op) => operation_hint(op),
+        Label::Base => "Основа",
+        Label::CenterX => "Центр X",
+        Label::CenterY => "Центр Y",
+        Label::Width => "Ширина",
+        Label::Height => "Висота",
+        Label::RadiusX => "Радіус X",
+        Label::RadiusY => "Радіус Y",
+        Label::Rotation => "Поворот, °",
+        Label::MoveUp => "Застосувати раніше",
+        Label::MoveDown => "Застосувати пізніше",
+        Label::DeleteChild => "Видалити фігуру",
         Label::DrawHint => {
             "Клацайте, щоб додавати точки. Клацніть першу точку або натисніть Enter, щоб замкнути контур; Esc скасовує."
         }
@@ -324,25 +338,22 @@ pub(super) fn message(message: &Message) -> String {
         Message::DefaultPieceName { id } => format!("Деталь {id}"),
         Message::PieceNotFound { id } => format!("Деталь {id} не існує."),
         Message::PieceLocked { name } => format!("Деталь «{name}» заблоковано."),
-        Message::HoleAdded { name } => format!("Додано отвір у деталь «{name}»."),
-        Message::HoleDeleted => "Отвір видалено.".to_owned(),
-        Message::PieceEdgeCut { name } => format!("Змінено край деталі «{name}»."),
-        Message::HoleSplitsPiece { name } => {
-            format!("Цей виріз розділив би деталь «{name}» на кілька частин.")
+        Message::ChildAdded { name } => format!("Додано фігуру в деталь «{name}»."),
+        Message::ChildDeleted => "Фігуру видалено.".to_owned(),
+        Message::SelectPieceForChild => "Виберіть деталь, до якої треба додати фігуру.".to_owned(),
+        Message::ChildNotFound { name } => format!("У деталі «{name}» немає такої фігури."),
+        Message::TooManyChildren { name, max } => {
+            format!("Деталь «{name}» може мати не більше {max} фігур.")
         }
-        Message::HoleCoversPiece { name } => {
-            format!("Цей виріз повністю прибрав би деталь «{name}».")
+        Message::InvalidChildId { name } => {
+            format!("Фігура деталі «{name}» має неправильний або повторений ідентифікатор.")
         }
-        Message::SelectPieceForHole => "Виберіть деталь, у якій треба вирізати отвір.".to_owned(),
-        Message::HoleNotFound { name } => format!("У деталі «{name}» немає такого отвору."),
-        Message::TooManyHoles { name, max } => {
-            format!("Деталь «{name}» може мати не більше {max} отворів.")
+        Message::InvalidShapeSize { name } => {
+            format!("Фігури деталі «{name}» мають бути додатного розміру.")
         }
-        Message::HoleOutsidePiece { name } => {
-            format!("Отвори деталі «{name}» мають лежати всередині контуру й не торкатися його.")
-        }
-        Message::HolesOverlap { name } => {
-            format!("Отвори деталі «{name}» не повинні перетинатися чи торкатися один одного.")
+        Message::ResultEmpty { name } => format!("Від деталі «{name}» нічого не лишилося."),
+        Message::ResultSplit { name } => {
+            format!("Деталь «{name}» розпадається на кілька частин.")
         }
         Message::UnsupportedVersion { found, expected } => {
             format!("Версія проєкту {found} не підтримується (очікується {expected}).")
@@ -395,14 +406,35 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionUnits => "Змінено одиниці відображення".to_owned(),
         Message::ActionAddPiece { name } => format!("Додано «{name}»"),
         Message::ActionRenamePiece { name } => format!("Перейменовано на «{name}»"),
-        Message::ActionReshapePiece { name } => format!("Змінено форму «{name}»"),
+        Message::ActionEditBase { name } => format!("Змінено основу «{name}»"),
+        Message::ActionMovePiece { name } => format!("Переміщено «{name}»"),
         Message::ActionLockPiece { name } => format!("Заблоковано «{name}»"),
         Message::ActionUnlockPiece { name } => format!("Розблоковано «{name}»"),
         Message::ActionMaterial { name } => format!("Змінено матеріал «{name}»"),
         Message::ActionRemovePiece { name } => format!("Видалено «{name}»"),
-        Message::ActionAddHole { name } => format!("Додано отвір у «{name}»"),
-        Message::ActionCutEdge { name } => format!("Змінено край «{name}»"),
-        Message::ActionRemoveHole { name } => format!("Видалено отвір у «{name}»"),
+        Message::ActionAddChild { name } => format!("Додано фігуру в «{name}»"),
+        Message::ActionEditChild { name } => format!("Змінено фігуру «{name}»"),
+        Message::ActionSetChildOp { name } => format!("Змінено операцію «{name}»"),
+        Message::ActionReorderChild { name } => format!("Змінено порядок фігур «{name}»"),
+        Message::ActionRemoveChild { name } => format!("Видалено фігуру з «{name}»"),
+    }
+}
+
+fn operation(op: BooleanOp) -> &'static str {
+    match op {
+        BooleanOp::Subtract => "Вирізати",
+        BooleanOp::Union => "Об’єднати",
+        BooleanOp::Intersect => "Перетнути",
+    }
+}
+
+fn operation_hint(op: BooleanOp) -> &'static str {
+    match op {
+        BooleanOp::Subtract => "Вирізати: нові фігури вирізаються з вибраної деталі",
+        BooleanOp::Union => "Об’єднати: нові фігури додаються до вибраної деталі",
+        BooleanOp::Intersect => {
+            "Перетнути: від вибраної деталі лишається тільки частина всередині нових фігур"
+        }
     }
 }
 

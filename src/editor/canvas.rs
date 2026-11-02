@@ -1,4 +1,5 @@
 use super::drag::{begin_drag, finish_drag, update_drag};
+use super::drag_state_struct::ShapeRef;
 use super::grid::draw_grid;
 use super::{EditorState, ShapeDraft, format_length, send};
 use crate::document::ProjectMessage;
@@ -8,7 +9,8 @@ use bevy_egui::egui;
 use earcutr::earcut;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Language, Message};
-use leathercraft::model::{PatternPiece, Point, Project, Units};
+use leathercraft::model::{BooleanOp, PatternPiece, Point, Project, Units};
+use leathercraft::shapes::Shape;
 
 const MIN_ZOOM: f32 = 0.05;
 const MAX_ZOOM: f32 = 100.0;
@@ -78,7 +80,7 @@ pub(super) fn canvas(
     match state.tool {
         Tool::Select => handle_select(ui, &response, view, project, events, state),
         Tool::Draw => handle_draw(ui, &response, view, project, events, state),
-        Tool::Rectangle | Tool::Circle => {
+        Tool::Rectangle | Tool::Ellipse => {
             handle_shape(ui, &response, view, project, events, state);
         }
     }
@@ -135,15 +137,15 @@ fn handle_select(
     }
 }
 
-/// A hole of the selected piece takes the click; otherwise it selects a piece.
+/// A child of the selected piece takes the click; otherwise it selects a piece.
 fn select_at(project: &Project, point: Point, state: &mut EditorState) {
-    let hole = state
+    let child = state
         .selected
         .and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
-        .and_then(|piece| piece.hole_at(point).map(|index| (piece.id, index)));
-    state.selected_hole = hole;
-    if hole.is_none() {
-        state.selected = piece_at(project, point);
+        .and_then(|piece| child_at(piece, point).map(|child| (piece.id, child)));
+    match child {
+        Some((piece, child)) => state.select(Some(piece), Some(child)),
+        None => state.select(piece_at(project, point), None),
     }
 }
 
@@ -186,23 +188,24 @@ fn finish_draft(
     state: &mut EditorState,
 ) {
     let points = state.draft.clone();
-    commit_shape(project, events, state, points);
+    commit_shape(project, events, state, Shape::Polygon { points });
 }
 
-/// A finished shape becomes a hole in the selected piece in hole mode, otherwise a new piece.
+/// A finished shape becomes a child of the selected piece when an operation is chosen,
+/// otherwise a new piece.
 fn commit_shape(
     project: &Project,
     events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
-    points: Vec<Point>,
+    shape: Shape,
 ) {
-    if !state.hole_mode {
-        add_piece(project, events, state.language, points);
+    let Some(op) = state.op_mode else {
+        add_piece(project, events, state.language, shape);
         return;
-    }
+    };
     match state.selected {
-        Some(id) => send(events, ProjectEvent::AddHole { id, points }),
-        None => state.report_error(Message::SelectPieceForHole),
+        Some(id) => send(events, ProjectEvent::AddChild { id, op, shape }),
+        None => state.report_error(Message::SelectPieceForChild),
     }
 }
 
@@ -214,11 +217,16 @@ fn handle_shape(
     events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
 ) {
+    let circle = ui.input(|input| input.modifiers.shift);
     if response.drag_started_by(egui::PointerButton::Primary)
         && let Some(origin) = ui.input(|input| input.pointer.press_origin())
     {
         let start = state.snap_point(view.to_world(origin));
-        state.shape_draft = Some(ShapeDraft { start, end: start });
+        state.shape_draft = Some(ShapeDraft {
+            start,
+            end: start,
+            circle,
+        });
     }
     if response.dragged_by(egui::PointerButton::Primary)
         && let Some(position) = response.interact_pointer_pos()
@@ -226,13 +234,14 @@ fn handle_shape(
         let end = state.snap_point(view.to_world(position));
         if let Some(draft) = &mut state.shape_draft {
             draft.end = end;
+            draft.circle = circle;
         }
     }
     if response.drag_stopped_by(egui::PointerButton::Primary)
         && let Some(draft) = state.shape_draft.take()
-        && let Some(points) = state.tool.shape_points(draft.start, draft.end)
+        && let Some(shape) = state.tool.shape(draft.start, draft.end, draft.circle)
     {
-        commit_shape(project, events, state, points);
+        commit_shape(project, events, state, shape);
     }
     if !ui.ctx().wants_keyboard_input() && ui.input(|input| input.key_pressed(egui::Key::Escape)) {
         state.shape_draft = None;
@@ -243,13 +252,21 @@ fn add_piece(
     project: &Project,
     events: &mut MessageWriter<ProjectMessage>,
     language: Language,
-    points: Vec<Point>,
+    base: Shape,
 ) {
     // The name is document content, so it stays in the language it was created in.
     let name = language.message(&Message::DefaultPieceName {
         id: project.next_piece_id(),
     });
-    send(events, ProjectEvent::AddPiece { name, points });
+    send(events, ProjectEvent::AddPiece { name, base });
+}
+
+/// Whether the point is on the piece. A piece whose shapes don't combine is hit by its base.
+fn piece_hit(piece: &PatternPiece, point: Point) -> bool {
+    match piece.region() {
+        Ok(region) => region.contains(point),
+        Err(_) => piece.base.contains(point),
+    }
 }
 
 pub(super) fn piece_at(project: &Project, point: Point) -> Option<u64> {
@@ -257,36 +274,82 @@ pub(super) fn piece_at(project: &Project, point: Point) -> Option<u64> {
         .pieces
         .iter()
         .rev()
-        .find(|piece| piece.contains(point))
+        .find(|piece| piece_hit(piece, point))
         .map(|piece| piece.id)
 }
 
-pub(super) fn vertex_at(
-    piece: &PatternPiece,
-    position: egui::Pos2,
-    view: Viewport,
-) -> Option<usize> {
+/// The smallest child under the point, so that a child inside a larger one stays reachable.
+pub(super) fn child_at(piece: &PatternPiece, point: Point) -> Option<u64> {
+    let area = |shape: &Shape| {
+        shape
+            .bounds()
+            .map_or(0.0, |bounds| bounds.width() * bounds.height())
+    };
     piece
-        .points
+        .children
         .iter()
-        .position(|point| view.to_screen(*point).distance(position) <= VERTEX_HIT_RADIUS_PX)
+        .filter(|child| child.shape.contains(point))
+        .min_by(|a, b| area(&a.shape).total_cmp(&area(&b.shape)))
+        .map(|child| child.id)
 }
 
-pub(super) fn hole_vertex_at(
+/// A handle of the selected child, or else of the base, under the cursor.
+pub(super) fn handle_at(
     piece: &PatternPiece,
+    selected_child: Option<u64>,
     position: egui::Pos2,
     view: Viewport,
-) -> Option<(usize, usize)> {
-    piece.holes.iter().enumerate().find_map(|(index, hole)| {
-        hole.iter()
-            .position(|point| view.to_screen(*point).distance(position) <= VERTEX_HIT_RADIUS_PX)
-            .map(|vertex| (index, vertex))
-    })
+) -> Option<(ShapeRef, usize)> {
+    selected_child
+        .map(ShapeRef::Child)
+        .into_iter()
+        .chain([ShapeRef::Base])
+        .find_map(|shape| {
+            let handles = shape.get(piece)?.handles();
+            handles
+                .iter()
+                .position(|point| view.to_screen(*point).distance(position) <= VERTEX_HIT_RADIUS_PX)
+                .map(|handle| (shape, handle))
+        })
+}
+
+fn op_color(op: BooleanOp) -> egui::Color32 {
+    match op {
+        BooleanOp::Subtract => egui::Color32::from_rgb(235, 110, 110),
+        BooleanOp::Union => egui::Color32::from_rgb(110, 205, 125),
+        BooleanOp::Intersect => egui::Color32::from_rgb(110, 170, 245),
+    }
+}
+
+/// The color of shapes being drawn, which shows what they will do.
+fn draft_color(state: &EditorState) -> egui::Color32 {
+    state
+        .op_mode
+        .map_or(egui::Color32::from_rgb(110, 190, 240), op_color)
+}
+
+fn to_screen(view: Viewport, ring: &[Point]) -> Vec<egui::Pos2> {
+    ring.iter().map(|point| view.to_screen(*point)).collect()
+}
+
+fn dashed_ring(painter: &egui::Painter, mut screen: Vec<egui::Pos2>, stroke: egui::Stroke) {
+    let Some(&first) = screen.first() else {
+        return;
+    };
+    screen.push(first);
+    painter.extend(egui::Shape::dashed_line(&screen, stroke, 6.0, 4.0));
+}
+
+fn draw_handles(painter: &egui::Painter, view: Viewport, shape: &Shape, color: egui::Color32) {
+    for point in shape.handles() {
+        let rect = egui::Rect::from_center_size(view.to_screen(point), egui::Vec2::splat(7.0));
+        painter.rect_filled(rect, 1.0, color);
+    }
 }
 
 fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state: &EditorState) {
     let text_color = egui::Color32::from_gray(220);
-    let selected_hole_color = egui::Color32::from_rgb(110, 190, 240);
+    let error_color = egui::Color32::from_rgb(235, 80, 80);
     let fill_color = egui::Color32::from_rgba_unmultiplied(128, 128, 128, 80);
     for piece in &project.pieces {
         let piece = state.displayed(piece);
@@ -296,61 +359,91 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
         } else {
             egui::Stroke::new(1.5, egui::Color32::from_rgb(190, 190, 200))
         };
-        let screen: Vec<egui::Pos2> = piece
-            .points
-            .iter()
-            .map(|point| view.to_screen(*point))
-            .collect();
-        let holes: Vec<Vec<egui::Pos2>> = piece
-            .holes
-            .iter()
-            .map(|hole| hole.iter().map(|point| view.to_screen(*point)).collect())
-            .collect();
-        let selected_hole = if selected {
-            state.selected_hole_index()
-        } else {
-            None
-        };
-        let vertices: Vec<egui::Pos2> = piece
-            .vertices()
-            .map(|point| view.to_screen(*point))
-            .collect();
-        fill_polygon(painter, &vertices, &piece.hole_indices(), fill_color);
-        painter.add(egui::Shape::closed_line(screen.clone(), stroke));
-        for (index, hole) in holes.iter().enumerate() {
-            let hole_stroke = if selected_hole == Some(index) {
-                egui::Stroke::new(stroke.width, selected_hole_color)
-            } else {
-                stroke
-            };
-            painter.add(egui::Shape::closed_line(hole.clone(), hole_stroke));
+        let region = piece.region();
+        match &region {
+            Ok(region) => {
+                let vertices: Vec<egui::Pos2> = region
+                    .vertices()
+                    .map(|point| view.to_screen(*point))
+                    .collect();
+                fill_polygon(painter, &vertices, &region.hole_indices(), fill_color);
+                for ring in region.rings() {
+                    painter.add(egui::Shape::closed_line(to_screen(view, ring), stroke));
+                }
+            }
+            // The shapes stay visible, so that the edit that broke the piece can be undone by hand.
+            Err(_) => {
+                let error_stroke = egui::Stroke::new(stroke.width, error_color);
+                dashed_ring(painter, to_screen(view, &piece.base.ring()), error_stroke);
+                for child in &piece.children {
+                    dashed_ring(painter, to_screen(view, &child.shape.ring()), error_stroke);
+                }
+            }
         }
         if let Some(bounds) = piece.bounds() {
-            let center = Point::new(
+            let center = view.to_screen(Point::new(
                 (bounds.min_x + bounds.max_x) * 0.5,
                 (bounds.min_y + bounds.max_y) * 0.5,
-            );
+            ));
             painter.text(
-                view.to_screen(center),
+                center,
                 egui::Align2::CENTER_CENTER,
                 &piece.name,
                 egui::FontId::proportional(13.0),
                 text_color,
             );
+            if let Err(error) = &region {
+                painter.text(
+                    center + egui::vec2(0.0, 16.0),
+                    egui::Align2::CENTER_CENTER,
+                    state.language.message(error),
+                    egui::FontId::proportional(12.0),
+                    error_color,
+                );
+            }
         }
         if !selected {
             continue;
         }
-        if !piece.locked {
-            for position in &vertices {
-                painter.circle_filled(*position, 4.0, stroke.color);
+
+        let selected_child = state.selected_child_id();
+        let construction = egui::Stroke::new(1.0, stroke.color.gamma_multiply(0.7));
+        dashed_ring(painter, to_screen(view, &piece.base.ring()), construction);
+        for child in &piece.children {
+            let screen = to_screen(view, &child.shape.ring());
+            let color = op_color(child.op);
+            if selected_child == Some(child.id) {
+                painter.add(egui::Shape::closed_line(
+                    screen,
+                    egui::Stroke::new(2.0, color),
+                ));
+            } else {
+                dashed_ring(painter, screen, egui::Stroke::new(1.0, color));
             }
         }
-        draw_edge_labels(painter, &piece.points, &screen, project.units, state);
-        if let Some(index) = selected_hole
-            && let (Some(hole), Some(hole_screen)) = (piece.holes.get(index), holes.get(index))
-        {
-            draw_edge_labels(painter, hole, hole_screen, project.units, state);
+        if !piece.locked {
+            draw_handles(painter, view, &piece.base, stroke.color);
+        }
+        match selected_child.and_then(|id| piece.child(id)) {
+            Some(child) => {
+                if !piece.locked {
+                    draw_handles(painter, view, &child.shape, op_color(child.op));
+                }
+                let ring = child.shape.ring();
+                draw_edge_labels(
+                    painter,
+                    &ring,
+                    &to_screen(view, &ring),
+                    project.units,
+                    state,
+                );
+            }
+            None => {
+                if let Ok(region) = &region {
+                    let outline = to_screen(view, &region.outline);
+                    draw_edge_labels(painter, &region.outline, &outline, project.units, state);
+                }
+            }
         }
     }
 }
@@ -414,13 +507,9 @@ fn draw_draft(
     let Some(&last) = state.draft.last() else {
         return;
     };
-    let color = egui::Color32::from_rgb(110, 190, 240);
+    let color = draft_color(state);
     let stroke = egui::Stroke::new(2.0, color);
-    let screen: Vec<egui::Pos2> = state
-        .draft
-        .iter()
-        .map(|point| view.to_screen(*point))
-        .collect();
+    let screen = to_screen(view, &state.draft);
     painter.add(egui::Shape::line(screen.clone(), stroke));
     for position in &screen {
         painter.circle_filled(*position, 4.0, color);
@@ -450,26 +539,24 @@ fn draw_shape_draft(painter: &egui::Painter, view: Viewport, units: Units, state
     let Some(draft) = state.shape_draft else {
         return;
     };
-    let Some(points) = state.tool.shape_points(draft.start, draft.end) else {
+    let Some(shape) = state.tool.shape(draft.start, draft.end, draft.circle) else {
         return;
     };
-    let color = egui::Color32::from_rgb(110, 190, 240);
-    let screen: Vec<egui::Pos2> = points.iter().map(|point| view.to_screen(*point)).collect();
+    let color = draft_color(state);
     painter.add(egui::Shape::closed_line(
-        screen,
+        to_screen(view, &shape.ring()),
         egui::Stroke::new(2.0, color),
     ));
-    let language = state.language;
-    let dx = draft.end.x - draft.start.x;
-    let dy = draft.end.y - draft.start.y;
-    let size = if state.tool == Tool::Circle {
-        format!("Ø {}", format_length(language, units, dx.hypot(dy) * 2.0))
-    } else {
-        format!(
-            "{} × {}",
-            format_length(language, units, dx.abs()),
-            format_length(language, units, dy.abs())
-        )
+    let length = |millimeters: f64| format_length(state.language, units, millimeters);
+    let size = match shape {
+        Shape::Ellipse {
+            radius_x, radius_y, ..
+        } if radius_x == radius_y => format!("Ø {}", length(radius_x * 2.0)),
+        Shape::Ellipse {
+            radius_x, radius_y, ..
+        } => format!("{} × {}", length(radius_x * 2.0), length(radius_y * 2.0)),
+        Shape::Rectangle { width, height, .. } => format!("{} × {}", length(width), length(height)),
+        Shape::Polygon { .. } => return,
     };
     painter.text(
         view.to_screen(draft.end) + egui::vec2(10.0, -10.0),

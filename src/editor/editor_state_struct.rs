@@ -5,7 +5,7 @@ use bevy_egui::egui;
 use leathercraft::events::ProjectChange;
 use leathercraft::i18n::{Language, Message};
 use leathercraft::material::Material;
-use leathercraft::model::{PatternPiece, Point, Project};
+use leathercraft::model::{BooleanOp, PatternPiece, Point, Project};
 use std::borrow::Cow;
 
 #[derive(Resource)]
@@ -13,12 +13,13 @@ pub struct EditorState {
     pub(super) tool: Tool,
     pub(super) draft: Vec<Point>,
     pub(super) shape_draft: Option<ShapeDraft>,
-    /// Draw, Rectangle and Circle cut a hole in the selected piece instead of adding a piece.
-    pub(super) hole_mode: bool,
+    /// With an operation, Draw, Rectangle and Ellipse add a child with it to the selected
+    /// piece instead of adding a piece.
+    pub(super) op_mode: Option<BooleanOp>,
     pub(super) selected: Option<u64>,
-    /// Piece id and hole index. Read through `selected_hole_index`, since it only counts
+    /// Piece id and child id. Read through `selected_child_id`, since it only counts
     /// while that piece is the selected one.
-    pub(super) selected_hole: Option<(u64, usize)>,
+    pub(super) selected_child: Option<(u64, u64)>,
     pub(super) drag: Option<DragState>,
     pub(super) pan: egui::Vec2,
     pub(super) zoom: f32,
@@ -41,9 +42,9 @@ impl Default for EditorState {
             tool: Tool::default(),
             draft: Vec::new(),
             shape_draft: None,
-            hole_mode: false,
+            op_mode: None,
             selected: None,
-            selected_hole: None,
+            selected_child: None,
             drag: None,
             pan: egui::Vec2::ZERO,
             zoom: 2.0,
@@ -94,7 +95,7 @@ impl EditorState {
         self.draft.clear();
         self.shape_draft = None;
         self.selected = None;
-        self.selected_hole = None;
+        self.selected_child = None;
         self.drag = None;
         self.rename_buffer = None;
         self.fit_requested = true;
@@ -131,36 +132,28 @@ impl EditorState {
                     self.selected = None;
                 }
                 // The id can be given to the next new piece.
-                self.selected_hole = None;
+                self.selected_child = None;
                 if self.drag.as_ref().is_some_and(|drag| drag.piece_id == id) {
                     self.drag = None;
                 }
                 self.report(Message::PieceDeleted);
             }
-            // The tool and hole mode stay, so that several holes can be cut in a row.
-            ProjectChange::HoleAdded { id, index } => {
+            // The tool and operation stay, so that several shapes can be added in a row.
+            ProjectChange::ChildAdded { id, child } => {
                 self.draft.clear();
-                self.selected_hole = Some((id, index));
+                self.selected = Some(id);
+                self.selected_child = Some((id, child));
                 if let Some(piece) = project.pieces.iter().find(|piece| piece.id == id) {
-                    self.report(Message::HoleAdded {
+                    self.report(Message::ChildAdded {
                         name: piece.name.clone(),
                     });
                 }
             }
-            ProjectChange::EdgeCut { id } => {
-                self.draft.clear();
-                self.selected_hole = None;
-                if let Some(piece) = project.pieces.iter().find(|piece| piece.id == id) {
-                    self.report(Message::PieceEdgeCut {
-                        name: piece.name.clone(),
-                    });
+            ProjectChange::ChildRemoved { id } => {
+                if self.selected_child.is_some_and(|(piece, _)| piece == id) {
+                    self.selected_child = None;
                 }
-            }
-            ProjectChange::HoleRemoved { id } => {
-                if self.selected_hole.is_some_and(|(piece, _)| piece == id) {
-                    self.selected_hole = None;
-                }
-                self.report(Message::HoleDeleted);
+                self.report(Message::ChildDeleted);
             }
         }
     }
@@ -172,20 +165,33 @@ impl EditorState {
         self.shape_draft = None;
         self.drag = None;
         self.rename_buffer = None;
-        self.selected_hole = None;
         if self
             .selected
             .is_some_and(|id| !project.pieces.iter().any(|piece| piece.id == id))
         {
             self.selected = None;
         }
+        let child_exists = |(id, child): (u64, u64)| {
+            project
+                .pieces
+                .iter()
+                .any(|piece| piece.id == id && piece.child(child).is_some())
+        };
+        self.selected_child = self
+            .selected_child
+            .filter(|selected| child_exists(*selected));
         self.report(status);
     }
 
-    pub(super) fn selected_hole_index(&self) -> Option<usize> {
-        self.selected_hole
+    pub(super) fn selected_child_id(&self) -> Option<u64> {
+        self.selected_child
             .filter(|(id, _)| self.selected == Some(*id))
-            .map(|(_, index)| index)
+            .map(|(_, child)| child)
+    }
+
+    pub(super) fn select(&mut self, piece: Option<u64>, child: Option<u64>) {
+        self.selected = piece;
+        self.selected_child = piece.zip(child);
     }
 
     pub fn clear_released_drag(&mut self) {
@@ -196,11 +202,7 @@ impl EditorState {
 
     pub(super) fn displayed<'a>(&self, piece: &'a PatternPiece) -> Cow<'a, PatternPiece> {
         match &self.drag {
-            Some(drag) if drag.piece_id == piece.id => Cow::Owned(PatternPiece {
-                points: drag.points.clone(),
-                holes: drag.holes.clone(),
-                ..piece.clone()
-            }),
+            Some(drag) if drag.piece_id == piece.id => Cow::Owned(drag.current.clone()),
             _ => Cow::Borrowed(piece),
         }
     }

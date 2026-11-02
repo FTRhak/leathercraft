@@ -21,6 +21,7 @@ use leathercraft::exports::ExportError;
 use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{Project, Units};
 use leathercraft::persistence;
+use leathercraft::shapes::Shape;
 use shape_draft_struct::ShapeDraft;
 
 const PROJECT_EXTENSION: &str = "leathercraft";
@@ -144,15 +145,115 @@ fn selected_piece_details(
     state.rename_buffer = response.has_focus().then_some(name);
 
     let shown = state.displayed(piece);
-    ui.label(language.message(&Message::PointCount {
-        count: shown.points.len(),
-    }));
-    if let Some(bounds) = shown.bounds() {
-        ui.label(format!(
-            "{} × {}",
-            format_length(language, units, bounds.width()),
-            format_length(language, units, bounds.height())
-        ));
+    match shown.region() {
+        Ok(region) => {
+            if let Some(bounds) = region.bounds() {
+                ui.label(format!(
+                    "{} × {}",
+                    format_length(language, units, bounds.width()),
+                    format_length(language, units, bounds.height())
+                ));
+            }
+        }
+        Err(error) => {
+            ui.colored_label(ui.visuals().error_fg_color, language.message(&error));
+        }
+    }
+
+    ui.separator();
+    let id = piece.id;
+    let child = state
+        .selected_child_id()
+        .and_then(|child| shown.child(child));
+    let (title, shape) = match child {
+        Some(child) => {
+            let index = shown.child_index(child.id).unwrap_or_default() + 1;
+            let op = language.label(Label::Operation(child.op));
+            (format!("{index}. {op}"), &child.shape)
+        }
+        None => (language.label(Label::Base).to_owned(), &shown.base),
+    };
+    ui.strong(title);
+    let mut edited = shape.clone();
+    ui.add_enabled_ui(!piece.locked, |ui| {
+        shape_fields(ui, &mut edited, units, language);
+    });
+    if edited != *shape {
+        let event = match child {
+            Some(child) => ProjectEvent::SetChildShape {
+                id,
+                child: child.id,
+                shape: edited,
+            },
+            None => ProjectEvent::SetBaseShape { id, shape: edited },
+        };
+        send(events, event);
+    }
+}
+
+/// Fields for the parameters of a primitive, in display units; a polygon shows its point count.
+fn shape_fields(ui: &mut egui::Ui, shape: &mut Shape, units: Units, language: Language) {
+    let scale = units.from_millimeters(1.0);
+    let symbol = language.unit_symbol(units);
+    let length = |ui: &mut egui::Ui, label: Label, millimeters: &mut f64, min: f64| {
+        let mut value = *millimeters * scale;
+        ui.horizontal(|ui| {
+            ui.label(language.label(label));
+            let field = egui::DragValue::new(&mut value)
+                .speed(0.1 * scale)
+                .max_decimals(3)
+                .range(min * scale..=f64::MAX)
+                .suffix(format!(" {symbol}"));
+            if ui.add(field).changed() {
+                *millimeters = value / scale;
+            }
+        });
+    };
+    let angle = |ui: &mut egui::Ui, radians: &mut f64| {
+        let mut degrees = radians.to_degrees();
+        ui.horizontal(|ui| {
+            ui.label(language.label(Label::Rotation));
+            let field = egui::DragValue::new(&mut degrees)
+                .speed(1.0)
+                .max_decimals(2)
+                .range(-360.0..=360.0);
+            if ui.add(field).changed() {
+                *radians = degrees.to_radians();
+            }
+        });
+    };
+    // Sizes stay above zero, which the project would reject.
+    const MIN_SIZE_MM: f64 = 0.01;
+    match shape {
+        Shape::Polygon { points } => {
+            ui.label(language.message(&Message::PointCount {
+                count: points.len(),
+            }));
+        }
+        Shape::Rectangle {
+            center,
+            width,
+            height,
+            rotation,
+        } => {
+            length(ui, Label::CenterX, &mut center.x, f64::MIN);
+            length(ui, Label::CenterY, &mut center.y, f64::MIN);
+            length(ui, Label::Width, width, MIN_SIZE_MM);
+            length(ui, Label::Height, height, MIN_SIZE_MM);
+            angle(ui, rotation);
+        }
+        Shape::Ellipse {
+            center,
+            radius_x,
+            radius_y,
+            rotation,
+        } => {
+            length(ui, Label::CenterX, &mut center.x, f64::MIN);
+            length(ui, Label::CenterY, &mut center.y, f64::MIN);
+            length(ui, Label::RadiusX, radius_x, MIN_SIZE_MM);
+            length(ui, Label::RadiusY, radius_y, MIN_SIZE_MM);
+            angle(ui, rotation);
+        }
     }
 }
 

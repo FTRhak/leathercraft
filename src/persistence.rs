@@ -37,124 +37,97 @@ pub fn write_export(path: &Path, contents: &str) -> io::Result<()> {
 mod tests {
     use super::*;
     use crate::material::{LeatherColor, Material, Origin, Treatment};
-    use crate::model::{PatternPiece, Point, Project};
+    use crate::model::{BooleanOp, ChildShape, PatternPiece, Point, Project};
+    use crate::shapes::Shape;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    #[test]
-    fn project_save_and_load_round_trip() {
+    fn temp_path(label: &str) -> std::path::PathBuf {
         let id = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let path = std::env::temp_dir().join(format!(
-            "leathercraft-project-{}-{id}.leathercraft",
+        std::env::temp_dir().join(format!(
+            "leathercraft-{label}-{}-{id}.leathercraft",
             std::process::id()
-        ));
-        let project = Project {
-            pieces: vec![PatternPiece::new(
-                1,
-                "Flap",
-                vec![
+        ))
+    }
+
+    fn flap() -> PatternPiece {
+        PatternPiece::new(
+            1,
+            "Flap",
+            Shape::Polygon {
+                points: vec![
                     Point::new(-2.0, 0.0),
                     Point::new(50.0, 0.0),
                     Point::new(50.0, 70.0),
                     Point::new(-2.0, 70.0),
                 ],
-            )],
-            ..Project::default()
-        };
-
-        save_project(&path, &project).unwrap();
-        assert_eq!(load_project(&path).unwrap(), project);
-        fs::remove_file(path).unwrap();
-    }
-
-    #[test]
-    fn holes_round_trip_and_default_to_none_in_older_files() {
-        let id = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!(
-            "leathercraft-holes-{}-{id}.leathercraft",
-            std::process::id()
-        ));
-        let mut piece = PatternPiece::new(
-            1,
-            "Flap",
-            vec![
-                Point::new(0.0, 0.0),
-                Point::new(10.0, 0.0),
-                Point::new(0.0, 10.0),
-            ],
-        );
-        piece.holes = vec![vec![
-            Point::new(1.0, 1.0),
-            Point::new(3.0, 1.0),
-            Point::new(1.0, 3.0),
-        ]];
-        let project = Project {
-            pieces: vec![piece],
-            ..Project::default()
-        };
-        save_project(&path, &project).unwrap();
-        assert_eq!(load_project(&path).unwrap(), project);
-
-        fs::write(
-            &path,
-            r#"{"version":1,"units":"millimeters","pieces":[{"id":1,"name":"Flap","points":[{"x":0.0,"y":0.0},{"x":10.0,"y":0.0},{"x":0.0,"y":10.0}]}]}"#,
+            },
         )
-        .unwrap();
-        assert!(load_project(&path).unwrap().pieces[0].holes.is_empty());
+    }
+
+    #[test]
+    fn project_save_and_load_round_trip() {
+        let path = temp_path("project");
+        let project = Project {
+            pieces: vec![flap()],
+            ..Project::default()
+        };
+
+        save_project(&path, &project).unwrap();
+        assert_eq!(load_project(&path).unwrap(), project);
         fs::remove_file(path).unwrap();
     }
 
     #[test]
-    fn piece_lock_round_trips_and_defaults_to_unlocked() {
-        let id = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!(
-            "leathercraft-lock-{}-{id}.leathercraft",
-            std::process::id()
-        ));
-        let mut piece = PatternPiece::new(
-            1,
-            "Flap",
-            vec![
-                Point::new(0.0, 0.0),
-                Point::new(10.0, 0.0),
-                Point::new(0.0, 10.0),
-            ],
-        );
+    fn children_round_trip_with_their_operations_and_order() {
+        let path = temp_path("children");
+        let mut piece = flap();
+        piece.children = vec![
+            ChildShape {
+                id: 2,
+                op: BooleanOp::Subtract,
+                shape: Shape::Ellipse {
+                    center: Point::new(20.0, 20.0),
+                    radius_x: 5.0,
+                    radius_y: 3.0,
+                    rotation: 0.5,
+                },
+            },
+            ChildShape {
+                id: 1,
+                op: BooleanOp::Union,
+                shape: Shape::Rectangle {
+                    center: Point::new(50.0, 30.0),
+                    width: 10.0,
+                    height: 8.0,
+                    rotation: 0.0,
+                },
+            },
+            ChildShape {
+                id: 3,
+                op: BooleanOp::Intersect,
+                shape: Shape::rectangle_from_corners(
+                    Point::new(-5.0, -5.0),
+                    Point::new(60.0, 60.0),
+                )
+                .unwrap(),
+            },
+        ];
         piece.locked = true;
         let project = Project {
             pieces: vec![piece],
             ..Project::default()
         };
         save_project(&path, &project).unwrap();
-        assert!(load_project(&path).unwrap().pieces[0].locked);
-
-        fs::write(
-            &path,
-            r#"{"version":1,"units":"millimeters","pieces":[{"id":1,"name":"Flap","points":[{"x":0.0,"y":0.0},{"x":10.0,"y":0.0},{"x":0.0,"y":10.0}]}]}"#,
-        )
-        .unwrap();
-        assert!(!load_project(&path).unwrap().pieces[0].locked);
+        assert_eq!(load_project(&path).unwrap(), project);
         fs::remove_file(path).unwrap();
     }
 
     #[test]
-    fn materials_round_trip_and_default_in_older_files() {
-        let id = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!(
-            "leathercraft-material-{}-{id}.leathercraft",
-            std::process::id()
-        ));
+    fn materials_round_trip() {
+        let path = temp_path("material");
         let material = Material {
             origin: Origin::Ostrich,
             treatment: Treatment::Nubuck,
@@ -162,15 +135,7 @@ mod tests {
             color: LeatherColor::Emerald,
             ..Material::default()
         };
-        let mut piece = PatternPiece::new(
-            1,
-            "Flap",
-            vec![
-                Point::new(0.0, 0.0),
-                Point::new(10.0, 0.0),
-                Point::new(0.0, 10.0),
-            ],
-        );
+        let mut piece = flap();
         piece.material = material;
         let project = Project {
             pieces: vec![piece],
@@ -179,37 +144,26 @@ mod tests {
         };
         save_project(&path, &project).unwrap();
         assert_eq!(load_project(&path).unwrap(), project);
-
-        fs::write(
-            &path,
-            r#"{"version":1,"units":"millimeters","pieces":[{"id":1,"name":"Flap","points":[{"x":0.0,"y":0.0},{"x":10.0,"y":0.0},{"x":0.0,"y":10.0}]}]}"#,
-        )
-        .unwrap();
-        let older = load_project(&path).unwrap();
-        assert_eq!(older.default_material, Material::default());
-        assert_eq!(older.pieces[0].material, Material::default());
         fs::remove_file(path).unwrap();
     }
 
     #[test]
-    fn rejects_unknown_project_versions_on_load() {
-        let id = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!(
-            "leathercraft-invalid-{}-{id}.leathercraft",
-            std::process::id()
-        ));
-        fs::write(&path, r#"{"version":99,"units":"millimeters","pieces":[]}"#).unwrap();
-
-        assert_eq!(
-            load_project(&path),
-            Err(Message::UnsupportedVersion {
-                found: 99,
-                expected: crate::model::PROJECT_VERSION
-            })
-        );
+    fn rejects_other_project_versions_on_load() {
+        let path = temp_path("invalid");
+        for found in [1, 99] {
+            fs::write(
+                &path,
+                format!(r#"{{"version":{found},"units":"millimeters","pieces":[]}}"#),
+            )
+            .unwrap();
+            assert_eq!(
+                load_project(&path),
+                Err(Message::UnsupportedVersion {
+                    found,
+                    expected: crate::model::PROJECT_VERSION
+                })
+            );
+        }
         fs::remove_file(path).unwrap();
     }
 }

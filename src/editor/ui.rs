@@ -248,8 +248,8 @@ fn handle_delete_key(
         input.key_pressed(egui::Key::Delete) || input.key_pressed(egui::Key::Backspace)
     });
     if delete_pressed && let Some(id) = state.selected {
-        let event = match state.selected_hole_index() {
-            Some(index) => ProjectEvent::RemoveHole { id, index },
+        let event = match state.selected_child_id() {
+            Some(child) => ProjectEvent::RemoveChild { id, child },
             None => ProjectEvent::RemovePiece { id },
         };
         send(events, event);

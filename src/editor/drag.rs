@@ -1,4 +1,5 @@
-use super::canvas::{Viewport, hole_vertex_at, piece_at, vertex_at};
+use super::canvas::{Viewport, child_at, handle_at, piece_at};
+use super::drag_state_struct::ShapeRef;
 use super::{DragState, DragTarget, EditorState, send};
 use crate::document::ProjectMessage;
 use bevy::prelude::*;
@@ -6,20 +7,18 @@ use bevy_egui::egui;
 use leathercraft::events::ProjectEvent;
 use leathercraft::model::{PatternPiece, Point, Project};
 
-/// What the press grabs on the selected piece, nearest handles first.
+/// What the press grabs on the selected piece: handles first, then a child, then the piece.
 fn target_on_selected(
     piece: &PatternPiece,
+    selected_child: Option<u64>,
     origin: egui::Pos2,
     start: Point,
     view: Viewport,
 ) -> Option<DragTarget> {
-    if let Some((hole, vertex)) = hole_vertex_at(piece, origin, view) {
-        return Some(DragTarget::HoleVertex { hole, vertex });
+    if let Some((shape, handle)) = handle_at(piece, selected_child, origin, view) {
+        return Some(DragTarget::Handle(shape, handle));
     }
-    if let Some(vertex) = vertex_at(piece, origin, view) {
-        return Some(DragTarget::Vertex(vertex));
-    }
-    piece.hole_at(start).map(DragTarget::Hole)
+    child_at(piece, start).map(DragTarget::Child)
 }
 
 pub(super) fn begin_drag(
@@ -32,7 +31,9 @@ pub(super) fn begin_drag(
         .selected
         .and_then(|id| project.pieces.iter().find(|piece| piece.id == id));
     let start = view.to_world(origin);
-    let target = selected.and_then(|piece| target_on_selected(piece, origin, start, view));
+    let target = selected.and_then(|piece| {
+        target_on_selected(piece, state.selected_child_id(), origin, start, view)
+    });
     let piece_id = match (target, selected) {
         (Some(_), Some(piece)) => Some(piece.id),
         _ => piece_at(project, start),
@@ -43,13 +44,13 @@ pub(super) fn begin_drag(
     let Some(piece) = project.pieces.iter().find(|piece| piece.id == piece_id) else {
         return;
     };
-    state.selected = Some(piece_id);
-    state.selected_hole = match target {
-        Some(DragTarget::Hole(hole) | DragTarget::HoleVertex { hole, .. }) => {
-            Some((piece_id, hole))
+    let child = match target {
+        Some(DragTarget::Child(child) | DragTarget::Handle(ShapeRef::Child(child), _)) => {
+            Some(child)
         }
         _ => None,
     };
+    state.select(Some(piece_id), child);
     if piece.locked {
         return;
     }
@@ -57,46 +58,37 @@ pub(super) fn begin_drag(
         piece_id,
         target: target.unwrap_or(DragTarget::Piece),
         start,
-        original: piece.points.clone(),
-        original_holes: piece.holes.clone(),
-        points: piece.points.clone(),
-        holes: piece.holes.clone(),
+        offset: (0.0, 0.0),
+        original: piece.clone(),
+        current: piece.clone(),
         released: false,
     });
-}
-
-fn translate(points: &mut [Point], dx: f64, dy: f64) {
-    for point in points {
-        point.x += dx;
-        point.y += dy;
-    }
 }
 
 pub(super) fn update_drag(cursor: Point, state: &mut EditorState) {
     let Some(drag) = &state.drag else {
         return;
     };
-    let mut points = drag.original.clone();
-    let mut holes = drag.original_holes.clone();
+    let mut current = drag.original.clone();
     // Snap the offset, not the points, so that what moves keeps its own shape.
     let dx = state.snap(cursor.x - drag.start.x);
     let dy = state.snap(cursor.y - drag.start.y);
     match drag.target {
-        DragTarget::Vertex(vertex) => points[vertex] = state.snap_point(cursor),
-        DragTarget::HoleVertex { hole, vertex } => {
-            holes[hole][vertex] = state.snap_point(cursor);
+        DragTarget::Piece => current.translate(dx, dy),
+        DragTarget::Child(child) => {
+            if let Some(shape) = ShapeRef::Child(child).get_mut(&mut current) {
+                shape.translate(dx, dy);
+            }
         }
-        DragTarget::Hole(hole) => translate(&mut holes[hole], dx, dy),
-        DragTarget::Piece => {
-            translate(&mut points, dx, dy);
-            for hole in &mut holes {
-                translate(hole, dx, dy);
+        DragTarget::Handle(shape, handle) => {
+            if let Some(shape) = shape.get_mut(&mut current) {
+                *shape = shape.with_handle_at(handle, state.snap_point(cursor));
             }
         }
     }
     if let Some(drag) = &mut state.drag {
-        drag.points = points;
-        drag.holes = holes;
+        drag.current = current;
+        drag.offset = (dx, dy);
     }
 }
 
@@ -105,14 +97,29 @@ pub(super) fn finish_drag(events: &mut MessageWriter<ProjectMessage>, state: &mu
         return;
     };
     drag.released = true;
-    if drag.points != drag.original || drag.holes != drag.original_holes {
-        send(
-            events,
-            ProjectEvent::SetPieceGeometry {
-                id: drag.piece_id,
-                points: drag.points.clone(),
-                holes: drag.holes.clone(),
-            },
-        );
+    if drag.current == drag.original {
+        return;
     }
+    let id = drag.piece_id;
+    let shape = match drag.target {
+        DragTarget::Piece => {
+            let (dx, dy) = drag.offset;
+            send(events, ProjectEvent::MovePiece { id, dx, dy });
+            return;
+        }
+        DragTarget::Child(child) => ShapeRef::Child(child),
+        DragTarget::Handle(shape, _) => shape,
+    };
+    let Some(changed) = shape.get(&drag.current).cloned() else {
+        return;
+    };
+    let event = match shape {
+        ShapeRef::Base => ProjectEvent::SetBaseShape { id, shape: changed },
+        ShapeRef::Child(child) => ProjectEvent::SetChildShape {
+            id,
+            child,
+            shape: changed,
+        },
+    };
+    send(events, event);
 }

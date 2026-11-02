@@ -4,8 +4,9 @@ use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy_egui::egui;
 use earcutr::earcut;
+use leathercraft::boolean::Region;
 use leathercraft::i18n::{Label, Language};
-use leathercraft::model::{PatternPiece, Point, signed_area};
+use leathercraft::model::{Point, signed_area};
 
 // Scene units per millimeter; the scene is scaled up, so this is not a meters conversion.
 const MM_TO_SCENE: f64 = 0.01;
@@ -96,7 +97,11 @@ fn rebuild_preview(
         .clamp(MIN_DISTANCE, MAX_DISTANCE);
 
     for piece in &project.pieces {
-        match build_piece_mesh(piece, center_x, center_z) {
+        // A piece whose shapes don't combine into one outline is flagged in the editor instead.
+        let Ok(region) = piece.region() else {
+            continue;
+        };
+        match build_piece_mesh(&region, piece.material.thickness_mm, center_x, center_z) {
             Ok(mesh) => {
                 let [red, green, blue] = piece.material.color.rgb();
                 let leather = materials.add(StandardMaterial {
@@ -151,15 +156,20 @@ pub fn show_controls(ui: &mut egui::Ui, settings: &mut PreviewSettings, language
     );
 }
 
-fn build_piece_mesh(piece: &PatternPiece, center_x: f32, center_z: f32) -> Result<Mesh, String> {
-    let points: Vec<Point> = piece.vertices().copied().collect();
-    let thickness = (piece.material.thickness_mm * MM_TO_SCENE) as f32;
+fn build_piece_mesh(
+    region: &Region,
+    thickness_mm: f64,
+    center_x: f32,
+    center_z: f32,
+) -> Result<Mesh, String> {
+    let points: Vec<Point> = region.vertices().copied().collect();
+    let thickness = (thickness_mm * MM_TO_SCENE) as f32;
     let mut flat_points = Vec::with_capacity(points.len() * 2);
     for point in &points {
         flat_points.push(point.x * MM_TO_SCENE - f64::from(center_x));
         flat_points.push(point.y * MM_TO_SCENE - f64::from(center_z));
     }
-    let triangles = earcut(&flat_points, &piece.hole_indices(), 2)
+    let triangles = earcut(&flat_points, &region.hole_indices(), 2)
         .map_err(|error| format!("triangulation failed: {error}"))?;
 
     let mut positions = Vec::<[f32; 3]>::with_capacity(points.len() * 2 + points.len() * 4);
@@ -205,7 +215,7 @@ fn build_piece_mesh(piece: &PatternPiece, center_x: f32, center_z: f32) -> Resul
 
     // Rings can be wound either way; walls must still face away from the leather,
     // which for a hole means toward its own center.
-    for (ring_index, ring) in piece.rings().enumerate() {
+    for (ring_index, ring) in region.rings().enumerate() {
         let is_hole = ring_index > 0;
         let outward: f32 = if (signed_area(ring) >= 0.0) != is_hole {
             1.0

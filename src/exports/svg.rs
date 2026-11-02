@@ -1,9 +1,13 @@
 use super::{ExportError, number, validate_export};
-use crate::model::Project;
+use crate::model::{Bounds, Project};
 
 pub fn to_svg(project: &Project) -> Result<String, ExportError> {
-    validate_export(project)?;
-    let bounds = project.bounds().ok_or(ExportError::EmptyProject)?;
+    let regions = validate_export(project)?;
+    let bounds = regions
+        .iter()
+        .filter_map(|region| region.bounds())
+        .reduce(Bounds::union)
+        .ok_or(ExportError::EmptyProject)?;
     let (min_x, min_y) = (bounds.min_x, bounds.min_y);
     let width = bounds.width();
     let height = bounds.height();
@@ -17,10 +21,10 @@ pub fn to_svg(project: &Project) -> Result<String, ExportError> {
     svg.push_str(
         "  <g fill=\"none\" stroke=\"#111827\" stroke-width=\"0.25\" stroke-linejoin=\"round\">\n",
     );
-    for piece in &project.pieces {
+    for (piece, region) in project.pieces.iter().zip(&regions) {
         svg.push_str(&format!("    <path data-piece=\"{}\" d=\"", piece.id));
         let mut rings = Vec::new();
-        for ring in piece.rings() {
+        for ring in region.rings() {
             let mut path = String::new();
             for (index, point) in ring.iter().enumerate() {
                 let command = if index == 0 { 'M' } else { 'L' };

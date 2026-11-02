@@ -3,7 +3,7 @@ use crate::material::{
     ColorGroup, Flexibility, HeatResistance, LeatherColor, MAX_THICKNESS_MM, MIN_THICKNESS_MM,
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
 };
-use crate::model::Units;
+use crate::model::{BooleanOp, Units};
 
 pub(super) fn label(label: Label) -> &'static str {
     match label {
@@ -27,10 +27,24 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Select => "Select",
         Label::Draw => "Draw",
         Label::Rectangle => "Rectangle",
-        Label::Circle => "Circle",
+        Label::Ellipse => "Ellipse",
+        Label::Polygon => "Polygon",
         Label::RectangleHint => "Drag from corner to corner. Esc cancels.",
-        Label::CircleHint => "Drag from the center outward. Esc cancels.",
-        Label::HoleMode => "Hole: Draw, Rectangle and Circle cut into the selected piece",
+        Label::EllipseHint => "Drag from the center outward. Hold Shift for a circle. Esc cancels.",
+        Label::NewPieceMode => "New piece: Draw, Rectangle and Ellipse create a piece",
+        Label::Operation(op) => operation(op),
+        Label::OperationHint(op) => operation_hint(op),
+        Label::Base => "Base",
+        Label::CenterX => "Center X",
+        Label::CenterY => "Center Y",
+        Label::Width => "Width",
+        Label::Height => "Height",
+        Label::RadiusX => "Radius X",
+        Label::RadiusY => "Radius Y",
+        Label::Rotation => "Rotation, °",
+        Label::MoveUp => "Apply earlier",
+        Label::MoveDown => "Apply later",
+        Label::DeleteChild => "Delete shape",
         Label::DrawHint => {
             "Click to add points. Click the first point or press Enter to close; Esc cancels."
         }
@@ -320,25 +334,22 @@ pub(super) fn message(message: &Message) -> String {
         Message::DefaultPieceName { id } => format!("Piece {id}"),
         Message::PieceNotFound { id } => format!("Piece {id} does not exist."),
         Message::PieceLocked { name } => format!("Piece '{name}' is locked."),
-        Message::HoleAdded { name } => format!("Added a hole to '{name}'."),
-        Message::HoleDeleted => "Hole deleted.".to_owned(),
-        Message::PieceEdgeCut { name } => format!("Changed the edge of '{name}'."),
-        Message::HoleSplitsPiece { name } => {
-            format!("This cut would split piece '{name}' into several parts.")
+        Message::ChildAdded { name } => format!("Added a shape to '{name}'."),
+        Message::ChildDeleted => "Shape deleted.".to_owned(),
+        Message::SelectPieceForChild => "Select a piece to add the shape to.".to_owned(),
+        Message::ChildNotFound { name } => format!("Piece '{name}' has no such shape."),
+        Message::TooManyChildren { name, max } => {
+            format!("Piece '{name}' can have at most {max} shapes.")
         }
-        Message::HoleCoversPiece { name } => {
-            format!("This cut would remove all of piece '{name}'.")
+        Message::InvalidChildId { name } => {
+            format!("A shape of piece '{name}' has an invalid or duplicate ID.")
         }
-        Message::SelectPieceForHole => "Select a piece to cut the hole in.".to_owned(),
-        Message::HoleNotFound { name } => format!("Piece '{name}' has no such hole."),
-        Message::TooManyHoles { name, max } => {
-            format!("Piece '{name}' can have at most {max} holes.")
+        Message::InvalidShapeSize { name } => {
+            format!("Shapes of piece '{name}' must have a positive size.")
         }
-        Message::HoleOutsidePiece { name } => {
-            format!("Holes of piece '{name}' must lie inside its outline without touching it.")
-        }
-        Message::HolesOverlap { name } => {
-            format!("Holes of piece '{name}' must not overlap or touch each other.")
+        Message::ResultEmpty { name } => format!("Nothing is left of piece '{name}'."),
+        Message::ResultSplit { name } => {
+            format!("Piece '{name}' falls apart into several parts.")
         }
         Message::UnsupportedVersion { found, expected } => {
             format!("Project version {found} is not supported (expected {expected}).")
@@ -377,14 +388,35 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionUnits => "Changed display units".to_owned(),
         Message::ActionAddPiece { name } => format!("Added '{name}'"),
         Message::ActionRenamePiece { name } => format!("Renamed to '{name}'"),
-        Message::ActionReshapePiece { name } => format!("Changed the shape of '{name}'"),
+        Message::ActionEditBase { name } => format!("Changed the base of '{name}'"),
+        Message::ActionMovePiece { name } => format!("Moved '{name}'"),
         Message::ActionLockPiece { name } => format!("Locked '{name}'"),
         Message::ActionUnlockPiece { name } => format!("Unlocked '{name}'"),
         Message::ActionMaterial { name } => format!("Changed the material of '{name}'"),
         Message::ActionRemovePiece { name } => format!("Deleted '{name}'"),
-        Message::ActionAddHole { name } => format!("Added a hole to '{name}'"),
-        Message::ActionCutEdge { name } => format!("Changed the edge of '{name}'"),
-        Message::ActionRemoveHole { name } => format!("Deleted a hole from '{name}'"),
+        Message::ActionAddChild { name } => format!("Added a shape to '{name}'"),
+        Message::ActionEditChild { name } => format!("Changed a shape of '{name}'"),
+        Message::ActionSetChildOp { name } => format!("Changed an operation of '{name}'"),
+        Message::ActionReorderChild { name } => format!("Reordered the shapes of '{name}'"),
+        Message::ActionRemoveChild { name } => format!("Deleted a shape from '{name}'"),
+    }
+}
+
+fn operation(op: BooleanOp) -> &'static str {
+    match op {
+        BooleanOp::Subtract => "Subtract",
+        BooleanOp::Union => "Union",
+        BooleanOp::Intersect => "Intersect",
+    }
+}
+
+fn operation_hint(op: BooleanOp) -> &'static str {
+    match op {
+        BooleanOp::Subtract => "Subtract: new shapes cut into the selected piece",
+        BooleanOp::Union => "Union: new shapes add to the selected piece",
+        BooleanOp::Intersect => {
+            "Intersect: only the part of the selected piece inside new shapes is kept"
+        }
     }
 }
 
