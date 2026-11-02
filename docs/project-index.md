@@ -34,8 +34,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/drag.rs` | 125 | 1,000 | bin | `begin_drag`, `update_drag`, `finish_drag`: dragging pieces, children and shape handles with the Select tool |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
 | `src/editor/ui.rs` | 286 | 2,650 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete key, language picker |
-| `src/editor/panel_viewer.rs` | 102 | 800 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab |
-| `src/icons/mod.rs` | 68 | 550 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`; shared `icon_button` |
+| `src/editor/panel_viewer.rs` | 125 | 1,000 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History tab title has an icon |
+| `src/icons/mod.rs` | 87 | 760 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 5 | 50 | bin | Panel module declarations |
 | `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
 | `src/panels/tools/mod.rs` | 201 | 1,750 | bin | `Tool`, painted tool and operation icons, Tools panel |
@@ -58,7 +58,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings.rs` | 71 | 500 | bin | Saved language and panel layout in the OS config directory |
 | `src/document.rs` | 64 | 500 | bin | `ActiveProject` (project and history), `ProjectMessage`, `HistoryMessage`, `apply_project_events` |
-| `src/main.rs` | 37 | 250 | bin | App wiring and system schedule |
+| `src/main.rs` | 44 | 300 | bin | App wiring and system schedule; the editor UI starts one pass after the icon font is installed |
 | `src/lib.rs` | 9 | 40 | lib | Module declarations |
 
 ## Library crate (core, no Bevy)

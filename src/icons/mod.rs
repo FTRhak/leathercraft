@@ -8,13 +8,15 @@ pub mod glyph {
     pub const TRASH: char = '\u{E110}';
     pub const LOCK: char = '\u{E115}';
     pub const UNLOCK: char = '\u{E116}';
+    pub const HISTORY: char = '\u{E121}';
 }
 
 fn icon_font() -> egui::FontFamily {
     egui::FontFamily::Name(ICON_FONT.into())
 }
 
-/// Registers the icon font as its own family; run once, it takes effect from the next pass.
+/// Registers the icon font as its own family; run once, it takes effect from the next pass,
+/// so nothing may use the family in the pass that installs it.
 pub fn install_icon_font(mut contexts: EguiContexts) -> Result {
     let data = egui::FontData::from_static(include_bytes!("../res/leathercrafticons.ttf"));
     contexts
@@ -39,6 +41,23 @@ pub fn paint_glyph(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stro
         egui::FontId::new(rect.height() * 0.75, icon_font()),
         stroke.color,
     );
+}
+
+/// A glyph of the icon font followed by text, both in `text_style` and the widget's text color.
+pub fn icon_text(
+    style: &egui::Style,
+    text_style: egui::TextStyle,
+    glyph: char,
+    text: &str,
+) -> egui::WidgetText {
+    let size = text_style.resolve(style).size;
+    let mut job = egui::text::LayoutJob::default();
+    let align = egui::Align::Center;
+    egui::RichText::new(format!("{glyph} "))
+        .font(egui::FontId::new(size, icon_font()))
+        .append_to(&mut job, style, text_style.clone().into(), align);
+    egui::RichText::new(text).append_to(&mut job, style, text_style.into(), align);
+    job.into()
 }
 
 /// A square button with a painted icon; the closure gets the button's rect and stroke.

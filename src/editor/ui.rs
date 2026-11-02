@@ -110,6 +110,7 @@ pub fn editor_ui(
                 state,
                 view_mode: *view_mode,
                 settings: &mut settings,
+                style: ctx.style(),
             },
         );
     dock.save_on_release(ctx);

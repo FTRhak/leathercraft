@@ -2,6 +2,7 @@ use super::{
     EditorState, ViewMode, canvas, selected_piece_details, send, units_control, view_controls,
 };
 use crate::document::{HistoryMessage, ProjectMessage};
+use crate::icons::{glyph, icon_text};
 use crate::panels::dock::PanelTab;
 use crate::panels::{history, layout, material, tools};
 use crate::preview::{self, PreviewSettings};
@@ -22,6 +23,8 @@ pub(super) struct PanelViewer<'a, 'e, 'h, 's> {
     pub(super) view_mode: ViewMode,
     /// Stays behind `ResMut`, so that the camera only updates when the controls are shown.
     pub(super) settings: &'a mut ResMut<'s, PreviewSettings>,
+    /// Sizes the icons in the tab titles.
+    pub(super) style: std::sync::Arc<egui::Style>,
 }
 
 impl TabViewer for PanelViewer<'_, '_, '_, '_> {
@@ -32,7 +35,14 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
             (PanelTab::Canvas, ViewMode::Preview3d) => Label::Preview3d,
             _ => tab.label(),
         };
-        self.state.language.label(label).into()
+        let text = self.state.language.label(label);
+        match tab {
+            // Tab titles are drawn in the button text style.
+            PanelTab::History => {
+                icon_text(&self.style, egui::TextStyle::Button, glyph::HISTORY, text)
+            }
+            _ => text.into(),
+        }
     }
 
     /// Not derived from the title, which changes with the language and the view mode.

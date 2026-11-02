@@ -34,7 +34,10 @@ fn main() {
             EguiPrimaryContextPass,
             (
                 icons::install_icon_font.run_if(run_once),
-                (editor::editor_ui, document::apply_project_events).chain(),
+                // The icon font is bound only from the next pass, so the UI starts one pass later.
+                (editor::editor_ui, document::apply_project_events)
+                    .chain()
+                    .run_if(not(run_once)),
             ),
         )
         .run();
