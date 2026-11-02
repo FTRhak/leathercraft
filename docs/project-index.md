@@ -35,7 +35,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
 | `src/editor/ui.rs` | 286 | 2,650 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete key, language picker |
 | `src/editor/panel_viewer.rs` | 102 | 800 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab |
-| `src/panels/mod.rs` | 74 | 600 | bin | Shared `icon_button`; icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph` |
+| `src/icons/mod.rs` | 68 | 550 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`; shared `icon_button` |
+| `src/panels/mod.rs` | 5 | 50 | bin | Panel module declarations |
 | `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
 | `src/panels/tools/mod.rs` | 201 | 1,750 | bin | `Tool`, painted tool and operation icons, Tools panel |
 | `src/panels/layout/mod.rs` | 252 | 2,600 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls |
@@ -57,7 +58,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings.rs` | 71 | 500 | bin | Saved language and panel layout in the OS config directory |
 | `src/document.rs` | 64 | 500 | bin | `ActiveProject` (project and history), `ProjectMessage`, `HistoryMessage`, `apply_project_events` |
-| `src/main.rs` | 36 | 250 | bin | App wiring and system schedule |
+| `src/main.rs` | 37 | 250 | bin | App wiring and system schedule |
 | `src/lib.rs` | 9 | 40 | lib | Module declarations |
 
 ## Library crate (core, no Bevy)
@@ -150,7 +151,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | Symbols |
 |---|---:|---|
-| `mod.rs` | 8 | `icon_button` |
+| `mod.rs` | 1-5 | Module declarations |
 | `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
 | | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
 | | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
@@ -222,10 +223,11 @@ There are 60 tests, all inline in the library crate:
 | File | Status |
 |---|---|
 | `CLAUDE.md` | Current. Loaded automatically in every session, so keep it short. |
+| `docs/icons.md` | Current. Spec for the icon font, `paint_glyph` and `icon_button`: adding glyphs, sizes, toggles, disabled state. |
+| `docs/history.md` | Current. Spec for undo, redo and the History panel: user controls, snapshots and merging, the message flow in the binary, adding a new edit. |
+| `docs/i18n.md` | Current. Spec for the localization module: `Label` vs `Message`, rendering, language selection, adding text and languages, translation conventions. |
 | `docs/plan.md` | Historical MVP plan. It still says the repo contains only a license. Its todo 6 asks for build and run docs, and there is no README; `CLAUDE.md` only lists the commands. |
-| `docs/plans/localization.md` | Historical plan for finished work (~1,700 tokens). It refers to `src/preview.rs`, which is now `src/preview/mod.rs`. Read the "Decisions" and "Out of scope" sections only if you need the reasoning. |
-| `docs/plans/add-tools-panel-where-harmonic-nautilus.md` | Historical plan for the Tools panel. |
-| `docs/plans/render-icons-instend-text-peppy-hejlsberg.md` | Historical plan for the Tools panel icons. |
+
 
 ## Refreshing this index
 

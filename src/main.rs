@@ -1,5 +1,6 @@
 mod document;
 mod editor;
+mod icons;
 mod panels;
 mod preview;
 mod settings;
@@ -32,7 +33,7 @@ fn main() {
         .add_systems(
             EguiPrimaryContextPass,
             (
-                panels::install_icon_font.run_if(run_once),
+                icons::install_icon_font.run_if(run_once),
                 (editor::editor_ui, document::apply_project_events).chain(),
             ),
         )

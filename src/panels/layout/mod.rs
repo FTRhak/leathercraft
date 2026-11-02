@@ -1,4 +1,4 @@
-use super::{glyph, icon_button, paint_glyph};
+use crate::icons::{glyph, icon_button, paint_glyph};
 use bevy_egui::egui;
 use bevy_egui::egui::collapsing_header::{CollapsingState, paint_default_icon};
 use leathercraft::events::ProjectEvent;

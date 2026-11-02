@@ -1,4 +1,4 @@
-use super::icon_button;
+use crate::icons::icon_button;
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::model::{BooleanOp, Point};
