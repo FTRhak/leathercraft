@@ -5,6 +5,7 @@ use crate::document::ProjectMessage;
 use crate::panels::tools::Tool;
 use bevy::prelude::*;
 use bevy_egui::egui;
+use earcutr::earcut;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Language, Message};
 use leathercraft::model::{PatternPiece, Point, Project, Units};
@@ -243,6 +244,7 @@ pub(super) fn vertex_at(
 
 fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state: &EditorState) {
     let text_color = egui::Color32::from_gray(220);
+    let fill_color = egui::Color32::from_rgba_unmultiplied(128, 128, 128, 80);
     for piece in &project.pieces {
         let piece = state.displayed(piece);
         let selected = state.selected == Some(piece.id);
@@ -256,6 +258,7 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
             .iter()
             .map(|point| view.to_screen(*point))
             .collect();
+        fill_polygon(painter, &screen, fill_color);
         painter.add(egui::Shape::closed_line(screen.clone(), stroke));
         if let Some(bounds) = piece.bounds() {
             let center = Point::new(
@@ -294,6 +297,25 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
             );
         }
     }
+}
+
+// Triangulated because pieces can be concave, which `Shape::convex_polygon` doesn't fill correctly.
+fn fill_polygon(painter: &egui::Painter, screen: &[egui::Pos2], color: egui::Color32) {
+    let flat: Vec<f64> = screen
+        .iter()
+        .flat_map(|position| [f64::from(position.x), f64::from(position.y)])
+        .collect();
+    let Ok(triangles) = earcut(&flat, &[], 2) else {
+        return;
+    };
+    let mut mesh = egui::Mesh::default();
+    for position in screen {
+        mesh.colored_vertex(*position, color);
+    }
+    for triangle in triangles.chunks_exact(3) {
+        mesh.add_triangle(triangle[0] as u32, triangle[1] as u32, triangle[2] as u32);
+    }
+    painter.add(mesh);
 }
 
 fn draw_draft(
