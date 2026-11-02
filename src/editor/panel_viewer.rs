@@ -1,11 +1,9 @@
-use super::{
-    EditorState, ViewMode, canvas, selected_piece_details, send, units_control, view_controls,
-};
+use super::{EditorState, ViewMode, canvas, send};
 use crate::document::{HistoryMessage, ProjectMessage};
 use crate::icons::{glyph, icon_text};
 use crate::panels::dock::PanelTab;
-use crate::panels::{history, layout, material, tools};
-use crate::preview::{self, PreviewSettings};
+use crate::panels::{history, layout, material, properties, tools};
+use crate::preview::PreviewSettings;
 use bevy::prelude::*;
 use bevy_egui::egui;
 use egui_dock::TabViewer;
@@ -66,15 +64,31 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                 });
             }
             PanelTab::Properties => {
-                if editing {
-                    view_controls(ui, self.state);
+                let state = &mut *self.state;
+                let piece = state
+                    .selected
+                    .and_then(|id| self.project.pieces.iter().find(|piece| piece.id == id))
+                    .map(|piece| state.displayed(piece));
+                let child = state.selected_child_id();
+                let view = if editing {
+                    properties::ViewControls::Editor(properties::EditorView {
+                        hint: state.tool.hint(),
+                        snap_enabled: &mut state.snap_enabled,
+                        snap_mm: &mut state.snap_mm,
+                        fit_requested: &mut state.fit_requested,
+                    })
                 } else {
-                    preview::show_controls(ui, self.settings, language);
+                    properties::ViewControls::Preview(self.settings)
+                };
+                let selection = properties::Selection {
+                    piece: piece.as_deref(),
+                    child,
+                    rename_buffer: &mut state.rename_buffer,
+                };
+                let event = properties::show_panel(ui, self.project, view, selection, language);
+                if let Some(event) = event {
+                    send(self.events, event);
                 }
-                ui.separator();
-                units_control(ui, self.project, self.events, language);
-                ui.separator();
-                selected_piece_details(ui, self.project, self.events, self.state);
             }
             PanelTab::Layout => {
                 let selection = layout::Selection {

@@ -25,7 +25,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
-| `src/editor/mod.rs` | 266 | 2,050 | bin | `ViewMode`, `send`, menu helpers, sidebar, `shape_fields`, `format_length` |
+| `src/editor/mod.rs` | 78 | 550 | bin | `ViewMode`, `send`, `export`, `format_length` |
 | `src/editor/editor_state_struct.rs` | 216 | 1,800 | bin | `EditorState` and its methods, `document_name` |
 | `src/editor/drag_state_struct.rs` | 51 | 400 | bin | `ShapeRef`, `DragTarget`, `DragState` |
 | `src/editor/shape_draft_struct.rs` | 9 | 60 | bin | `ShapeDraft` |
@@ -34,14 +34,15 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/drag.rs` | 125 | 1,000 | bin | `begin_drag`, `update_drag`, `finish_drag`: dragging pieces, children and shape handles with the Select tool |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
 | `src/editor/ui.rs` | 286 | 2,650 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete key, language picker |
-| `src/editor/panel_viewer.rs` | 125 | 1,000 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History tab title has an icon |
+| `src/editor/panel_viewer.rs` | 139 | 1,150 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History tab title has an icon |
 | `src/icons/mod.rs` | 87 | 760 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
-| `src/panels/mod.rs` | 5 | 50 | bin | Panel module declarations |
+| `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
 | `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
 | `src/panels/tools/mod.rs` | 201 | 1,750 | bin | `Tool`, painted tool and operation icons, Tools panel |
 | `src/panels/layout/mod.rs` | 252 | 2,600 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
+| `src/panels/properties/mod.rs` | 215 | 1,800 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields |
 | `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion |
 | `src/model.rs` | 476 | 3,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation |
 | `src/boolean.rs` | 221 | 1,900 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes |
@@ -109,12 +110,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 29-34 | Types | `ViewMode` |
-| 36-38 | Events | `send` |
-| 40-72 | Menu bar helpers | `export` |
-| 74-193 | Sidebar | `view_controls`, `units_control`, `selected_piece_details` (name, size or result error, fields of the selected base or child) |
-| 195-258 | Shape fields | `shape_fields`: center, size and rotation of a primitive in display units |
-| 260-266 | Formatting | `format_length` |
+| 27-32 | Types | `ViewMode` |
+| 34-36 | Events | `send` |
+| 38-70 | Menu bar helpers | `export` |
+| 72-78 | Formatting | `format_length`, also used by the Properties panel |
 
 ### `editor/editor_state_struct.rs`
 
@@ -151,7 +150,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | Symbols |
 |---|---:|---|
-| `mod.rs` | 1-5 | Module declarations |
+| `mod.rs` | 1-6 | Module declarations |
 | `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
 | | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
 | | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
@@ -171,6 +170,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 105 | `material_fields`, shared by the dialog and the Material panel |
 | | 189 | `show_panel`, which returns the `ProjectEvent` to send |
 | | 214 | `new_project_dialog` |
+| `properties/mod.rs` | 10-29 | `EditorView`, `ViewControls` (editor or preview), `Selection` (displayed piece, child, rename buffer) |
+| | 32-59 | `view_controls`, `units_control` |
+| | 61 | `selected_piece_details`: name, size or result error, fields of the selected base or child |
+| | 132 | `shape_fields`: center, size and rotation of a primitive in display units |
+| | 199 | `show_panel`, which returns the `ProjectEvent` to send |
 
 ### `preview/mod.rs`
 
@@ -187,7 +191,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Task | Read | Change |
 |---|---|---|
-| Add a project edit | `events.rs` 10-229, `history.rs` `describe` | Add a `ProjectEvent` variant and handle it in `apply`, give it an entry label in `History::describe` (an `Action…` `Message`), then send it from `editor/mod.rs` with `send` |
+| Add a project edit | `events.rs` 10-229, `history.rs` `describe` | Add a `ProjectEvent` variant and handle it in `apply`, give it an entry label in `History::describe` (an `Action…` `Message`), then return it from a panel or send it from `editor/` with `send` |
 | Add a validation rule | `model.rs` 8-13, 200-262, 301-333 | `validate`, plus a `Message` variant and both catalogs |
 | Add UI text | `i18n/mod.rs` 70-166 | A `Label` or `Message` variant and an arm in `en.rs` and `uk.rs`; the compiler flags missing arms |
 | Add a language | `i18n/mod.rs` 14-66 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
