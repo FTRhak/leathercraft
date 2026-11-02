@@ -1,6 +1,7 @@
 use bevy_egui::egui;
 
 pub mod dock;
+pub mod history;
 pub mod layout;
 pub mod material;
 pub mod tools;

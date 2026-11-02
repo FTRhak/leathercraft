@@ -14,11 +14,18 @@ pub enum PanelTab {
     Properties,
     Layout,
     Material,
+    History,
 }
 
 impl PanelTab {
     /// The panels the Window menu lists; the canvas always stays open.
-    pub const CLOSEABLE: [Self; 4] = [Self::Tools, Self::Properties, Self::Layout, Self::Material];
+    pub const CLOSEABLE: [Self; 5] = [
+        Self::Tools,
+        Self::Properties,
+        Self::Layout,
+        Self::Material,
+        Self::History,
+    ];
 
     pub fn label(self) -> Label {
         match self {
@@ -27,6 +34,7 @@ impl PanelTab {
             Self::Properties => Label::Properties,
             Self::Layout => Label::Layout,
             Self::Material => Label::Material,
+            Self::History => Label::History,
         }
     }
 }
@@ -147,7 +155,11 @@ fn restore_windows(mut layout: SavedLayout) -> DockState<PanelTab> {
 fn default_state() -> DockState<PanelTab> {
     let mut state = DockState::new(vec![PanelTab::Canvas]);
     let surface = state.main_surface_mut();
-    let [canvas, right] = surface.split_right(NodeIndex::root(), 0.78, vec![PanelTab::Layout]);
+    let [canvas, right] = surface.split_right(
+        NodeIndex::root(),
+        0.78,
+        vec![PanelTab::Layout, PanelTab::History],
+    );
     surface.split_below(right, 0.35, vec![PanelTab::Material]);
     let [_, left] = surface.split_left(canvas, 0.2, vec![PanelTab::Tools]);
     surface.split_below(left, 0.3, vec![PanelTab::Properties]);

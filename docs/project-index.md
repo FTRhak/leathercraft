@@ -2,7 +2,7 @@
 
 A map for finding code without reading whole files. It complements `CLAUDE.md`, which holds the architecture rules and invariants and isn't repeated here.
 
-Indexed at commit `5afa155` plus the Tools and Layout panel, material and dockable panel changes. Line numbers drift, so treat them as hints and search for the symbol name if one doesn't match.
+Indexed at commit `5afa155` plus the Tools and Layout panel, material, dockable panel and history changes. Line numbers drift, so treat them as hints and search for the symbol name if one doesn't match.
 
 ## How to read this repo cheaply
 
@@ -39,6 +39,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
 | `src/panels/tools/mod.rs` | 100 | 800 | bin | `Tool`, painted tool icons, Tools panel |
 | `src/panels/layout/mod.rs` | 127 | 900 | bin | Layout panel: piece tree, lock and delete buttons |
+| `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
 | `src/preview/mod.rs` | 247 | 2,200 | bin | 3D scene, camera, mesh extrusion |
 | `src/model.rs` | 335 | 2,400 | lib | `Project`, `PatternPiece`, `Point`, `Units`, validation |
@@ -51,9 +52,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/exports/dxf.rs` | 24 | 200 | lib | `to_dxf` |
 | `src/shapes.rs` | 107 | 900 | lib | `rectangle`, `circle` |
 | `src/i18n/en.rs` | 351 | 3,500 | lib | English catalog |
+| `src/history.rs` | 445 | 3,600 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
 | `src/persistence.rs` | 175 | 1,400 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings.rs` | 71 | 500 | bin | Saved language and panel layout in the OS config directory |
-| `src/document.rs` | 32 | 300 | bin | `ActiveProject`, `ProjectMessage`, `apply_project_events` |
+| `src/document.rs` | 64 | 500 | bin | `ActiveProject` (project and history), `ProjectMessage`, `HistoryMessage`, `apply_project_events` |
 | `src/main.rs` | 36 | 250 | bin | App wiring and system schedule |
 | `src/lib.rs` | 6 | 25 | lib | Module declarations |
 
@@ -77,6 +79,9 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 35-91 | `Project::apply` |
 | | 93-121 | `edit` (validates a copy), `piece_mut`, `unlocked_piece_mut` |
 | | 123-365 | Tests |
+| `history.rs` | 6-46 | `MAX_HISTORY`, `HistoryCommand`, `MergeKey`, `Entry`, `History` |
+| | 48-205 | `new`, `record`, `apply`, `actions`, `position`, `can_undo`, `can_redo`, `describe` |
+| | 207-445 | Tests |
 | `persistence.rs` | 7-34 | `save_project`, `load_project`, `write_export` |
 | | 36-175 | Tests |
 | `exports/mod.rs` | 13-36 | `ExportError`, conversion to `Message` |
@@ -131,8 +136,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Lines | Area | Symbols |
 |---:|---|---|
 | 18-119 | Top-level layout | `editor_ui`, which also shows the dock area and the new-project dialog |
-| 121-173 | Menus | `file_menu`, `window_menu` |
-| 175-190 | Input | `handle_delete_key` |
+| Search by name | Menus | `file_menu`, `edit_menu`, `window_menu` |
+| Search by name | Input | `handle_delete_key`, `handle_history_keys` and the `UNDO`/`REDO` shortcuts |
 | 192-206 | Language | `language_control` |
 | 208-219 | File dialog | `project_dialog`, `save_as` |
 
@@ -151,6 +156,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 10-47 | `paint_lock`, `paint_trash` |
 | | 48 | `piece_row` |
 | | 99 | `show_panel`, which returns the `ProjectEvent` to send |
+| `history/mod.rs` | 6 | `show_panel`, which returns the `HistoryCommand` to send |
 | `material/mod.rs` | 15-103 | `DialogResult`, `combo`, `swatch`, `color_combo`, `thickness_row` |
 | | 105 | `material_fields`, shared by the dialog and the Material panel |
 | | 189 | `show_panel`, which returns the `ProjectEvent` to send |
@@ -171,7 +177,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Task | Read | Change |
 |---|---|---|
-| Add a project edit | `events.rs` 9-121 | Add a `ProjectEvent` variant and handle it in `apply`, then send it from `editor/mod.rs` with `send` |
+| Add a project edit | `events.rs` 9-121, `history.rs` `describe` | Add a `ProjectEvent` variant and handle it in `apply`, give it an entry label in `History::describe` (an `Action…` `Message`), then send it from `editor/mod.rs` with `send` |
 | Add a validation rule | `model.rs` 7-11, 173-234 | `validate`, plus a `Message` variant and both catalogs |
 | Add UI text | `i18n/mod.rs` 70-166 | A `Label` or `Message` variant and an arm in `en.rs` and `uk.rs`; the compiler flags missing arms |
 | Add a language | `i18n/mod.rs` 14-66 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
@@ -185,13 +191,14 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 49 tests, all inline in the library crate:
+There are 58 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
 | `model` | 14 |
 | `material` | 3 |
 | `events` | 13 |
+| `history` | 9 |
 | `i18n` | 5 |
 | `exports` | 5 |
 | `persistence` | 5 |

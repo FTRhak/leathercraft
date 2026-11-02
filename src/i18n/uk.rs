@@ -54,6 +54,9 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::ClosePanel => "Закрити",
         Label::FloatPanel => "Відкріпити",
         Label::ResetPanels => "Скинути панелі",
+        Label::History => "Історія",
+        Label::Undo => "Скасувати",
+        Label::Redo => "Повторити",
         Label::NoPieceSelected => "Деталь не вибрано",
         Label::Camera => "Камера",
         Label::Orbit => "Оберт",
@@ -384,6 +387,22 @@ pub(super) fn message(message: &Message) -> String {
             format!("Не вдалося записати «{path}»: {detail}")
         }
         Message::ExportEmpty => "Додайте принаймні одну деталь перед експортом.".to_owned(),
+        Message::Undone { action } => format!("Скасовано: {}.", self::message(action)),
+        Message::Redone { action } => format!("Повторено: {}.", self::message(action)),
+        Message::HistoryRestored { action } => format!("Повернуто до: {}.", self::message(action)),
+        Message::ActionNewProject => "Новий проєкт".to_owned(),
+        Message::ActionOpened { name } => format!("Відкрито {name}"),
+        Message::ActionUnits => "Змінено одиниці відображення".to_owned(),
+        Message::ActionAddPiece { name } => format!("Додано «{name}»"),
+        Message::ActionRenamePiece { name } => format!("Перейменовано на «{name}»"),
+        Message::ActionReshapePiece { name } => format!("Змінено форму «{name}»"),
+        Message::ActionLockPiece { name } => format!("Заблоковано «{name}»"),
+        Message::ActionUnlockPiece { name } => format!("Розблоковано «{name}»"),
+        Message::ActionMaterial { name } => format!("Змінено матеріал «{name}»"),
+        Message::ActionRemovePiece { name } => format!("Видалено «{name}»"),
+        Message::ActionAddHole { name } => format!("Додано отвір у «{name}»"),
+        Message::ActionCutEdge { name } => format!("Змінено край «{name}»"),
+        Message::ActionRemoveHole { name } => format!("Видалено отвір у «{name}»"),
     }
 }
 

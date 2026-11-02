@@ -165,6 +165,23 @@ impl EditorState {
         }
     }
 
+    /// Work in progress refers to the replaced content, so it is dropped; the selection stays
+    /// if its piece still exists.
+    pub fn on_history_restore(&mut self, status: Message, project: &Project) {
+        self.draft.clear();
+        self.shape_draft = None;
+        self.drag = None;
+        self.rename_buffer = None;
+        self.selected_hole = None;
+        if self
+            .selected
+            .is_some_and(|id| !project.pieces.iter().any(|piece| piece.id == id))
+        {
+            self.selected = None;
+        }
+        self.report(status);
+    }
+
     pub(super) fn selected_hole_index(&self) -> Option<usize> {
         self.selected_hole
             .filter(|(id, _)| self.selected == Some(*id))

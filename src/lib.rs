@@ -1,5 +1,6 @@
 pub mod events;
 pub mod exports;
+pub mod history;
 pub mod i18n;
 pub mod material;
 pub mod model;

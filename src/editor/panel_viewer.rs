@@ -1,27 +1,30 @@
 use super::{
     EditorState, ViewMode, canvas, selected_piece_details, send, units_control, view_controls,
 };
-use crate::document::ProjectMessage;
+use crate::document::{HistoryMessage, ProjectMessage};
 use crate::panels::dock::PanelTab;
-use crate::panels::{layout, material, tools};
+use crate::panels::{history, layout, material, tools};
 use crate::preview::{self, PreviewSettings};
 use bevy::prelude::*;
 use bevy_egui::egui;
 use egui_dock::TabViewer;
+use leathercraft::history::History;
 use leathercraft::i18n::Label;
 use leathercraft::model::Project;
 
 /// Draws each dock tab from the editor's state.
-pub(super) struct PanelViewer<'a, 'e, 's> {
+pub(super) struct PanelViewer<'a, 'e, 'h, 's> {
     pub(super) project: &'a Project,
+    pub(super) history: &'a History,
     pub(super) events: &'a mut MessageWriter<'e, ProjectMessage>,
+    pub(super) history_events: &'a mut MessageWriter<'h, HistoryMessage>,
     pub(super) state: &'a mut EditorState,
     pub(super) view_mode: ViewMode,
     /// Stays behind `ResMut`, so that the camera only updates when the controls are shown.
     pub(super) settings: &'a mut ResMut<'s, PreviewSettings>,
 }
 
-impl TabViewer for PanelViewer<'_, '_, '_> {
+impl TabViewer for PanelViewer<'_, '_, '_, '_> {
     type Tab = PanelTab;
 
     fn title(&mut self, tab: &mut PanelTab) -> egui::WidgetText {
@@ -81,6 +84,11 @@ impl TabViewer for PanelViewer<'_, '_, '_> {
                     send(self.events, event);
                 }
             }
+            PanelTab::History => {
+                if let Some(command) = history::show_panel(ui, self.history, language) {
+                    self.history_events.write(HistoryMessage(command));
+                }
+            }
         }
     }
 
@@ -101,7 +109,9 @@ impl TabViewer for PanelViewer<'_, '_, '_> {
         match tab {
             PanelTab::Tools | PanelTab::Properties => [false, true],
             // The canvas pans itself, and these two have their own scroll areas.
-            PanelTab::Canvas | PanelTab::Layout | PanelTab::Material => [false, false],
+            PanelTab::Canvas | PanelTab::Layout | PanelTab::Material | PanelTab::History => {
+                [false, false]
+            }
         }
     }
 }

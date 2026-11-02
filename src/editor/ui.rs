@@ -2,7 +2,7 @@ use super::{
     EditorState, PROJECT_EXTENSION, ViewMode, confirm_discard::confirm_discard, export,
     format_length, panel_viewer::PanelViewer, send,
 };
-use crate::document::{ActiveProject, ProjectMessage};
+use crate::document::{ActiveProject, HistoryMessage, ProjectMessage};
 use crate::panels::dock::{PanelDock, PanelTab};
 use crate::panels::material::{self, DialogResult};
 use crate::preview::PreviewSettings;
@@ -12,19 +12,24 @@ use bevy_egui::{EguiContexts, egui};
 use egui_dock::DockArea;
 use leathercraft::events::ProjectEvent;
 use leathercraft::exports;
+use leathercraft::history::{History, HistoryCommand};
 use leathercraft::i18n::{Label, Language};
 use leathercraft::model::Project;
 
+// A Bevy system takes its resources as parameters.
+#[allow(clippy::too_many_arguments)]
 pub fn editor_ui(
     mut contexts: EguiContexts,
     project: Res<ActiveProject>,
     mut events: MessageWriter<ProjectMessage>,
+    mut history_events: MessageWriter<HistoryMessage>,
     mut state: ResMut<EditorState>,
     mut view_mode: ResMut<ViewMode>,
     mut settings: ResMut<PreviewSettings>,
     mut dock: ResMut<PanelDock>,
 ) -> Result {
     let ctx: &egui::Context = contexts.ctx_mut()?;
+    let history = project.history();
     let project: &Project = &project;
     let state = &mut *state;
     let dock = &mut *dock;
@@ -36,7 +41,9 @@ pub fn editor_ui(
                 file_menu(ui, project, &mut events, state);
             });
             ui.menu_button(language.label(Label::View), |_| {});
-            ui.menu_button(language.label(Label::Edit), |_| {});
+            ui.menu_button(language.label(Label::Edit), |ui| {
+                edit_menu(ui, history, &mut history_events, language);
+            });
             // Stays open on a click, so that the toggled state can be seen.
             egui::containers::menu::MenuButton::new(language.label(Label::Window))
                 .config(
@@ -83,6 +90,7 @@ pub fn editor_ui(
     });
 
     handle_delete_key(ctx, &mut events, state);
+    handle_history_keys(ctx, &mut history_events, state);
 
     // The canvas sets this again if its tab is showing.
     state.cursor = None;
@@ -96,7 +104,9 @@ pub fn editor_ui(
             ctx,
             &mut PanelViewer {
                 project,
+                history,
                 events: &mut events,
+                history_events: &mut history_events,
                 state,
                 view_mode: *view_mode,
                 settings: &mut settings,
@@ -152,6 +162,59 @@ fn file_menu(
     }
     if ui.button(language.label(Label::ExportDxf)).clicked() {
         export(project, state, "DXF", "dxf", exports::to_dxf);
+    }
+}
+
+const UNDO: egui::KeyboardShortcut =
+    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Z);
+const REDO: egui::KeyboardShortcut = egui::KeyboardShortcut::new(
+    egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
+    egui::Key::Z,
+);
+const REDO_ALT: egui::KeyboardShortcut =
+    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Y);
+
+fn edit_menu(
+    ui: &mut egui::Ui,
+    history: &History,
+    events: &mut MessageWriter<HistoryMessage>,
+    language: Language,
+) {
+    let items = [
+        (Label::Undo, UNDO, history.can_undo(), HistoryCommand::Undo),
+        (Label::Redo, REDO, history.can_redo(), HistoryCommand::Redo),
+    ];
+    for (label, shortcut, enabled, command) in items {
+        let button = egui::Button::new(language.label(label))
+            .shortcut_text(ui.ctx().format_shortcut(&shortcut));
+        if ui.add_enabled(enabled, button).clicked() {
+            events.write(HistoryMessage(command));
+        }
+    }
+}
+
+/// Text fields keep their own undo, so the shortcuts only act outside them.
+fn handle_history_keys(
+    ctx: &egui::Context,
+    events: &mut MessageWriter<HistoryMessage>,
+    state: &EditorState,
+) {
+    let drafting = !state.draft.is_empty() || state.shape_draft.is_some();
+    if drafting || state.new_project_dialog.is_some() || ctx.wants_keyboard_input() {
+        return;
+    }
+    // Redo first: matching ignores an extra Shift, so Ctrl+Z would also take Ctrl+Shift+Z.
+    let command = ctx.input_mut(|input| {
+        if input.consume_shortcut(&REDO) || input.consume_shortcut(&REDO_ALT) {
+            Some(HistoryCommand::Redo)
+        } else if input.consume_shortcut(&UNDO) {
+            Some(HistoryCommand::Undo)
+        } else {
+            None
+        }
+    });
+    if let Some(command) = command {
+        events.write(HistoryMessage(command));
     }
 }
 

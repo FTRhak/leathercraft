@@ -109,6 +109,9 @@ pub enum Label {
     ClosePanel,
     FloatPanel,
     ResetPanels,
+    History,
+    Undo,
+    Redo,
     NoPieceSelected,
     Camera,
     Orbit,
@@ -184,6 +187,23 @@ pub enum Message {
     CouldNotParse { path: String, detail: String },
     CouldNotWrite { path: String, detail: String },
     ExportEmpty,
+    Undone { action: Box<Message> },
+    Redone { action: Box<Message> },
+    HistoryRestored { action: Box<Message> },
+    // Entries of the History panel.
+    ActionNewProject,
+    ActionOpened { name: String },
+    ActionUnits,
+    ActionAddPiece { name: String },
+    ActionRenamePiece { name: String },
+    ActionReshapePiece { name: String },
+    ActionLockPiece { name: String },
+    ActionUnlockPiece { name: String },
+    ActionMaterial { name: String },
+    ActionRemovePiece { name: String },
+    ActionAddHole { name: String },
+    ActionCutEdge { name: String },
+    ActionRemoveHole { name: String },
 }
 
 impl fmt::Display for Message {

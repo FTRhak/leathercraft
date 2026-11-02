@@ -32,12 +32,13 @@ The package has two crates with a deliberate boundary: geometry and file-format 
   - `persistence`: `.leathercraft` save/load as pretty-printed, versioned JSON.
   - `exports`: `to_svg` and `to_dxf` return strings; `persistence::write_export` writes them to disk.
   - `shapes`: `rectangle` and `circle` build the point lists of predefined shapes.
+  - `history`: `History` keeps a `Project` snapshot after each accepted edit, for undo, redo and the History panel. Consecutive renames or material changes of the same piece share one entry, and `New`/`Open` start a new history.
   - `i18n`: `Language`, `Label` (fixed text) and `Message` (text with arguments), with one exhaustive catalog per language, so a missing translation is a compile error.
 - **Binary (`src/main.rs`), requires the `desktop` feature:** `document`, `editor`, `panels`, `preview` and `settings` are modules of the binary, not the library, and import the core via `leathercraft::model`. Code that needs Bevy, egui, `egui_dock`, `earcutr`, `rfd`, `dirs`, or `sys-locale` belongs here.
 
 All document data lives in `Project`; `EditorState`, `ViewMode` and `PreviewSettings` hold interface state only. The interface language is interface state, stored in `EditorState` and saved by `settings`, never in `Project`; so is the panel arrangement, stored in `panels::dock::PanelDock`. Fields that are not part of the file format, such as `path` and `modified`, are `#[serde(skip)]`.
 
-The UI never writes to the project. It sends a `ProjectEvent` wrapped in `document::ProjectMessage`, and `document::apply_project_events` calls `Project::apply` and tells `EditorState` the outcome. `document::ActiveProject` exposes the project read-only, so this system is its only writer. To add an edit, add a `ProjectEvent` variant and handle it in `Project::apply`. In-progress work (drawing, dragging, a name being typed) stays in `EditorState` until it is committed by an event.
+The UI never writes to the project. It sends a `ProjectEvent` wrapped in `document::ProjectMessage`, and `document::apply_project_events` calls `Project::apply` and tells `EditorState` the outcome. `document::ActiveProject` exposes the project read-only, so this system is its only writer. To add an edit, add a `ProjectEvent` variant, handle it in `Project::apply`, and give it an entry label in `History::describe`. `ActiveProject` also owns the `History`; undo, redo and jumps are sent as `document::HistoryMessage` and applied by the same system after the project events. In-progress work (drawing, dragging, a name being typed) stays in `EditorState` until it is committed by an event.
 
 `preview::rebuild_preview` rebuilds on the change detection of `ActiveProject`, which `apply_project_events` triggers only for events that changed the content. `editor::editor_ui` must stay in the `EguiPrimaryContextPass` schedule, not `Update`, chained before `apply_project_events` so events apply in the frame they are sent.
 
