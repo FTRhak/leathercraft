@@ -1,4 +1,4 @@
-use super::icon_button;
+use super::{glyph, icon_button, paint_glyph};
 use bevy_egui::egui;
 use bevy_egui::egui::collapsing_header::{CollapsingState, paint_default_icon};
 use leathercraft::events::ProjectEvent;
@@ -28,42 +28,8 @@ fn expand_toggle(ui: &mut egui::Ui, state: &mut CollapsingState, has_children: b
     paint_default_icon(ui, openness, &response);
 }
 
-fn paint_lock(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke, locked: bool) {
-    let rect = rect.shrink(ICON_MARGIN);
-    let at = |x: f32, y: f32| rect.lerp_inside(egui::vec2(x, y));
-    painter.rect_stroke(
-        egui::Rect::from_min_max(at(0.1, 0.5), at(0.9, 1.0)),
-        0.0,
-        stroke,
-        egui::StrokeKind::Middle,
-    );
-    // An open shackle stops short of the body on the right.
-    let right_end = if locked { 0.5 } else { 0.25 };
-    painter.add(egui::Shape::line(
-        vec![
-            at(0.28, 0.5),
-            at(0.28, 0.15),
-            at(0.4, 0.0),
-            at(0.6, 0.0),
-            at(0.72, 0.15),
-            at(0.72, right_end),
-        ],
-        stroke,
-    ));
-}
-
 fn paint_trash(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
-    let rect = rect.shrink(ICON_MARGIN);
-    let at = |x: f32, y: f32| rect.lerp_inside(egui::vec2(x, y));
-    painter.line_segment([at(0.0, 0.2), at(1.0, 0.2)], stroke);
-    painter.add(egui::Shape::line(
-        vec![at(0.35, 0.2), at(0.35, 0.0), at(0.65, 0.0), at(0.65, 0.2)],
-        stroke,
-    ));
-    painter.add(egui::Shape::line(
-        vec![at(0.15, 0.2), at(0.22, 1.0), at(0.78, 1.0), at(0.85, 0.2)],
-        stroke,
-    ));
+    paint_glyph(painter, rect, stroke, glyph::TRASH);
 }
 
 /// A triangle pointing up or down, for moving a child earlier or later in the list.
@@ -199,7 +165,14 @@ fn piece_row(
         ICON_BUTTON_SIZE,
         piece.locked,
         name,
-        |painter, rect, stroke| paint_lock(painter, rect, stroke, piece.locked),
+        |painter, rect, stroke| {
+            let icon = if piece.locked {
+                glyph::LOCK
+            } else {
+                glyph::UNLOCK
+            };
+            paint_glyph(painter, rect, stroke, icon);
+        },
     )
     .clicked()
     {

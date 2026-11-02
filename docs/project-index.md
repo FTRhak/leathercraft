@@ -35,10 +35,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
 | `src/editor/ui.rs` | 286 | 2,650 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete key, language picker |
 | `src/editor/panel_viewer.rs` | 102 | 800 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab |
-| `src/panels/mod.rs` | 32 | 250 | bin | Shared `icon_button` |
+| `src/panels/mod.rs` | 74 | 600 | bin | Shared `icon_button`; icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph` |
 | `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
 | `src/panels/tools/mod.rs` | 201 | 1,750 | bin | `Tool`, painted tool and operation icons, Tools panel |
-| `src/panels/layout/mod.rs` | 279 | 2,600 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls |
+| `src/panels/layout/mod.rs` | 252 | 2,600 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
 | `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion |
@@ -160,11 +160,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 157 | `show_panel`: tools, then the new-piece and operation modes |
 | `layout/mod.rs` | 9-10 | Constants |
 | | 14 | `expand_toggle`: expands or collapses a piece's children |
-| | 31-86 | `paint_lock`, `paint_trash`, `paint_arrow`, `shape_label` |
-| | 88 | `Selection` |
-| | 94 | `child_row`: delete, reorder, operation picker, select |
-| | 169 | `piece_row` |
-| | 222 | `show_panel`, which returns the `ProjectEvent` to send |
+| | 31-52 | `paint_trash` (icon font), `paint_arrow`, `shape_label`; the lock button uses the font's lock and unlock glyphs |
+| | 54 | `Selection` |
+| | 60 | `child_row`: delete, reorder, operation picker, select |
+| | 135 | `piece_row` |
+| | 195 | `show_panel`, which returns the `ProjectEvent` to send |
 | `history/mod.rs` | 6 | `show_panel`, which returns the `HistoryCommand` to send |
 | `material/mod.rs` | 15-103 | `DialogResult`, `combo`, `swatch`, `color_combo`, `thickness_row` |
 | | 105 | `material_fields`, shared by the dialog and the Material panel |

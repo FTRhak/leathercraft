@@ -31,7 +31,10 @@ fn main() {
         .init_resource::<ViewMode>()
         .add_systems(
             EguiPrimaryContextPass,
-            (editor::editor_ui, document::apply_project_events).chain(),
+            (
+                panels::install_icon_font.run_if(run_once),
+                (editor::editor_ui, document::apply_project_events).chain(),
+            ),
         )
         .run();
 }

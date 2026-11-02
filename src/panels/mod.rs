@@ -1,10 +1,51 @@
-use bevy_egui::egui;
+use bevy::prelude::*;
+use bevy_egui::{EguiContexts, egui};
 
 pub mod dock;
 pub mod history;
 pub mod layout;
 pub mod material;
 pub mod tools;
+
+const ICON_FONT: &str = "leathercraft-icons";
+
+/// Glyphs of the icon font, in its private use area.
+mod glyph {
+    pub const TRASH: char = '\u{E110}';
+    pub const LOCK: char = '\u{E115}';
+    pub const UNLOCK: char = '\u{E116}';
+}
+
+fn icon_font() -> egui::FontFamily {
+    egui::FontFamily::Name(ICON_FONT.into())
+}
+
+/// Registers the icon font as its own family; run once, it takes effect from the next pass.
+pub fn install_icon_font(mut contexts: EguiContexts) -> Result {
+    let data = egui::FontData::from_static(include_bytes!("../res/leathercrafticons.ttf"));
+    contexts
+        .ctx_mut()?
+        .add_font(egui::epaint::text::FontInsert::new(
+            ICON_FONT,
+            data,
+            vec![egui::epaint::text::InsertFontFamily {
+                family: icon_font(),
+                priority: egui::epaint::text::FontPriority::Highest,
+            }],
+        ));
+    Ok(())
+}
+
+/// Paints a glyph of the icon font centered in `rect`, in the stroke's color.
+fn paint_glyph(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke, glyph: char) {
+    painter.text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        glyph,
+        egui::FontId::new(rect.height() * 0.75, icon_font()),
+        stroke.color,
+    );
+}
 
 /// A square button with a painted icon; the closure gets the button's rect and stroke.
 fn icon_button(
