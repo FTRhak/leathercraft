@@ -1,5 +1,6 @@
 use super::icon_button;
 use bevy_egui::egui;
+use bevy_egui::egui::collapsing_header::{CollapsingState, paint_default_icon};
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::model::{BooleanOp, ChildShape, PatternPiece, Project};
@@ -7,7 +8,25 @@ use leathercraft::shapes::Shape;
 
 const ICON_BUTTON_SIZE: f32 = 20.0;
 const ICON_MARGIN: f32 = 4.0;
-const CHILD_INDENT: f32 = 16.0;
+
+/// A triangle that expands or collapses a piece's children, or empty space of the same width
+/// for a piece without children, so that all names start at the same position.
+fn expand_toggle(ui: &mut egui::Ui, state: &mut CollapsingState, has_children: bool) {
+    let size = egui::Vec2::splat(ICON_BUTTON_SIZE);
+    if !has_children {
+        ui.allocate_exact_size(size, egui::Sense::hover());
+        return;
+    }
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+    response
+        .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), ""));
+    if response.clicked() {
+        state.toggle(ui);
+    }
+    let openness = state.openness(ui.ctx());
+    let response = response.with_new_rect(rect.shrink(ICON_MARGIN + 1.0));
+    paint_default_icon(ui, openness, &response);
+}
 
 fn paint_lock(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke, locked: bool) {
     let rect = rect.shrink(ICON_MARGIN);
@@ -137,9 +156,9 @@ fn child_row(
         index + 1,
         language.label(shape_label(&child.shape))
     );
-    let row = egui::Button::selectable(selected, text)
+    let row = egui::Button::selectable(selected, (text, egui::Atom::grow()))
         .truncate()
-        .min_size(egui::vec2(ui.available_width() - CHILD_INDENT, 0.0));
+        .min_size(egui::vec2(ui.available_width(), 0.0));
     if ui.add(row).clicked() {
         *selection.piece = Some(id);
         *selection.child = Some((id, child_id));
@@ -190,7 +209,7 @@ fn piece_row(
         });
     }
     let selected = *selection.piece == Some(piece.id) && selection.child.is_none();
-    let row = egui::Button::selectable(selected, piece.name.as_str())
+    let row = egui::Button::selectable(selected, (piece.name.as_str(), egui::Atom::grow()))
         .truncate()
         .min_size(egui::vec2(ui.available_width(), 0.0));
     if ui.add(row).clicked() {
@@ -213,24 +232,42 @@ pub fn show_panel(
             .default_open(true)
             .show(ui, |ui| {
                 for piece in &project.pieces {
+                    let id = ui.make_persistent_id(("layout_piece", piece.id));
+                    let mut state = CollapsingState::load_with_default_open(ui.ctx(), id, true);
+                    let has_children = !piece.children.is_empty();
                     let row = ui.push_id(piece.id, |ui| {
-                        // Right to left, so that a long name gives way to the buttons.
-                        ui.allocate_ui_with_layout(
-                            egui::vec2(ui.available_width(), ICON_BUTTON_SIZE),
-                            egui::Layout::right_to_left(egui::Align::Center),
-                            |ui| piece_row(ui, piece, &mut selection, language),
-                        )
-                        .inner
-                    });
-                    event = row.inner.or(event.take());
-                    // Children are listed in the order their operations apply.
-                    for (index, child) in piece.children.iter().enumerate() {
-                        let row = ui.push_id((piece.id, child.id), |ui| {
+                        ui.horizontal(|ui| {
+                            expand_toggle(ui, &mut state, has_children);
+                            // Right to left, so that a long name gives way to the buttons.
                             ui.allocate_ui_with_layout(
                                 egui::vec2(ui.available_width(), ICON_BUTTON_SIZE),
                                 egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| child_row(ui, piece, index, child, &mut selection, language),
+                                |ui| piece_row(ui, piece, &mut selection, language),
                             )
+                            .inner
+                        })
+                        .inner
+                    });
+                    state.store(ui.ctx());
+                    event = row.inner.or(event.take());
+                    if !(has_children && state.is_open()) {
+                        continue;
+                    }
+                    // Children are listed in the order their operations apply, indented so that
+                    // their names start under the name of their piece.
+                    for (index, child) in piece.children.iter().enumerate() {
+                        let row = ui.push_id((piece.id, child.id), |ui| {
+                            ui.horizontal(|ui| {
+                                ui.add_space(ICON_BUTTON_SIZE);
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(ui.available_width(), ICON_BUTTON_SIZE),
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        child_row(ui, piece, index, child, &mut selection, language)
+                                    },
+                                )
+                                .inner
+                            })
                             .inner
                         });
                         event = row.inner.or(event.take());

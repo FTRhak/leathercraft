@@ -38,7 +38,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/mod.rs` | 32 | 250 | bin | Shared `icon_button` |
 | `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
 | `src/panels/tools/mod.rs` | 201 | 1,750 | bin | `Tool`, painted tool and operation icons, Tools panel |
-| `src/panels/layout/mod.rs` | 242 | 2,100 | bin | Layout panel: pieces with their children, lock, delete, reorder and operation controls |
+| `src/panels/layout/mod.rs` | 279 | 2,600 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
 | `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion |
@@ -158,12 +158,13 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 14-95 | `Tool`: `ALL`, `label`, `hint`, `shape`, `paint_icon` |
 | | 99-155 | `arc`, `paint_operation_icon`, `paint_new_piece_icon` |
 | | 157 | `show_panel`: tools, then the new-piece and operation modes |
-| `layout/mod.rs` | 8-10 | Constants |
-| | 12-67 | `paint_lock`, `paint_trash`, `paint_arrow`, `shape_label` |
-| | 69 | `Selection` |
-| | 75 | `child_row`: delete, reorder, operation picker, select |
-| | 150 | `piece_row` |
-| | 203 | `show_panel`, which returns the `ProjectEvent` to send |
+| `layout/mod.rs` | 9-10 | Constants |
+| | 14 | `expand_toggle`: expands or collapses a piece's children |
+| | 31-86 | `paint_lock`, `paint_trash`, `paint_arrow`, `shape_label` |
+| | 88 | `Selection` |
+| | 94 | `child_row`: delete, reorder, operation picker, select |
+| | 169 | `piece_row` |
+| | 222 | `show_panel`, which returns the `ProjectEvent` to send |
 | `history/mod.rs` | 6 | `show_panel`, which returns the `HistoryCommand` to send |
 | `material/mod.rs` | 15-103 | `DialogResult`, `combo`, `swatch`, `color_combo`, `thickness_row` |
 | | 105 | `material_fields`, shared by the dialog and the Material panel |
