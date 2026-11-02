@@ -1,6 +1,6 @@
 use crate::i18n::Message;
 use crate::material::Material;
-use crate::model::{PatternPiece, Point, Project, Units};
+use crate::model::{Cut, PatternPiece, Point, Project, Units};
 use crate::persistence;
 use std::path::PathBuf;
 
@@ -63,6 +63,7 @@ pub enum ProjectChange {
     PieceRemoved(u64),
     HoleAdded { id: u64, index: usize },
     HoleRemoved { id: u64 },
+    EdgeCut { id: u64 },
 }
 
 impl Project {
@@ -125,11 +126,9 @@ impl Project {
                 Ok(ProjectChange::PieceRemoved(id))
             }),
             ProjectEvent::AddHole { id, points } => self.edit(|project| {
-                let piece = project.unlocked_piece_mut(id)?;
-                piece.holes.push(points);
-                Ok(ProjectChange::HoleAdded {
-                    id,
-                    index: piece.holes.len() - 1,
+                Ok(match project.unlocked_piece_mut(id)?.cut(points)? {
+                    Cut::Hole(index) => ProjectChange::HoleAdded { id, index },
+                    Cut::Edge => ProjectChange::EdgeCut { id },
                 })
             }),
             ProjectEvent::RemoveHole { id, index } => self.edit(|project| {
@@ -357,6 +356,55 @@ mod tests {
             Ok(ProjectChange::HoleRemoved { id: 1 })
         );
         assert!(project.pieces[0].holes.is_empty());
+    }
+
+    #[test]
+    fn a_hole_drawn_across_the_edge_reshapes_the_piece() {
+        let mut project = project_with_piece();
+        let area = project.pieces[0].signed_area().abs();
+        let across = vec![
+            Point::new(-1.0, 1.0),
+            Point::new(2.0, 1.0),
+            Point::new(2.0, 3.0),
+            Point::new(-1.0, 3.0),
+        ];
+        assert_eq!(
+            project.apply(ProjectEvent::AddHole {
+                id: 1,
+                points: across,
+            }),
+            Ok(ProjectChange::EdgeCut { id: 1 })
+        );
+        assert!(project.pieces[0].holes.is_empty());
+        assert!(project.pieces[0].signed_area().abs() < area);
+    }
+
+    #[test]
+    fn an_edge_cut_through_an_existing_hole_is_rejected() {
+        let mut project = project_with_piece();
+        project
+            .apply(ProjectEvent::AddHole {
+                id: 1,
+                points: small_hole(),
+            })
+            .unwrap();
+        let before = project.clone();
+        let across = vec![
+            Point::new(-1.0, 1.5),
+            Point::new(2.0, 1.5),
+            Point::new(2.0, 2.0),
+            Point::new(-1.0, 2.0),
+        ];
+        assert_eq!(
+            project.apply(ProjectEvent::AddHole {
+                id: 1,
+                points: across,
+            }),
+            Err(Message::HoleOutsidePiece {
+                name: "Деталь 1".to_owned()
+            })
+        );
+        assert_eq!(project, before);
     }
 
     #[test]

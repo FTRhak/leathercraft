@@ -70,7 +70,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `model.rs` | 7-11 | `PROJECT_VERSION` and validation limits (`MAX_PIECES`, `MAX_POINTS_PER_PIECE`, `MAX_COORDINATE_MM`, `MIN_POLYGON_AREA_MM2`) |
 | | 15-59 | `Units`, `Point`, `Bounds` |
 | | 50-150 | `Bounds::overlaps`; ring helpers: `ring_bounds`, `ring_contains`, `segments_touch`, `rings_cross`, `signed_area` |
-| | 150-290 | `PatternPiece`: `bounds`, `contains`, `hole_at`, `signed_area`, `rings`, `vertices`, `hole_indices`, `validate_ring`, `validate_holes` |
+| | 150-290 | `PatternPiece`: `bounds`, `contains`, `hole_at`, `signed_area`, `rings`, `vertices`, `hole_indices`, `cut`, `outline_without`, `validate_ring`, `validate_holes` |
 | | 133-254 | `Project`: `bounds`, `validate` (173), `next_piece_id`, `add_piece`, `remove_piece` |
 | | 256-335 | Tests |
 | `events.rs` | 9-31 | `ProjectEvent`, `ProjectChange` |
@@ -185,13 +185,13 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 42 tests, all inline in the library crate:
+There are 49 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
-| `model` | 9 |
+| `model` | 14 |
 | `material` | 3 |
-| `events` | 11 |
+| `events` | 13 |
 | `i18n` | 5 |
 | `exports` | 5 |
 | `persistence` | 5 |

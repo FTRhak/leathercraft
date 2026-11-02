@@ -319,6 +319,13 @@ pub(super) fn message(message: &Message) -> String {
         Message::PieceLocked { name } => format!("Piece '{name}' is locked."),
         Message::HoleAdded { name } => format!("Added a hole to '{name}'."),
         Message::HoleDeleted => "Hole deleted.".to_owned(),
+        Message::PieceEdgeCut { name } => format!("Changed the edge of '{name}'."),
+        Message::HoleSplitsPiece { name } => {
+            format!("This cut would split piece '{name}' into several parts.")
+        }
+        Message::HoleCoversPiece { name } => {
+            format!("This cut would remove all of piece '{name}'.")
+        }
         Message::SelectPieceForHole => "Select a piece to cut the hole in.".to_owned(),
         Message::HoleNotFound { name } => format!("Piece '{name}' has no such hole."),
         Message::TooManyHoles { name, max } => {

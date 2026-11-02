@@ -25,7 +25,7 @@ All existing tests are inline `#[cfg(test)]` modules in the library crate, so `-
 
 The package has two crates with a deliberate boundary: geometry and file-format logic stay free of UI and rendering so they can be tested without launching the app.
 
-- **Library (`src/lib.rs`), always built, depends only on serde:**
+- **Library (`src/lib.rs`), always built, depends only on serde and `i_overlay` (polygon subtraction):**
   - `model`: `Project`, `PatternPiece`, `Point`, `Units`, and `Project::validate`.
   - `material`: `Material` and the scales of its properties. Each piece has its own material; `Project.default_material`, chosen in the new-project dialog, is copied into each new piece.
   - `events`: `ProjectEvent`, `ProjectChange`, and `Project::apply`, the single entry point for changing a project.
@@ -44,7 +44,7 @@ The UI never writes to the project. It sends a `ProjectEvent` wrapped in `docume
 ## Invariants
 
 - **Internal geometry is always millimeters.** `Project.units` is a display preference only; convert explicitly with `Units::from_millimeters`. SVG and DXF exports are always written in mm, regardless of `Project.units`.
-- **A piece is a closed polygon** stored as an ordered point list without a repeated closing point. Validation treats the last point as connected to the first. Its holes are stored the same way and must lie inside the outline, without touching it or each other.
+- **A piece is a closed polygon** stored as an ordered point list without a repeated closing point. Validation treats the last point as connected to the first. Its holes are stored the same way and must lie inside the outline, without touching it or each other. `AddHole` with a shape that crosses the outline changes the outline instead of adding a hole.
 - **`Project::validate` guards every file boundary:** `save_project`, `load_project`, `to_svg`, and `to_dxf` all call it. New I/O paths should do the same.
 - **The project is always valid:** `Project::apply` validates every edit on a copy, so a rejected event leaves the project untouched.
 - **Format version:** `PROJECT_VERSION` must match exactly on load; there is no migration path yet. Changing the serialized shape of the model means bumping it and deciding how older files are handled. Adding a `#[serde(default)]` field doesn't need a bump, since older files still load.

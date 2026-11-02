@@ -147,6 +147,15 @@ impl EditorState {
                     });
                 }
             }
+            ProjectChange::EdgeCut { id } => {
+                self.draft.clear();
+                self.selected_hole = None;
+                if let Some(piece) = project.pieces.iter().find(|piece| piece.id == id) {
+                    self.report(Message::PieceEdgeCut {
+                        name: piece.name.clone(),
+                    });
+                }
+            }
             ProjectChange::HoleRemoved { id } => {
                 if self.selected_hole.is_some_and(|(piece, _)| piece == id) {
                     self.selected_hole = None;

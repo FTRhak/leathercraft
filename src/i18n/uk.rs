@@ -323,6 +323,13 @@ pub(super) fn message(message: &Message) -> String {
         Message::PieceLocked { name } => format!("Деталь «{name}» заблоковано."),
         Message::HoleAdded { name } => format!("Додано отвір у деталь «{name}»."),
         Message::HoleDeleted => "Отвір видалено.".to_owned(),
+        Message::PieceEdgeCut { name } => format!("Змінено край деталі «{name}»."),
+        Message::HoleSplitsPiece { name } => {
+            format!("Цей виріз розділив би деталь «{name}» на кілька частин.")
+        }
+        Message::HoleCoversPiece { name } => {
+            format!("Цей виріз повністю прибрав би деталь «{name}».")
+        }
         Message::SelectPieceForHole => "Виберіть деталь, у якій треба вирізати отвір.".to_owned(),
         Message::HoleNotFound { name } => format!("У деталі «{name}» немає такого отвору."),
         Message::TooManyHoles { name, max } => {

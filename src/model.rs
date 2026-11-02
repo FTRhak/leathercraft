@@ -1,5 +1,8 @@
 use crate::i18n::Message;
 use crate::material::Material;
+use i_overlay::core::fill_rule::FillRule;
+use i_overlay::core::overlay_rule::OverlayRule;
+use i_overlay::float::single::SingleFloatOverlay;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -10,6 +13,8 @@ const MAX_POINTS_PER_PIECE: usize = 2_048;
 const MAX_HOLES_PER_PIECE: usize = 512;
 const MAX_COORDINATE_MM: f64 = 1_000_000.0;
 const MIN_POLYGON_AREA_MM2: f64 = 1.0e-6;
+/// Removes the float noise that polygon subtraction leaves in coordinates.
+const CUT_PRECISION_MM: f64 = 1.0e-6;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -141,6 +146,13 @@ pub fn signed_area(ring: &[Point]) -> f64 {
     area * 0.5
 }
 
+/// What cutting a shape out of a piece did to it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Cut {
+    Hole(usize),
+    Edge,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PatternPiece {
     pub id: u64,
@@ -209,6 +221,61 @@ impl PatternPiece {
                 index
             })
             .collect()
+    }
+
+    /// Cuts a shape out of the piece: inside the outline it becomes a hole, and across the
+    /// outline it changes the outline. The caller still validates the result, which rejects
+    /// a new outline that crosses an existing hole.
+    pub(crate) fn cut(&mut self, ring: Vec<Point>) -> Result<Cut, Message> {
+        self.validate_ring(&ring)?;
+        if rings_cross(&self.points, &ring) {
+            self.points = self.outline_without(&ring)?;
+            return Ok(Cut::Edge);
+        }
+        if ring_contains(&ring, self.points[0]) {
+            return Err(Message::HoleCoversPiece {
+                name: self.name.clone(),
+            });
+        }
+        if !ring_contains(&self.points, ring[0]) {
+            return Err(Message::HoleOutsidePiece {
+                name: self.name.clone(),
+            });
+        }
+        self.holes.push(ring);
+        Ok(Cut::Hole(self.holes.len() - 1))
+    }
+
+    fn outline_without(&self, ring: &[Point]) -> Result<Vec<Point>, Message> {
+        let contour = |points: &[Point]| -> Vec<[f64; 2]> {
+            points.iter().map(|point| [point.x, point.y]).collect()
+        };
+        let shapes = contour(&self.points).overlay(
+            &contour(ring),
+            OverlayRule::Difference,
+            FillRule::NonZero,
+        );
+        let name = self.name.clone();
+        let outline = match shapes.as_slice() {
+            [] => return Err(Message::HoleCoversPiece { name }),
+            // A second contour means the shape touches the outline from inside at a single point.
+            [shape] => match shape.as_slice() {
+                [outline] => outline,
+                _ => return Err(Message::HoleOutsidePiece { name }),
+            },
+            _ => return Err(Message::HoleSplitsPiece { name }),
+        };
+        let round = |value: f64| (value / CUT_PRECISION_MM).round() * CUT_PRECISION_MM;
+        let points: Vec<Point> = outline
+            .iter()
+            .map(|[x, y]| Point::new(round(*x), round(*y)))
+            .collect();
+        // A shape that only touches the outline from outside removes nothing.
+        let removed = self.signed_area().abs() - signed_area(&points).abs();
+        if removed < MIN_POLYGON_AREA_MM2 {
+            return Err(Message::HoleOutsidePiece { name });
+        }
+        Ok(points)
     }
 
     fn validate_ring(&self, ring: &[Point]) -> Result<(), Message> {
@@ -525,6 +592,102 @@ mod tests {
             Err(Message::ZeroArea {
                 name: "Pocket".to_owned()
             })
+        );
+    }
+
+    fn assert_same_outline(piece: &PatternPiece, expected: &[(f64, f64)]) {
+        assert_eq!(piece.points.len(), expected.len());
+        for (x, y) in expected {
+            assert!(
+                piece
+                    .points
+                    .iter()
+                    .any(|point| { (point.x - x).abs() < 1.0e-5 && (point.y - y).abs() < 1.0e-5 }),
+                "missing ({x}, {y}) in {:?}",
+                piece.points
+            );
+        }
+    }
+
+    #[test]
+    fn a_shape_inside_the_outline_becomes_a_hole() {
+        let mut piece = rectangle(1);
+        let outline = piece.points.clone();
+        assert_eq!(piece.cut(square(10.0, 10.0, 10.0)), Ok(Cut::Hole(0)));
+        assert_eq!(piece.points, outline);
+        assert_eq!(piece.holes.len(), 1);
+    }
+
+    #[test]
+    fn a_shape_across_the_outline_notches_the_edge() {
+        let mut piece = rectangle(1);
+        assert_eq!(piece.cut(square(70.0, 50.0, 20.0)), Ok(Cut::Edge));
+        assert!(piece.holes.is_empty());
+        assert_same_outline(
+            &piece,
+            &[
+                (0.0, 0.0),
+                (80.0, 0.0),
+                (80.0, 50.0),
+                (70.0, 50.0),
+                (70.0, 70.0),
+                (80.0, 70.0),
+                (80.0, 120.0),
+                (0.0, 120.0),
+            ],
+        );
+        assert!((piece.signed_area().abs() - 9400.0).abs() < 1.0e-3);
+    }
+
+    #[test]
+    fn a_shape_flush_with_the_outline_notches_the_edge() {
+        let mut piece = rectangle(1);
+        assert_eq!(piece.cut(square(70.0, 50.0, 10.0)), Ok(Cut::Edge));
+        assert!(piece.holes.is_empty());
+        assert!((piece.signed_area().abs() - 9500.0).abs() < 1.0e-3);
+    }
+
+    #[test]
+    fn a_corner_can_be_cut_off() {
+        let mut piece = rectangle(1);
+        assert_eq!(piece.cut(square(70.0, -10.0, 20.0)), Ok(Cut::Edge));
+        assert_same_outline(
+            &piece,
+            &[
+                (0.0, 0.0),
+                (70.0, 0.0),
+                (70.0, 10.0),
+                (80.0, 10.0),
+                (80.0, 120.0),
+                (0.0, 120.0),
+            ],
+        );
+    }
+
+    #[test]
+    fn cuts_that_do_not_leave_one_outline_are_rejected() {
+        let name = "Pocket".to_owned();
+        let splitting = vec![
+            Point::new(-10.0, 50.0),
+            Point::new(90.0, 50.0),
+            Point::new(90.0, 60.0),
+            Point::new(-10.0, 60.0),
+        ];
+        assert_eq!(
+            rectangle(1).cut(splitting),
+            Err(Message::HoleSplitsPiece { name: name.clone() })
+        );
+        assert_eq!(
+            rectangle(1).cut(square(-10.0, -10.0, 200.0)),
+            Err(Message::HoleCoversPiece { name: name.clone() })
+        );
+        assert_eq!(
+            rectangle(1).cut(square(200.0, 200.0, 10.0)),
+            Err(Message::HoleOutsidePiece { name: name.clone() })
+        );
+        assert_eq!(
+            rectangle(1).cut(square(80.0, 50.0, 10.0)),
+            Err(Message::HoleOutsidePiece { name })
         );
     }
 
