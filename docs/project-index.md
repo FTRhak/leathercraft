@@ -42,23 +42,23 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/layout/mod.rs` | 252 | 2,600 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
-| `src/panels/properties/mod.rs` | 215 | 1,800 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields |
+| `src/panels/properties/mod.rs` | 237 | 1,850 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, To Polygon button |
 | `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion |
 | `src/model.rs` | 476 | 3,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation |
 | `src/boolean.rs` | 221 | 1,900 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes |
 | `src/material.rs` | 462 | 2,800 | lib | `Material` and the scales of its properties |
 | `src/events.rs` | 631 | 4,850 | lib | `ProjectEvent`, `ProjectChange`, `Project::apply` |
-| `src/i18n/uk.rs` | 459 | 5,900 | lib | Ukrainian catalog, `plural` helper |
-| `src/i18n/mod.rs` | 279 | 2,000 | lib | `Language`, `Label`, `Message` |
+| `src/i18n/uk.rs` | 466 | 5,900 | lib | Ukrainian catalog, `plural` helper |
+| `src/i18n/mod.rs` | 284 | 2,000 | lib | `Language`, `Label`, `Message` |
 | `src/exports/mod.rs` | 187 | 1,200 | lib | `ExportError`, shared helpers, tests |
 | `src/exports/svg.rs` | 45 | 430 | lib | `to_svg` |
 | `src/exports/dxf.rs` | 25 | 200 | lib | `to_dxf` |
-| `src/shapes/mod.rs` | 195 | 1,450 | lib | `Shape`: dispatch to the shape structs, constructors from a drag |
+| `src/shapes/mod.rs` | 214 | 1,600 | lib | `Shape`: dispatch to the shape structs, constructors from a drag |
 | `src/shapes/rectangle.rs` | 113 | 800 | lib | `Rectangle` |
 | `src/shapes/ellipse.rs` | 123 | 900 | lib | `Ellipse`, `CIRCLE_SEGMENTS` |
 | `src/shapes/regular_polygon.rs` | 142 | 1,050 | lib | `RegularPolygon`, `REGULAR_POLYGON_SIDES` |
 | `src/shapes/polygon.rs` | 25 | 150 | lib | `Polygon` |
-| `src/i18n/en.rs` | 428 | 4,550 | lib | English catalog |
+| `src/i18n/en.rs` | 435 | 4,550 | lib | English catalog |
 | `src/history.rs` | 508 | 4,350 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
 | `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings.rs` | 71 | 500 | bin | Saved language and panel layout in the OS config directory |
@@ -84,8 +84,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 265-353 | `Project`: `bounds`, `validate` (301), `next_piece_id`, `add_piece`, `remove_piece` |
 | | 355-476 | Tests |
 | `shapes/mod.rs` | 1-40 | Re-exports, `Shape` enum (`Polygon`, `Rectangle`, `Ellipse`, `RegularPolygon` wrapping the structs of the same name), `to_world`, `to_local`, `positive` |
-| | 42-140 | `rectangle_from_corners`, `ellipse_from_center`, `regular_polygon_from_center`, `ring`, `bounds`, `contains`, `center`, `translate`, `handles`, `with_handle_at`, `has_valid_size` |
-| | 142-195 | `test_support` (`validate`, `assert_near`), tests |
+| | 42-147 | `rectangle_from_corners`, `ellipse_from_center`, `regular_polygon_from_center`, `ring`, `to_polygon`, `bounds`, `contains`, `center`, `translate`, `handles`, `with_handle_at`, `has_valid_size` |
+| | 149-214 | `test_support` (`validate`, `assert_near`), tests |
 | `shapes/rectangle.rs` | 5-53 | `Rectangle`: `from_corners`, `ring`, `with_handle_at`, `has_valid_size`; tests from 55 |
 | `shapes/ellipse.rs` | 6-79 | `CIRCLE_SEGMENTS`, `Ellipse`: `from_center`, `ring`, `handles`, `with_handle_at`, `has_valid_size`; tests from 81 |
 | `shapes/regular_polygon.rs` | 7-73 | `REGULAR_POLYGON_SIDES` (3..=64), `ROTATION_SNAP`, `RegularPolygon`: `from_center`, `ring`, `with_handle_at`, `has_valid_size`; tests from 75 |
@@ -180,9 +180,9 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 214 | `new_project_dialog` |
 | `properties/mod.rs` | 10-29 | `EditorView`, `ViewControls` (editor or preview), `Selection` (displayed piece, child, rename buffer) |
 | | 32-59 | `view_controls`, `units_control` |
-| | 61 | `selected_piece_details`: name, size or result error, fields of the selected base or child |
-| | 132 | `shape_fields`: center, size and rotation of a primitive in display units |
-| | 199 | `show_panel`, which returns the `ProjectEvent` to send |
+| | 63 | `selected_piece_details`: name, size or result error, fields of the selected base or child, To Polygon button for a primitive |
+| | 139 | `shape_fields`: center, size and rotation of a primitive in display units |
+| | 221 | `show_panel`, which returns the `ProjectEvent` to send |
 
 ### `preview/mod.rs`
 

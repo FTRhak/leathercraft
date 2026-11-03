@@ -48,6 +48,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Radius => "Радіус",
         Label::Sides => "Кількість граней",
         Label::Rotation => "Поворот, °",
+        Label::ToPolygon => "У многокутник",
         Label::MoveUp => "Застосувати раніше",
         Label::MoveDown => "Застосувати пізніше",
         Label::DeleteChild => "Видалити фігуру",

@@ -111,6 +111,7 @@ pub enum Label {
     Radius,
     Sides,
     Rotation,
+    ToPolygon,
     MoveUp,
     MoveDown,
     DeleteChild,

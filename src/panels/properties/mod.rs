@@ -116,6 +116,11 @@ fn selected_piece_details(
     let mut edited = shape.clone();
     ui.add_enabled_ui(!piece.locked, |ui| {
         shape_fields(ui, &mut edited, units, language);
+        if !matches!(shape, Shape::Polygon(_))
+            && ui.button(language.label(Label::ToPolygon)).clicked()
+        {
+            edited = shape.to_polygon();
+        }
     });
     if edited != *shape {
         event = Some(match child {

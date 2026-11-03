@@ -48,6 +48,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Radius => "Radius",
         Label::Sides => "Sides",
         Label::Rotation => "Rotation, °",
+        Label::ToPolygon => "To Polygon",
         Label::MoveUp => "Apply earlier",
         Label::MoveDown => "Apply later",
         Label::DeleteChild => "Delete shape",

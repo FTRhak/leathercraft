@@ -70,6 +70,13 @@ impl Shape {
         }
     }
 
+    /// The shape as a free polygon through the points of its ring; a polygon stays as it is.
+    pub fn to_polygon(&self) -> Self {
+        Self::Polygon(Polygon {
+            points: self.ring(),
+        })
+    }
+
     pub fn bounds(&self) -> Option<Bounds> {
         ring_bounds(&self.ring())
     }
@@ -177,6 +184,18 @@ mod tests {
             Shape::ellipse_from_center(Point::new(0.0, 0.0), Point::new(1.0, 1.0), false).unwrap();
         ellipse.translate(2.0, 3.0);
         assert_eq!(ellipse.center(), Point::new(2.0, 3.0));
+    }
+
+    #[test]
+    fn converting_to_a_polygon_keeps_the_ring() {
+        let ellipse =
+            Shape::ellipse_from_center(Point::new(0.0, 0.0), Point::new(30.0, 20.0), false)
+                .unwrap();
+        let polygon = ellipse.to_polygon();
+        assert!(matches!(polygon, Shape::Polygon(_)));
+        assert_eq!(polygon.ring(), ellipse.ring());
+        assert_eq!(validate(polygon.clone()), Ok(()));
+        assert_eq!(polygon.to_polygon(), polygon);
     }
 
     #[test]
