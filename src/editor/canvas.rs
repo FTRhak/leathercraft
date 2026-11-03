@@ -10,7 +10,7 @@ use earcutr::earcut;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Language, Message};
 use leathercraft::model::{BooleanOp, PatternPiece, Point, Project, Units};
-use leathercraft::shapes::Shape;
+use leathercraft::shapes::{Ellipse, Polygon, Rectangle, RegularPolygon, Shape};
 
 const MIN_ZOOM: f32 = 0.05;
 const MAX_ZOOM: f32 = 100.0;
@@ -188,7 +188,7 @@ fn finish_draft(
     state: &mut EditorState,
 ) {
     let points = state.draft.clone();
-    commit_shape(project, events, state, Shape::Polygon { points });
+    commit_shape(project, events, state, Shape::Polygon(Polygon { points }));
 }
 
 /// A finished shape becomes a child of the selected piece when an operation is chosen,
@@ -559,15 +559,17 @@ fn draw_shape_draft(painter: &egui::Painter, view: Viewport, units: Units, state
     ));
     let length = |millimeters: f64| format_length(state.language, units, millimeters);
     let size = match shape {
-        Shape::Ellipse {
+        Shape::Ellipse(Ellipse {
             radius_x, radius_y, ..
-        } if radius_x == radius_y => format!("Ø {}", length(radius_x * 2.0)),
-        Shape::Ellipse {
+        }) if radius_x == radius_y => format!("Ø {}", length(radius_x * 2.0)),
+        Shape::Ellipse(Ellipse {
             radius_x, radius_y, ..
-        } => format!("{} × {}", length(radius_x * 2.0), length(radius_y * 2.0)),
-        Shape::Rectangle { width, height, .. } => format!("{} × {}", length(width), length(height)),
-        Shape::RegularPolygon { radius, .. } => format!("R {}", length(radius)),
-        Shape::Polygon { .. } => return,
+        }) => format!("{} × {}", length(radius_x * 2.0), length(radius_y * 2.0)),
+        Shape::Rectangle(Rectangle { width, height, .. }) => {
+            format!("{} × {}", length(width), length(height))
+        }
+        Shape::RegularPolygon(RegularPolygon { radius, .. }) => format!("R {}", length(radius)),
+        Shape::Polygon(_) => return,
     };
     painter.text(
         view.to_screen(draft.end) + egui::vec2(10.0, -10.0),

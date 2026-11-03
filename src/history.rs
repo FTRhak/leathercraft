@@ -223,17 +223,17 @@ impl History {
 mod tests {
     use super::*;
     use crate::model::{BooleanOp, Point};
-    use crate::shapes::Shape;
+    use crate::shapes::{Polygon, Shape};
     use std::path::PathBuf;
 
     fn triangle() -> Shape {
-        Shape::Polygon {
+        Shape::Polygon(Polygon {
             points: vec![
                 Point::new(0.0, 0.0),
                 Point::new(10.0, 0.0),
                 Point::new(0.0, 10.0),
             ],
-        }
+        })
     }
 
     fn add_piece(name: &str) -> ProjectEvent {

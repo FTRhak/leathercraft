@@ -44,10 +44,10 @@ fn paint_arrow(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke, 
 
 fn shape_label(shape: &Shape) -> Label {
     match shape {
-        Shape::Polygon { .. } => Label::Polygon,
-        Shape::Rectangle { .. } => Label::Rectangle,
-        Shape::Ellipse { .. } => Label::Ellipse,
-        Shape::RegularPolygon { .. } => Label::RegularPolygon,
+        Shape::Polygon(_) => Label::Polygon,
+        Shape::Rectangle(_) => Label::Rectangle,
+        Shape::Ellipse(_) => Label::Ellipse,
+        Shape::RegularPolygon(_) => Label::RegularPolygon,
     }
 }
 

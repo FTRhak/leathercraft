@@ -355,6 +355,7 @@ impl Project {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shapes::{Ellipse, Polygon};
 
     fn rectangle(id: u64) -> PatternPiece {
         PatternPiece::new(
@@ -414,13 +415,13 @@ mod tests {
         project.pieces = vec![PatternPiece::new(
             2,
             "Bad",
-            Shape::Polygon {
+            Shape::Polygon(Polygon {
                 points: vec![
                     Point::new(0.0, 0.0),
                     Point::new(2.0, 2.0),
                     Point::new(4.0, 4.0),
                 ],
-            },
+            }),
         )];
         assert_eq!(
             project.validate(),
@@ -435,12 +436,12 @@ mod tests {
         let piece = PatternPiece::new(
             1,
             "Pocket",
-            Shape::Ellipse {
+            Shape::Ellipse(Ellipse {
                 center: Point::new(0.0, 0.0),
                 radius_x: 0.0,
                 radius_y: 5.0,
                 rotation: 0.0,
-            },
+            }),
         );
         assert_eq!(
             project(piece).validate(),

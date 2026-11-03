@@ -233,17 +233,18 @@ mod tests {
     use super::*;
     use crate::material::{LeatherColor, Origin};
     use crate::model::Point;
+    use crate::shapes::{Polygon, Rectangle};
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn triangle() -> Shape {
-        Shape::Polygon {
+        Shape::Polygon(Polygon {
             points: vec![
                 Point::new(0.0, 0.0),
                 Point::new(10.0, 0.0),
                 Point::new(0.0, 10.0),
             ],
-        }
+        })
     }
 
     fn small_square() -> Shape {
@@ -295,7 +296,7 @@ mod tests {
         let invalid = [
             ProjectEvent::AddPiece {
                 name: "Flap".to_owned(),
-                base: Shape::Polygon { points: Vec::new() },
+                base: Shape::Polygon(Polygon { points: Vec::new() }),
             },
             ProjectEvent::AddPiece {
                 name: " ".to_owned(),
@@ -307,9 +308,9 @@ mod tests {
             },
             ProjectEvent::SetBaseShape {
                 id: 1,
-                shape: Shape::Polygon {
+                shape: Shape::Polygon(Polygon {
                     points: vec![Point::new(0.0, 0.0); 3],
-                },
+                }),
             },
             ProjectEvent::SetBaseShape {
                 id: 9,
@@ -329,12 +330,12 @@ mod tests {
             ProjectEvent::SetChildShape {
                 id: 1,
                 child: 1,
-                shape: Shape::Rectangle {
+                shape: Shape::Rectangle(Rectangle {
                     center: Point::new(2.0, 2.0),
                     width: -1.0,
                     height: 2.0,
                     rotation: 0.0,
-                },
+                }),
             },
             ProjectEvent::SetChildOp {
                 id: 1,

@@ -4,7 +4,9 @@ use bevy_egui::egui;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{PatternPiece, Project, Units};
-use leathercraft::shapes::{REGULAR_POLYGON_SIDES, Shape};
+use leathercraft::shapes::{
+    Ellipse, Polygon, REGULAR_POLYGON_SIDES, Rectangle, RegularPolygon, Shape,
+};
 
 /// The canvas options of the 2D editor.
 pub struct EditorView<'a> {
@@ -162,41 +164,41 @@ fn shape_fields(ui: &mut egui::Ui, shape: &mut Shape, units: Units, language: La
     // Sizes stay above zero, which the project would reject.
     const MIN_SIZE_MM: f64 = 0.01;
     match shape {
-        Shape::Polygon { points } => {
+        Shape::Polygon(Polygon { points }) => {
             ui.label(language.message(&Message::PointCount {
                 count: points.len(),
             }));
         }
-        Shape::Rectangle {
+        Shape::Rectangle(Rectangle {
             center,
             width,
             height,
             rotation,
-        } => {
+        }) => {
             length(ui, Label::CenterX, &mut center.x, f64::MIN);
             length(ui, Label::CenterY, &mut center.y, f64::MIN);
             length(ui, Label::Width, width, MIN_SIZE_MM);
             length(ui, Label::Height, height, MIN_SIZE_MM);
             angle(ui, rotation);
         }
-        Shape::Ellipse {
+        Shape::Ellipse(Ellipse {
             center,
             radius_x,
             radius_y,
             rotation,
-        } => {
+        }) => {
             length(ui, Label::CenterX, &mut center.x, f64::MIN);
             length(ui, Label::CenterY, &mut center.y, f64::MIN);
             length(ui, Label::RadiusX, radius_x, MIN_SIZE_MM);
             length(ui, Label::RadiusY, radius_y, MIN_SIZE_MM);
             angle(ui, rotation);
         }
-        Shape::RegularPolygon {
+        Shape::RegularPolygon(RegularPolygon {
             center,
             radius,
             sides,
             rotation,
-        } => {
+        }) => {
             length(ui, Label::CenterX, &mut center.x, f64::MIN);
             length(ui, Label::CenterY, &mut center.y, f64::MIN);
             length(ui, Label::Radius, radius, MIN_SIZE_MM);

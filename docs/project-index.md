@@ -53,7 +53,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/exports/mod.rs` | 187 | 1,200 | lib | `ExportError`, shared helpers, tests |
 | `src/exports/svg.rs` | 45 | 430 | lib | `to_svg` |
 | `src/exports/dxf.rs` | 25 | 200 | lib | `to_dxf` |
-| `src/shapes.rs` | 498 | 4,200 | lib | `Shape`: rings, handles, constructors from a drag |
+| `src/shapes/mod.rs` | 195 | 1,450 | lib | `Shape`: dispatch to the shape structs, constructors from a drag |
+| `src/shapes/rectangle.rs` | 113 | 800 | lib | `Rectangle` |
+| `src/shapes/ellipse.rs` | 123 | 900 | lib | `Ellipse`, `CIRCLE_SEGMENTS` |
+| `src/shapes/regular_polygon.rs` | 142 | 1,050 | lib | `RegularPolygon`, `REGULAR_POLYGON_SIDES` |
+| `src/shapes/polygon.rs` | 25 | 150 | lib | `Polygon` |
 | `src/i18n/en.rs` | 428 | 4,550 | lib | English catalog |
 | `src/history.rs` | 508 | 4,350 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
 | `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
@@ -79,9 +83,13 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 143-262 | `PatternPiece`: `bounds`, `child`, `child_index`, `next_child_id`, `translate`, `validate_shape`, `validate_ring`, `validate_shapes` |
 | | 265-353 | `Project`: `bounds`, `validate` (301), `next_piece_id`, `add_piece`, `remove_piece` |
 | | 355-476 | Tests |
-| `shapes.rs` | 6-56 | `CIRCLE_SEGMENTS`, `REGULAR_POLYGON_SIDES` (3..=64), `ROTATION_SNAP`, `Shape` (`Polygon`, `Rectangle`, `Ellipse`, `RegularPolygon`), `to_world`, `to_local` |
-| | 58-307 | `rectangle_from_corners`, `ellipse_from_center`, `regular_polygon_from_center`, `ring`, `bounds`, `contains`, `center`, `translate`, `handles`, `with_handle_at`, `has_valid_size` |
-| | 309-498 | Tests |
+| `shapes/mod.rs` | 1-40 | Re-exports, `Shape` enum (`Polygon`, `Rectangle`, `Ellipse`, `RegularPolygon` wrapping the structs of the same name), `to_world`, `to_local`, `positive` |
+| | 42-140 | `rectangle_from_corners`, `ellipse_from_center`, `regular_polygon_from_center`, `ring`, `bounds`, `contains`, `center`, `translate`, `handles`, `with_handle_at`, `has_valid_size` |
+| | 142-195 | `test_support` (`validate`, `assert_near`), tests |
+| `shapes/rectangle.rs` | 5-53 | `Rectangle`: `from_corners`, `ring`, `with_handle_at`, `has_valid_size`; tests from 55 |
+| `shapes/ellipse.rs` | 6-79 | `CIRCLE_SEGMENTS`, `Ellipse`: `from_center`, `ring`, `handles`, `with_handle_at`, `has_valid_size`; tests from 81 |
+| `shapes/regular_polygon.rs` | 7-73 | `REGULAR_POLYGON_SIDES` (3..=64), `ROTATION_SNAP`, `RegularPolygon`: `from_center`, `ring`, `with_handle_at`, `has_valid_size`; tests from 75 |
+| `shapes/polygon.rs` | 4-25 | `Polygon`: `translate`, `with_handle_at` |
 | `boolean.rs` | 11-53 | `ROUND_PRECISION_MM`, `Region`: `rings`, `vertices`, `hole_indices`, `bounds`, `contains` |
 | | 67-96 | `PatternPiece::region` |
 | | 98-221 | Tests |
@@ -198,7 +206,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add a canvas tool | `panels/tools/mod.rs`, `editor/canvas.rs` 38-93, 152-262 | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`; a new primitive also goes in `Shape` (`ring`, `handles`, `with_handle_at`, `has_valid_size`), `shape_label` and `shape_fields` |
 | Add a boolean operation | `model.rs` `BooleanOp`, `boolean.rs` `region` | A `BooleanOp` variant and its `ALL`, its `OverlayRule`, catalog arms, `op_color` and `paint_operation_icon` |
 | Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material` and `material_fields` |
-| Change the file format | `model.rs` 119-160, 265-278, `shapes.rs` 12-30, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
+| Change the file format | `model.rs` 119-160, 265-278, `shapes/mod.rs` 14-23 and the shape structs, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
 | Change the 3D look or mesh | `preview/mod.rs` 49-123, 159-261 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
 | Add a dockable panel | `panels/dock/mod.rs`, `editor/panel_viewer.rs` | A `PanelTab` variant, its `CLOSEABLE` and `label` entries, `default_state`, and arms in `PanelViewer::ui` and `scroll_bars` |
@@ -214,12 +222,12 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 63 tests, all inline in the library crate:
+There are 65 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
 | `model` | 6 |
-| `shapes` | 10 |
+| `shapes` | 12 |
 | `boolean` | 7 |
 | `material` | 3 |
 | `events` | 11 |

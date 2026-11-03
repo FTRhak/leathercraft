@@ -38,7 +38,7 @@ mod tests {
     use super::*;
     use crate::material::{LeatherColor, Material, Origin, Treatment};
     use crate::model::{BooleanOp, ChildShape, PatternPiece, Point, Project};
-    use crate::shapes::Shape;
+    use crate::shapes::{Ellipse, Polygon, Rectangle, Shape};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn temp_path(label: &str) -> std::path::PathBuf {
@@ -56,14 +56,14 @@ mod tests {
         PatternPiece::new(
             1,
             "Flap",
-            Shape::Polygon {
+            Shape::Polygon(Polygon {
                 points: vec![
                     Point::new(-2.0, 0.0),
                     Point::new(50.0, 0.0),
                     Point::new(50.0, 70.0),
                     Point::new(-2.0, 70.0),
                 ],
-            },
+            }),
         )
     }
 
@@ -88,22 +88,22 @@ mod tests {
             ChildShape {
                 id: 2,
                 op: BooleanOp::Subtract,
-                shape: Shape::Ellipse {
+                shape: Shape::Ellipse(Ellipse {
                     center: Point::new(20.0, 20.0),
                     radius_x: 5.0,
                     radius_y: 3.0,
                     rotation: 0.5,
-                },
+                }),
             },
             ChildShape {
                 id: 1,
                 op: BooleanOp::Union,
-                shape: Shape::Rectangle {
+                shape: Shape::Rectangle(Rectangle {
                     center: Point::new(50.0, 30.0),
                     width: 10.0,
                     height: 8.0,
                     rotation: 0.0,
-                },
+                }),
             },
             ChildShape {
                 id: 3,
