@@ -51,11 +51,21 @@ fn shape_label(shape: &Shape) -> Label {
     }
 }
 
-/// Selection of a piece and, optionally, one of its children.
+/// The selected pieces, and the child selected in the primary piece.
 pub struct Selection<'a> {
-    pub piece: &'a mut Option<u64>,
-    pub child: &'a mut Option<(u64, u64)>,
+    pub primary: Option<u64>,
+    pub pieces: &'a [u64],
+    pub child: Option<u64>,
 }
+
+/// A clicked row. With Shift, a piece is added to or removed from the selection.
+pub enum Pick {
+    Piece { id: u64, toggle: bool },
+    Child { id: u64, child: u64 },
+}
+
+/// What a row did: an edit to send, and a row to select.
+type RowResult = (Option<ProjectEvent>, Option<Pick>);
 
 /// Buttons right to left, then the op picker and the name, which takes the remaining width.
 fn child_row(
@@ -63,9 +73,9 @@ fn child_row(
     piece: &PatternPiece,
     index: usize,
     child: &ChildShape,
-    selection: &mut Selection,
+    selection: &Selection,
     language: Language,
-) -> Option<ProjectEvent> {
+) -> RowResult {
     let mut event = None;
     let (id, child_id) = (piece.id, child.id);
     ui.add_enabled_ui(!piece.locked, |ui| {
@@ -117,7 +127,7 @@ fn child_row(
             });
         }
     });
-    let selected = *selection.piece == Some(id) && *selection.child == Some((id, child_id));
+    let selected = selection.primary == Some(id) && selection.child == Some(child_id);
     let text = format!(
         "{}. {}",
         index + 1,
@@ -126,19 +136,19 @@ fn child_row(
     let row = egui::Button::selectable(selected, (text, egui::Atom::grow()))
         .truncate()
         .min_size(egui::vec2(ui.available_width(), 0.0));
-    if ui.add(row).clicked() {
-        *selection.piece = Some(id);
-        *selection.child = Some((id, child_id));
-    }
-    event
+    let pick = ui.add(row).clicked().then_some(Pick::Child {
+        id,
+        child: child_id,
+    });
+    (event, pick)
 }
 
 fn piece_row(
     ui: &mut egui::Ui,
     piece: &PatternPiece,
-    selection: &mut Selection,
+    selection: &Selection,
     language: Language,
-) -> Option<ProjectEvent> {
+) -> RowResult {
     let mut event = None;
     ui.add_enabled_ui(!piece.locked, |ui| {
         let name = language.label(Label::DeletePiece);
@@ -182,24 +192,26 @@ fn piece_row(
             locked: !piece.locked,
         });
     }
-    let selected = *selection.piece == Some(piece.id) && selection.child.is_none();
+    let child_shown = selection.primary == Some(piece.id) && selection.child.is_some();
+    let selected = selection.pieces.contains(&piece.id) && !child_shown;
     let row = egui::Button::selectable(selected, (piece.name.as_str(), egui::Atom::grow()))
         .truncate()
         .min_size(egui::vec2(ui.available_width(), 0.0));
-    if ui.add(row).clicked() {
-        *selection.piece = Some(piece.id);
-        *selection.child = None;
-    }
-    event
+    let pick = ui.add(row).clicked().then(|| Pick::Piece {
+        id: piece.id,
+        toggle: ui.input(|input| input.modifiers.shift),
+    });
+    (event, pick)
 }
 
 pub fn show_panel(
     ui: &mut egui::Ui,
     project: &Project,
-    mut selection: Selection,
+    selection: Selection,
     language: Language,
-) -> Option<ProjectEvent> {
+) -> RowResult {
     let mut event = None;
+    let mut pick = None;
     egui::ScrollArea::vertical().show(ui, |ui| {
         egui::CollapsingHeader::new(language.label(Label::Pieces))
             .id_salt("layout_pieces")
@@ -216,14 +228,16 @@ pub fn show_panel(
                             ui.allocate_ui_with_layout(
                                 egui::vec2(ui.available_width(), ICON_BUTTON_SIZE),
                                 egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| piece_row(ui, piece, &mut selection, language),
+                                |ui| piece_row(ui, piece, &selection, language),
                             )
                             .inner
                         })
                         .inner
                     });
                     state.store(ui.ctx());
-                    event = row.inner.or(event.take());
+                    let (row_event, row_pick) = row.inner;
+                    event = row_event.or(event.take());
+                    pick = row_pick.or(pick.take());
                     if !(has_children && state.is_open()) {
                         continue;
                     }
@@ -236,18 +250,18 @@ pub fn show_panel(
                                 ui.allocate_ui_with_layout(
                                     egui::vec2(ui.available_width(), ICON_BUTTON_SIZE),
                                     egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        child_row(ui, piece, index, child, &mut selection, language)
-                                    },
+                                    |ui| child_row(ui, piece, index, child, &selection, language),
                                 )
                                 .inner
                             })
                             .inner
                         });
-                        event = row.inner.or(event.take());
+                        let (row_event, row_pick) = row.inner;
+                        event = row_event.or(event.take());
+                        pick = row_pick.or(pick.take());
                     }
                 }
             });
     });
-    event
+    (event, pick)
 }

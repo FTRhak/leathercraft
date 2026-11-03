@@ -100,11 +100,19 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                 }
             }
             PanelTab::Layout => {
+                let state = &mut *self.state;
                 let selection = layout::Selection {
-                    piece: &mut self.state.selected,
-                    child: &mut self.state.selected_child,
+                    primary: state.selected,
+                    pieces: &state.pieces,
+                    child: state.selected_child_id(),
                 };
-                let event = layout::show_panel(ui, self.project, selection, language);
+                let (event, pick) = layout::show_panel(ui, self.project, selection, language);
+                match pick {
+                    Some(layout::Pick::Piece { id, toggle: true }) => state.toggle_piece(id),
+                    Some(layout::Pick::Piece { id, toggle: false }) => state.select(Some(id), None),
+                    Some(layout::Pick::Child { id, child }) => state.select(Some(id), Some(child)),
+                    None => {}
+                }
                 if let Some(event) = event {
                     send(self.events, event);
                 }

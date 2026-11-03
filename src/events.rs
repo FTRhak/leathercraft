@@ -36,6 +36,12 @@ pub enum ProjectEvent {
         dx: f64,
         dy: f64,
     },
+    /// Moves several pieces by the same offset, as one edit.
+    MovePieces {
+        ids: Vec<u64>,
+        dx: f64,
+        dy: f64,
+    },
     SetPieceLocked {
         id: u64,
         locked: bool,
@@ -46,6 +52,10 @@ pub enum ProjectEvent {
     },
     RemovePiece {
         id: u64,
+    },
+    /// Removes several pieces as one edit.
+    RemovePieces {
+        ids: Vec<u64>,
     },
     AddChild {
         id: u64,
@@ -83,6 +93,7 @@ pub enum ProjectChange {
     Edited,
     PieceAdded(u64),
     PieceRemoved(u64),
+    PiecesRemoved,
     ChildAdded { id: u64, child: u64 },
     ChildRemoved { id: u64 },
 }
@@ -135,6 +146,18 @@ impl Project {
                 project.unlocked_piece_mut(id)?.translate(dx, dy);
                 Ok(ProjectChange::Edited)
             }),
+            // Each id is checked first, so a repeated id still moves its piece only once.
+            ProjectEvent::MovePieces { ids, dx, dy } => self.edit(|project| {
+                for id in &ids {
+                    project.unlocked_piece_mut(*id)?;
+                }
+                for piece in &mut project.pieces {
+                    if ids.contains(&piece.id) {
+                        piece.translate(dx, dy);
+                    }
+                }
+                Ok(ProjectChange::Edited)
+            }),
             ProjectEvent::SetPieceLocked { id, locked } => self.edit(|project| {
                 project.piece_mut(id)?.locked = locked;
                 Ok(ProjectChange::Edited)
@@ -147,6 +170,15 @@ impl Project {
                 project.unlocked_piece_mut(id)?;
                 project.remove_piece(id);
                 Ok(ProjectChange::PieceRemoved(id))
+            }),
+            ProjectEvent::RemovePieces { ids } => self.edit(|project| {
+                for id in &ids {
+                    project.unlocked_piece_mut(*id)?;
+                }
+                for id in &ids {
+                    project.remove_piece(*id);
+                }
+                Ok(ProjectChange::PiecesRemoved)
             }),
             ProjectEvent::AddChild { id, op, shape } => self.edit(|project| {
                 let piece = project.unlocked_piece_mut(id)?;
@@ -438,6 +470,71 @@ mod tests {
         let piece = &project.pieces[0];
         assert_eq!(piece.base.ring()[0], Point::new(5.0, -2.0));
         assert_eq!(piece.children[0].shape.center(), Point::new(7.0, 0.0));
+    }
+
+    fn project_with_three_pieces() -> Project {
+        let mut project = Project::default();
+        for _ in 0..3 {
+            project.apply(add_piece()).unwrap();
+        }
+        project
+    }
+
+    #[test]
+    fn group_edits_reach_every_named_piece_once() {
+        let mut project = project_with_three_pieces();
+        project
+            .apply(ProjectEvent::MovePieces {
+                ids: vec![1, 3, 3],
+                dx: 5.0,
+                dy: 0.0,
+            })
+            .unwrap();
+        let first_points: Vec<Point> = project
+            .pieces
+            .iter()
+            .map(|piece| piece.base.ring()[0])
+            .collect();
+        assert_eq!(
+            first_points,
+            [
+                Point::new(5.0, 0.0),
+                Point::new(0.0, 0.0),
+                Point::new(5.0, 0.0)
+            ]
+        );
+        assert_eq!(
+            project.apply(ProjectEvent::RemovePieces { ids: vec![1, 3] }),
+            Ok(ProjectChange::PiecesRemoved)
+        );
+        let ids: Vec<u64> = project.pieces.iter().map(|piece| piece.id).collect();
+        assert_eq!(ids, [2]);
+    }
+
+    #[test]
+    fn group_edits_with_a_locked_or_missing_piece_change_nothing() {
+        let mut project = project_with_three_pieces();
+        project
+            .apply(ProjectEvent::SetPieceLocked {
+                id: 2,
+                locked: true,
+            })
+            .unwrap();
+        let before = project.clone();
+        assert!(
+            project
+                .apply(ProjectEvent::MovePieces {
+                    ids: vec![1, 2],
+                    dx: 5.0,
+                    dy: 0.0,
+                })
+                .is_err()
+        );
+        assert_eq!(
+            project.apply(ProjectEvent::RemovePieces { ids: vec![1, 9] }),
+            Err(Message::PieceNotFound { id: 9 })
+        );
+        assert_eq!(project, before);
     }
 
     #[test]

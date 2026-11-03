@@ -61,7 +61,7 @@ pub(super) fn label(label: Label) -> &'static str {
             "Click an edge of a polygon to select it, then set its length in Properties. Drag a vertex to move it. Esc clears."
         }
         Label::SelectHint => {
-            "Drag a piece or a vertex of the selected piece. Del removes the selected piece."
+            "Drag a piece or a vertex of the selected piece. Shift+click adds or removes a piece, Ctrl+A selects all. Del removes the selected pieces."
         }
         Label::NavigationHint => "Right or middle drag pans; scroll zooms.",
         Label::SnapMillimeters => "Snap (mm)",
@@ -81,6 +81,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::History => "History",
         Label::Undo => "Undo",
         Label::Redo => "Redo",
+        Label::SelectAll => "Select all",
         Label::NoPieceSelected => "No piece selected",
         Label::Camera => "Camera",
         Label::Orbit => "Orbit",
@@ -341,6 +342,7 @@ pub(super) fn message(message: &Message) -> String {
         Message::Exported { path } => format!("Exported {path}."),
         Message::PieceAdded { name } => format!("Added {name}."),
         Message::PieceDeleted => "Piece deleted.".to_owned(),
+        Message::PiecesDeleted { count } => format!("{count} pieces deleted."),
         Message::PointCount { count: 1 } => "1 point".to_owned(),
         Message::PointCount { count } => format!("{count} points"),
         Message::SelectedEdge { number } => format!("Edge {number}"),
@@ -403,10 +405,12 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionRenamePiece { name } => format!("Renamed to '{name}'"),
         Message::ActionEditBase { name } => format!("Changed the base of '{name}'"),
         Message::ActionMovePiece { name } => format!("Moved '{name}'"),
+        Message::ActionMovePieces { count } => format!("Moved {count} pieces"),
         Message::ActionLockPiece { name } => format!("Locked '{name}'"),
         Message::ActionUnlockPiece { name } => format!("Unlocked '{name}'"),
         Message::ActionMaterial { name } => format!("Changed the material of '{name}'"),
         Message::ActionRemovePiece { name } => format!("Deleted '{name}'"),
+        Message::ActionRemovePieces { count } => format!("Deleted {count} pieces"),
         Message::ActionAddChild { name } => format!("Added a shape to '{name}'"),
         Message::ActionEditChild { name } => format!("Changed a shape of '{name}'"),
         Message::ActionSetChildOp { name } => format!("Changed an operation of '{name}'"),

@@ -40,6 +40,8 @@ pub(super) enum DragTarget {
 pub(super) struct DragState {
     pub(super) piece_id: u64,
     pub(super) target: DragTarget,
+    /// Other pieces moved by a whole-piece drag.
+    pub(super) group: Vec<u64>,
     pub(super) start: Point,
     /// The snapped offset of a whole-piece drag.
     pub(super) offset: (f64, f64),

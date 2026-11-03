@@ -19,7 +19,11 @@ pub struct EditorState {
     /// With an operation, the drawing tools add a child with it to the selected piece instead
     /// of adding a piece.
     pub(super) op_mode: Option<BooleanOp>,
+    /// The primary selected piece: the one shown in Properties and reshaped with handles.
     pub(super) selected: Option<u64>,
+    /// Every selected piece, in the order selected. It contains `selected` whenever that is set,
+    /// and has more than one piece only through Shift+click or Ctrl+A.
+    pub(super) pieces: Vec<u64>,
     /// Piece id and child id. Read through `selected_child_id`, since it only counts
     /// while that piece is the selected one.
     pub(super) selected_child: Option<(u64, u64)>,
@@ -51,6 +55,7 @@ impl Default for EditorState {
             polygon_sides: 6,
             op_mode: None,
             selected: None,
+            pieces: Vec::new(),
             selected_child: None,
             selected_edge: None,
             drag: None,
@@ -103,6 +108,7 @@ impl EditorState {
         self.draft.clear();
         self.shape_draft = None;
         self.selected = None;
+        self.pieces.clear();
         self.selected_child = None;
         self.selected_edge = None;
         self.drag = None;
@@ -128,7 +134,7 @@ impl EditorState {
             ProjectChange::Edited => {}
             ProjectChange::PieceAdded(id) => {
                 self.draft.clear();
-                self.selected = Some(id);
+                self.select(Some(id), None);
                 self.tool = Tool::Select;
                 if let Some(piece) = project.pieces.iter().find(|piece| piece.id == id) {
                     self.report(Message::PieceAdded {
@@ -137,8 +143,9 @@ impl EditorState {
                 }
             }
             ProjectChange::PieceRemoved(id) => {
+                self.pieces.retain(|piece| *piece != id);
                 if self.selected == Some(id) {
-                    self.selected = None;
+                    self.selected = self.pieces.last().copied();
                 }
                 // The id can be given to the next new piece.
                 self.selected_child = None;
@@ -148,11 +155,23 @@ impl EditorState {
                 }
                 self.report(Message::PieceDeleted);
             }
+            ProjectChange::PiecesRemoved => {
+                let count = self.pieces.len();
+                self.prune_selection(project);
+                let count = count - self.pieces.len();
+                self.selected_child = None;
+                self.selected_edge = None;
+                if self.drag.as_ref().is_some_and(|drag| {
+                    !project.pieces.iter().any(|piece| piece.id == drag.piece_id)
+                }) {
+                    self.drag = None;
+                }
+                self.report(Message::PiecesDeleted { count });
+            }
             // The tool and operation stay, so that several shapes can be added in a row.
             ProjectChange::ChildAdded { id, child } => {
                 self.draft.clear();
-                self.selected = Some(id);
-                self.selected_child = Some((id, child));
+                self.select(Some(id), Some(child));
                 if let Some(piece) = project.pieces.iter().find(|piece| piece.id == id) {
                     self.report(Message::ChildAdded {
                         name: piece.name.clone(),
@@ -176,12 +195,7 @@ impl EditorState {
         self.shape_draft = None;
         self.drag = None;
         self.rename_buffer = None;
-        if self
-            .selected
-            .is_some_and(|id| !project.pieces.iter().any(|piece| piece.id == id))
-        {
-            self.selected = None;
-        }
+        self.prune_selection(project);
         let child_exists = |(id, child): (u64, u64)| {
             project
                 .pieces
@@ -202,8 +216,53 @@ impl EditorState {
 
     pub(super) fn select(&mut self, piece: Option<u64>, child: Option<u64>) {
         self.selected = piece;
+        self.pieces = piece.into_iter().collect();
         self.selected_child = piece.zip(child);
         self.selected_edge = None;
+    }
+
+    pub(super) fn is_selected(&self, piece: u64) -> bool {
+        self.pieces.contains(&piece)
+    }
+
+    /// Adds the piece to the selection as its primary piece, or removes it, after which the
+    /// piece selected before it becomes primary.
+    pub(super) fn toggle_piece(&mut self, piece: u64) {
+        if self.is_selected(piece) {
+            self.pieces.retain(|selected| *selected != piece);
+            if self.selected == Some(piece) {
+                self.selected = self.pieces.last().copied();
+            }
+        } else {
+            self.pieces.push(piece);
+            self.selected = Some(piece);
+        }
+        self.selected_child = None;
+        self.selected_edge = None;
+    }
+
+    /// Makes an already selected piece the primary one, keeping the rest of the selection.
+    pub(super) fn focus(&mut self, piece: u64) {
+        self.selected = Some(piece);
+        self.selected_child = None;
+        self.selected_edge = None;
+    }
+
+    /// The primary piece stays if there is one.
+    pub(super) fn select_all(&mut self, project: &Project) {
+        self.pieces = project.pieces.iter().map(|piece| piece.id).collect();
+        if self.selected.is_none() {
+            self.selected = self.pieces.last().copied();
+        }
+    }
+
+    /// Drops pieces that no longer exist, and picks a new primary piece if it was one of them.
+    fn prune_selection(&mut self, project: &Project) {
+        let exists = |id: u64| project.pieces.iter().any(|piece| piece.id == id);
+        self.pieces.retain(|id| exists(*id));
+        if self.selected.is_some_and(|id| !exists(id)) {
+            self.selected = self.pieces.last().copied();
+        }
     }
 
     /// Selects the edge along with its piece, and its child if it belongs to one.
@@ -236,6 +295,11 @@ impl EditorState {
     pub(super) fn displayed<'a>(&self, piece: &'a PatternPiece) -> Cow<'a, PatternPiece> {
         match &self.drag {
             Some(drag) if drag.piece_id == piece.id => Cow::Owned(drag.current.clone()),
+            Some(drag) if drag.group.contains(&piece.id) => {
+                let mut moved = piece.clone();
+                moved.translate(drag.offset.0, drag.offset.1);
+                Cow::Owned(moved)
+            }
             _ => Cow::Borrowed(piece),
         }
     }

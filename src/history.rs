@@ -182,6 +182,9 @@ impl History {
             ProjectEvent::MovePiece { id, .. } => {
                 (Message::ActionMovePiece { name: name(*id) }, None)
             }
+            ProjectEvent::MovePieces { ids, .. } => {
+                (Message::ActionMovePieces { count: ids.len() }, None)
+            }
             ProjectEvent::SetPieceLocked { id, locked: true } => {
                 (Message::ActionLockPiece { name: name(*id) }, None)
             }
@@ -194,6 +197,9 @@ impl History {
             ),
             ProjectEvent::RemovePiece { id } => {
                 (Message::ActionRemovePiece { name: name(*id) }, None)
+            }
+            ProjectEvent::RemovePieces { ids } => {
+                (Message::ActionRemovePieces { count: ids.len() }, None)
             }
             ProjectEvent::AddChild { id, .. } => {
                 (Message::ActionAddChild { name: name(*id) }, None)
@@ -443,6 +449,38 @@ mod tests {
                 name: "Flap".to_owned()
             })
         );
+    }
+
+    #[test]
+    fn a_group_edit_is_one_entry_counting_its_pieces() {
+        let mut project = Project::default();
+        let mut history = History::default();
+        run(&mut project, &mut history, add_piece("Flap"));
+        run(&mut project, &mut history, add_piece("Strap"));
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::MovePieces {
+                ids: vec![1, 2],
+                dx: 1.0,
+                dy: 1.0,
+            },
+        );
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::RemovePieces { ids: vec![1, 2] },
+        );
+        let actions: Vec<&Message> = history.actions().skip(3).collect();
+        assert_eq!(
+            actions,
+            [
+                &Message::ActionMovePieces { count: 2 },
+                &Message::ActionRemovePieces { count: 2 }
+            ]
+        );
+        history.apply(HistoryCommand::Undo, &mut project);
+        assert_eq!(project.pieces.len(), 2);
     }
 
     #[test]

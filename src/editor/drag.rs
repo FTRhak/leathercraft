@@ -21,8 +21,11 @@ fn target_on_selected(
     child_at(piece, start).map(DragTarget::Child)
 }
 
+/// Grabbing a whole piece that is selected moves the whole selection; with Shift, an
+/// unselected piece is added to it first.
 pub(super) fn begin_drag(
     origin: egui::Pos2,
+    shift: bool,
     view: Viewport,
     project: &Project,
     state: &mut EditorState,
@@ -50,13 +53,28 @@ pub(super) fn begin_drag(
         }
         _ => None,
     };
-    state.select(Some(piece_id), child);
+    match target {
+        Some(_) => state.select(Some(piece_id), child),
+        None if state.is_selected(piece_id) => state.focus(piece_id),
+        None if shift => state.toggle_piece(piece_id),
+        None => state.select(Some(piece_id), None),
+    }
     if piece.locked {
         return;
     }
+    let group = match target {
+        Some(_) => Vec::new(),
+        None => project
+            .pieces
+            .iter()
+            .filter(|other| other.id != piece_id && !other.locked && state.is_selected(other.id))
+            .map(|other| other.id)
+            .collect(),
+    };
     state.drag = Some(DragState {
         piece_id,
         target: target.unwrap_or(DragTarget::Piece),
+        group,
         start,
         offset: (0.0, 0.0),
         original: piece.clone(),
@@ -88,6 +106,7 @@ pub(super) fn begin_handle_drag(
     state.drag = Some(DragState {
         piece_id: piece.id,
         target: DragTarget::Handle(shape, handle),
+        group: Vec::new(),
         start: view.to_world(origin),
         offset: (0.0, 0.0),
         original: piece.clone(),
@@ -135,7 +154,13 @@ pub(super) fn finish_drag(events: &mut MessageWriter<ProjectMessage>, state: &mu
     let shape = match drag.target {
         DragTarget::Piece => {
             let (dx, dy) = drag.offset;
-            send(events, ProjectEvent::MovePiece { id, dx, dy });
+            let event = if drag.group.is_empty() {
+                ProjectEvent::MovePiece { id, dx, dy }
+            } else {
+                let ids = [id].into_iter().chain(drag.group.iter().copied()).collect();
+                ProjectEvent::MovePieces { ids, dx, dy }
+            };
+            send(events, event);
             return;
         }
         DragTarget::Child(child) => ShapeRef::Child(child),

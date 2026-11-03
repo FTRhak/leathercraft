@@ -26,20 +26,20 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
 | `src/editor/mod.rs` | 78 | 550 | bin | `ViewMode`, `send`, `export`, `format_length` |
-| `src/editor/editor_state_struct.rs` | 249 | 2,100 | bin | `EditorState` and its methods, `document_name` |
-| `src/editor/drag_state_struct.rs` | 51 | 400 | bin | `ShapeRef`, `DragTarget`, `DragState` |
+| `src/editor/editor_state_struct.rs` | 313 | 2,650 | bin | `EditorState` and its methods (primary piece plus multi-selection), `document_name` |
+| `src/editor/drag_state_struct.rs` | 53 | 420 | bin | `ShapeRef`, `DragTarget`, `DragState` (with the `group` moved along) |
 | `src/editor/shape_draft_struct.rs` | 9 | 60 | bin | `ShapeDraft` |
-| `src/editor/canvas.rs` | 728 | 6,100 | bin | `canvas`, `Viewport`, tool behavior, hit testing (pieces, children, handles, polygon edges), painting |
+| `src/editor/canvas.rs` | 736 | 6,150 | bin | `canvas`, `Viewport`, tool behavior (Shift+click toggles a piece), hit testing (pieces, children, handles, polygon edges), painting |
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
-| `src/editor/drag.rs` | 156 | 1,250 | bin | `begin_drag`, `begin_handle_drag`, `update_drag`, `finish_drag`: dragging pieces, children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
+| `src/editor/drag.rs` | 181 | 1,450 | bin | `begin_drag`, `begin_handle_drag`, `update_drag`, `finish_drag`: dragging pieces (the whole selection when a selected piece is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
-| `src/editor/ui.rs` | 286 | 2,650 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete key, language picker |
+| `src/editor/ui.rs` | 328 | 3,000 | bin | `editor_ui`, `file_menu`, `edit_menu`, `window_menu`, `handle_delete_key`, `handle_select_all_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete and Ctrl+A keys, language picker |
 | `src/editor/panel_viewer.rs` | 139 | 1,150 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History tab title has an icon |
 | `src/icons/mod.rs` | 87 | 760 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
 | `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
 | `src/panels/tools/mod.rs` | 242 | 2,100 | bin | `Tool`, painted tool and operation icons, Tools panel with the regular polygon's sides field |
-| `src/panels/layout/mod.rs` | 252 | 2,600 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls |
+| `src/panels/layout/mod.rs` | 267 | 2,750 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls; Shift+click toggles a piece |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
 | `src/panels/properties/mod.rs` | 256 | 2,000 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, selected edge's length, To Polygon button |
@@ -47,7 +47,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/model.rs` | 476 | 3,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation |
 | `src/boolean.rs` | 221 | 1,900 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes |
 | `src/material.rs` | 462 | 2,800 | lib | `Material` and the scales of its properties |
-| `src/events.rs` | 631 | 4,850 | lib | `ProjectEvent`, `ProjectChange`, `Project::apply` |
+| `src/events.rs` | 729 | 5,600 | lib | `ProjectEvent` (including the group `MovePieces`, `RemovePieces`), `ProjectChange`, `Project::apply` |
 | `src/i18n/uk.rs` | 466 | 5,900 | lib | Ukrainian catalog, `plural` helper |
 | `src/i18n/mod.rs` | 284 | 2,000 | lib | `Language`, `Label`, `Message` |
 | `src/exports/mod.rs` | 187 | 1,200 | lib | `ExportError`, shared helpers, tests |
@@ -59,7 +59,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/shapes/regular_polygon.rs` | 142 | 1,050 | lib | `RegularPolygon`, `REGULAR_POLYGON_SIDES` |
 | `src/shapes/polygon.rs` | 98 | 750 | lib | `Polygon`, its edges and their lengths |
 | `src/i18n/en.rs` | 435 | 4,550 | lib | English catalog |
-| `src/history.rs` | 508 | 4,350 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
+| `src/history.rs` | 546 | 4,650 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
 | `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings.rs` | 71 | 500 | bin | Saved language and panel layout in the OS config directory |
 | `src/document.rs` | 64 | 500 | bin | `ActiveProject` (project and history), `ProjectMessage`, `HistoryMessage`, `apply_project_events` |
@@ -127,9 +127,9 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 12-40 | Type | `EditorState`, with `op_mode`, `selected_child` and `selected_edge` |
+| 12-48 | Type | `EditorState`, with `op_mode`, `selected` (primary piece), `pieces` (every selected piece), `selected_child` and `selected_edge` |
 | 39-62 | Defaults | `Default` impl |
-| 67-242 | Methods | `new`, `report`, `report_error`, `snap`, `snap_point`, `reset_document`, `on_project_change`, `on_history_restore`, `selected_child_id`, `select`, `select_edge`, `selected_edge` (only while its shape is the one shown in Properties), `clear_released_drag`, `displayed` |
+| 67-242 | Methods | `new`, `report`, `report_error`, `snap`, `snap_point`, `reset_document`, `on_project_change`, `on_history_restore`, `selected_child_id`, `select`, `is_selected`, `toggle_piece`, `focus`, `select_all`, `prune_selection`, `select_edge`, `selected_edge` (only while its shape is the one shown in Properties), `clear_released_drag`, `displayed` |
 | 211-216 | Helpers | `document_name` |
 
 ### `editor/canvas.rs`
@@ -150,7 +150,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 |---:|---|---|
 | 18-119 | Top-level layout | `editor_ui`, which also shows the dock area and the new-project dialog |
 | Search by name | Menus | `file_menu`, `edit_menu`, `window_menu` |
-| Search by name | Input | `handle_delete_key`, `handle_history_keys` and the `UNDO`/`REDO` shortcuts |
+| Search by name | Input | `handle_delete_key` (several pieces go as `RemovePieces`, locked ones stay), `handle_select_all_key`, `handle_history_keys` and the `UNDO`/`REDO`/`SELECT_ALL` shortcuts |
 | 192-206 | Language | `language_control` |
 | 208-219 | File dialog | `project_dialog`, `save_as` |
 
@@ -169,10 +169,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `layout/mod.rs` | 9-10 | Constants |
 | | 14 | `expand_toggle`: expands or collapses a piece's children |
 | | 31-52 | `paint_trash` (icon font), `paint_arrow`, `shape_label`; the lock button uses the font's lock and unlock glyphs |
-| | 54 | `Selection` |
+| | 54 | `Selection` (read-only), `Pick` (the clicked row, returned to `PanelViewer`) |
 | | 60 | `child_row`: delete, reorder, operation picker, select |
 | | 135 | `piece_row` |
-| | 195 | `show_panel`, which returns the `ProjectEvent` to send |
+| | 195 | `show_panel`, which returns the `ProjectEvent` to send and the `Pick` |
 | `history/mod.rs` | 6 | `show_panel`, which returns the `HistoryCommand` to send |
 | `material/mod.rs` | 15-103 | `DialogResult`, `combo`, `swatch`, `color_combo`, `thickness_row` |
 | | 105 | `material_fields`, shared by the dialog and the Material panel |
@@ -222,7 +222,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 69 tests, all inline in the library crate:
+There are 72 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
@@ -230,8 +230,8 @@ There are 69 tests, all inline in the library crate:
 | `shapes` | 16 |
 | `boolean` | 7 |
 | `material` | 3 |
-| `events` | 11 |
-| `history` | 10 |
+| `events` | 13 |
+| `history` | 11 |
 | `i18n` | 5 |
 | `exports` | 7 |
 | `persistence` | 4 |

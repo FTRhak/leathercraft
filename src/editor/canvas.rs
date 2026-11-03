@@ -122,7 +122,8 @@ fn handle_select(
     if response.drag_started_by(egui::PointerButton::Primary) {
         // The drag only registers past a movement threshold, so hit test where it was pressed.
         if let Some(origin) = ui.input(|input| input.pointer.press_origin()) {
-            begin_drag(origin, view, project, state);
+            let shift = ui.input(|input| input.modifiers.shift);
+            begin_drag(origin, shift, view, project, state);
         }
     }
     if response.dragged_by(egui::PointerButton::Primary)
@@ -136,7 +137,14 @@ fn handle_select(
     if response.clicked()
         && let Some(position) = response.interact_pointer_pos()
     {
-        select_at(project, view.to_world(position), state);
+        let point = view.to_world(position);
+        if ui.input(|input| input.modifiers.shift) {
+            if let Some(piece) = piece_at(project, point) {
+                state.toggle_piece(piece);
+            }
+        } else {
+            select_at(project, point, state);
+        }
     }
 }
 
@@ -456,7 +464,7 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
     for piece in &project.pieces {
         let piece = state.displayed(piece);
         let selected = state.selected == Some(piece.id);
-        let stroke = if selected {
+        let stroke = if state.is_selected(piece.id) {
             egui::Stroke::new(2.5, egui::Color32::from_rgb(240, 160, 70))
         } else {
             egui::Stroke::new(1.5, egui::Color32::from_rgb(190, 190, 200))

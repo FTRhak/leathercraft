@@ -61,7 +61,7 @@ pub(super) fn label(label: Label) -> &'static str {
             "Клацніть грань полігона, щоб вибрати її, і задайте довжину на панелі властивостей. Перетягуйте вершину, щоб перемістити її. Esc знімає вибір."
         }
         Label::SelectHint => {
-            "Перетягуйте деталь або вершину вибраної деталі. Del видаляє вибрану деталь."
+            "Перетягуйте деталь або вершину вибраної деталі. Shift+клік додає або прибирає деталь, Ctrl+A вибирає всі. Del видаляє вибрані деталі."
         }
         Label::NavigationHint => {
             "Перетягування правою або середньою кнопкою зсуває вигляд; коліщатко змінює масштаб."
@@ -83,6 +83,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::History => "Історія",
         Label::Undo => "Скасувати",
         Label::Redo => "Повторити",
+        Label::SelectAll => "Вибрати все",
         Label::NoPieceSelected => "Деталь не вибрано",
         Label::Camera => "Камера",
         Label::Orbit => "Оберт",
@@ -343,6 +344,10 @@ pub(super) fn message(message: &Message) -> String {
         Message::Exported { path } => format!("Експортовано {path}."),
         Message::PieceAdded { name } => format!("Додано: {name}."),
         Message::PieceDeleted => "Деталь видалено.".to_owned(),
+        Message::PiecesDeleted { count } => {
+            let noun = plural(*count, "деталь", "деталі", "деталей");
+            format!("Видалено {count} {noun}.")
+        }
         Message::PointCount { count } => {
             let noun = plural(*count, "точка", "точки", "точок");
             format!("{count} {noun}")
@@ -421,10 +426,18 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionRenamePiece { name } => format!("Перейменовано на «{name}»"),
         Message::ActionEditBase { name } => format!("Змінено основу «{name}»"),
         Message::ActionMovePiece { name } => format!("Переміщено «{name}»"),
+        Message::ActionMovePieces { count } => {
+            let noun = plural(*count, "деталь", "деталі", "деталей");
+            format!("Переміщено {count} {noun}")
+        }
         Message::ActionLockPiece { name } => format!("Заблоковано «{name}»"),
         Message::ActionUnlockPiece { name } => format!("Розблоковано «{name}»"),
         Message::ActionMaterial { name } => format!("Змінено матеріал «{name}»"),
         Message::ActionRemovePiece { name } => format!("Видалено «{name}»"),
+        Message::ActionRemovePieces { count } => {
+            let noun = plural(*count, "деталь", "деталі", "деталей");
+            format!("Видалено {count} {noun}")
+        }
         Message::ActionAddChild { name } => format!("Додано фігуру в «{name}»"),
         Message::ActionEditChild { name } => format!("Змінено фігуру «{name}»"),
         Message::ActionSetChildOp { name } => format!("Змінено операцію «{name}»"),

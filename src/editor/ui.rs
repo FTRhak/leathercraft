@@ -42,7 +42,7 @@ pub fn editor_ui(
             });
             ui.menu_button(language.label(Label::View), |_| {});
             ui.menu_button(language.label(Label::Edit), |ui| {
-                edit_menu(ui, history, &mut history_events, language);
+                edit_menu(ui, project, history, &mut history_events, state);
             });
             // Stays open on a click, so that the toggled state can be seen.
             egui::containers::menu::MenuButton::new(language.label(Label::Window))
@@ -89,7 +89,8 @@ pub fn editor_ui(
         });
     });
 
-    handle_delete_key(ctx, &mut events, state);
+    handle_delete_key(ctx, project, &mut events, state);
+    handle_select_all_key(ctx, project, state);
     handle_history_keys(ctx, &mut history_events, state);
 
     // The canvas sets this again if its tab is showing.
@@ -174,13 +175,17 @@ const REDO: egui::KeyboardShortcut = egui::KeyboardShortcut::new(
 );
 const REDO_ALT: egui::KeyboardShortcut =
     egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Y);
+const SELECT_ALL: egui::KeyboardShortcut =
+    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::A);
 
 fn edit_menu(
     ui: &mut egui::Ui,
+    project: &Project,
     history: &History,
     events: &mut MessageWriter<HistoryMessage>,
-    language: Language,
+    state: &mut EditorState,
 ) {
+    let language = state.language;
     let items = [
         (Label::Undo, UNDO, history.can_undo(), HistoryCommand::Undo),
         (Label::Redo, REDO, history.can_redo(), HistoryCommand::Redo),
@@ -191,6 +196,12 @@ fn edit_menu(
         if ui.add_enabled(enabled, button).clicked() {
             events.write(HistoryMessage(command));
         }
+    }
+    ui.separator();
+    let button = egui::Button::new(language.label(Label::SelectAll))
+        .shortcut_text(ui.ctx().format_shortcut(&SELECT_ALL));
+    if ui.add_enabled(!project.pieces.is_empty(), button).clicked() {
+        state.select_all(project);
     }
 }
 
@@ -236,8 +247,10 @@ fn window_menu(ui: &mut egui::Ui, state: &EditorState, dock: &mut PanelDock) {
     }
 }
 
+/// With several pieces selected, the locked ones stay.
 fn handle_delete_key(
     ctx: &egui::Context,
+    project: &Project,
     events: &mut MessageWriter<ProjectMessage>,
     state: &EditorState,
 ) {
@@ -248,12 +261,40 @@ fn handle_delete_key(
     let delete_pressed = ctx.input(|input| {
         input.key_pressed(egui::Key::Delete) || input.key_pressed(egui::Key::Backspace)
     });
-    if delete_pressed && let Some(id) = state.selected {
+    if !delete_pressed {
+        return;
+    }
+    if state.pieces.len() > 1 {
+        let mut ids: Vec<u64> = project
+            .pieces
+            .iter()
+            .filter(|piece| !piece.locked && state.is_selected(piece.id))
+            .map(|piece| piece.id)
+            .collect();
+        let event = match ids.len() {
+            0 => return,
+            1 => ProjectEvent::RemovePiece { id: ids.remove(0) },
+            _ => ProjectEvent::RemovePieces { ids },
+        };
+        send(events, event);
+        return;
+    }
+    if let Some(id) = state.selected {
         let event = match state.selected_child_id() {
             Some(child) => ProjectEvent::RemoveChild { id, child },
             None => ProjectEvent::RemovePiece { id },
         };
         send(events, event);
+    }
+}
+
+fn handle_select_all_key(ctx: &egui::Context, project: &Project, state: &mut EditorState) {
+    let drafting = !state.draft.is_empty() || state.shape_draft.is_some();
+    if drafting || state.new_project_dialog.is_some() || ctx.wants_keyboard_input() {
+        return;
+    }
+    if ctx.input_mut(|input| input.consume_shortcut(&SELECT_ALL)) {
+        state.select_all(project);
     }
 }
 
