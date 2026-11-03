@@ -1,0 +1,7 @@
+[target.x86_64-pc-windows-msvc]
+# rust-lld ships with the toolchain and links much faster than link.exe.
+linker = "rust-lld.exe"
+
+[alias]
+# Self-contained release build: Bevy linked statically, no extra DLLs to ship.
+release = "build --release --no-default-features --features desktop"

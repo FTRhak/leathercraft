@@ -90,10 +90,12 @@ pub enum Label {
     Rectangle,
     Ellipse,
     Polygon,
+    RegularPolygon,
     DrawHint,
     SelectHint,
     RectangleHint,
     EllipseHint,
+    RegularPolygonHint,
     /// Drawing tools create a new piece.
     NewPieceMode,
     /// Drawing tools add a child with this operation to the selected piece.
@@ -106,6 +108,8 @@ pub enum Label {
     Height,
     RadiusX,
     RadiusY,
+    Radius,
+    Sides,
     Rotation,
     MoveUp,
     MoveDown,

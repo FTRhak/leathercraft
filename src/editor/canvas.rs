@@ -80,7 +80,7 @@ pub(super) fn canvas(
     match state.tool {
         Tool::Select => handle_select(ui, &response, view, project, events, state),
         Tool::Draw => handle_draw(ui, &response, view, project, events, state),
-        Tool::Rectangle | Tool::Ellipse => {
+        Tool::Rectangle | Tool::Ellipse | Tool::RegularPolygon => {
             handle_shape(ui, &response, view, project, events, state);
         }
     }
@@ -217,7 +217,7 @@ fn handle_shape(
     events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
 ) {
-    let circle = ui.input(|input| input.modifiers.shift);
+    let constrained = ui.input(|input| input.modifiers.shift);
     if response.drag_started_by(egui::PointerButton::Primary)
         && let Some(origin) = ui.input(|input| input.pointer.press_origin())
     {
@@ -225,7 +225,7 @@ fn handle_shape(
         state.shape_draft = Some(ShapeDraft {
             start,
             end: start,
-            circle,
+            constrained,
         });
     }
     if response.dragged_by(egui::PointerButton::Primary)
@@ -234,12 +234,17 @@ fn handle_shape(
         let end = state.snap_point(view.to_world(position));
         if let Some(draft) = &mut state.shape_draft {
             draft.end = end;
-            draft.circle = circle;
+            draft.constrained = constrained;
         }
     }
     if response.drag_stopped_by(egui::PointerButton::Primary)
         && let Some(draft) = state.shape_draft.take()
-        && let Some(shape) = state.tool.shape(draft.start, draft.end, draft.circle)
+        && let Some(shape) = state.tool.shape(
+            draft.start,
+            draft.end,
+            draft.constrained,
+            state.polygon_sides,
+        )
     {
         commit_shape(project, events, state, shape);
     }
@@ -539,7 +544,12 @@ fn draw_shape_draft(painter: &egui::Painter, view: Viewport, units: Units, state
     let Some(draft) = state.shape_draft else {
         return;
     };
-    let Some(shape) = state.tool.shape(draft.start, draft.end, draft.circle) else {
+    let Some(shape) = state.tool.shape(
+        draft.start,
+        draft.end,
+        draft.constrained,
+        state.polygon_sides,
+    ) else {
         return;
     };
     let color = draft_color(state);
@@ -556,6 +566,7 @@ fn draw_shape_draft(painter: &egui::Painter, view: Viewport, units: Units, state
             radius_x, radius_y, ..
         } => format!("{} × {}", length(radius_x * 2.0), length(radius_y * 2.0)),
         Shape::Rectangle { width, height, .. } => format!("{} × {}", length(width), length(height)),
+        Shape::RegularPolygon { radius, .. } => format!("R {}", length(radius)),
         Shape::Polygon { .. } => return,
     };
     painter.text(

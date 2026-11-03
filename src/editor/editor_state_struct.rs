@@ -13,8 +13,10 @@ pub struct EditorState {
     pub(super) tool: Tool,
     pub(super) draft: Vec<Point>,
     pub(super) shape_draft: Option<ShapeDraft>,
-    /// With an operation, Draw, Rectangle and Ellipse add a child with it to the selected
-    /// piece instead of adding a piece.
+    /// The number of sides the Regular polygon tool draws.
+    pub(super) polygon_sides: usize,
+    /// With an operation, the drawing tools add a child with it to the selected piece instead
+    /// of adding a piece.
     pub(super) op_mode: Option<BooleanOp>,
     pub(super) selected: Option<u64>,
     /// Piece id and child id. Read through `selected_child_id`, since it only counts
@@ -42,6 +44,7 @@ impl Default for EditorState {
             tool: Tool::default(),
             draft: Vec::new(),
             shape_draft: None,
+            polygon_sides: 6,
             op_mode: None,
             selected: None,
             selected_child: None,

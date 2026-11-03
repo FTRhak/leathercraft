@@ -47,6 +47,7 @@ fn shape_label(shape: &Shape) -> Label {
         Shape::Polygon { .. } => Label::Polygon,
         Shape::Rectangle { .. } => Label::Rectangle,
         Shape::Ellipse { .. } => Label::Ellipse,
+        Shape::RegularPolygon { .. } => Label::RegularPolygon,
     }
 }
 

@@ -11,13 +11,16 @@ Project structure `docs/project-index.md` should be updated after any changes
 ## Commands
 
 ```sh
-cargo run                                   # desktop app (default `desktop` feature)
+cargo run                                   # desktop app (default `desktop` + `dynamic_linking` features)
+cargo release                               # static release build to ship (alias in .cargo/config.toml)
 cargo check --bin leathercraft              # type-check the desktop binary
 cargo test --lib --no-default-features      # core tests, without compiling Bevy
 cargo test --lib --no-default-features project_save_and_load_round_trip   # single test by name
 cargo fmt
 cargo clippy
 ```
+
+In dev builds Bevy is linked dynamically (`bevy_dylib` DLL plus Rust's `std` DLL), so the debug exe only runs through `cargo run`, which puts those DLLs on `PATH`. Builds to ship must use `cargo release`.
 
 All existing tests are inline `#[cfg(test)]` modules in the library crate, so `--no-default-features` covers them.
 
@@ -32,7 +35,7 @@ The package has two crates with a deliberate boundary: geometry and file-format 
   - `events`: `ProjectEvent`, `ProjectChange`, and `Project::apply`, the single entry point for changing a project.
   - `persistence`: `.leathercraft` save/load as pretty-printed, versioned JSON.
   - `exports`: `to_svg` and `to_dxf` return strings; `persistence::write_export` writes them to disk.
-  - `shapes`: `Shape` (polygon, or parametric rectangle and ellipse with a rotation): its `ring`, `handles` and `with_handle_at` for reshaping.
+  - `shapes`: `Shape` (polygon, or parametric rectangle, ellipse and regular polygon of 3 to 64 sides, with a rotation): its `ring`, `handles` and `with_handle_at` for reshaping.
   - `history`: `History` keeps a `Project` snapshot after each accepted edit, for undo, redo and the History panel. Consecutive renames or material changes of the same piece share one entry, and `New`/`Open` start a new history.
   - `i18n`: `Language`, `Label` (fixed text) and `Message` (text with arguments), with one exhaustive catalog per language, so a missing translation is a compile error.
 - **Binary (`src/main.rs`), requires the `desktop` feature:** `document`, `editor`, `panels`, `preview` and `settings` are modules of the binary, not the library, and import the core via `leathercraft::model`. Code that needs Bevy, egui, `egui_dock`, `earcutr`, `rfd`, `dirs`, or `sys-locale` belongs here.

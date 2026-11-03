@@ -14,8 +14,12 @@ path = "src/main.rs"
 required-features = ["desktop"]
 
 [features]
-default = ["desktop"]
+default = ["desktop", "dynamic_linking"]
 desktop = ["dep:bevy", "dep:bevy_egui", "dep:dirs", "dep:earcutr", "dep:egui_dock", "dep:rfd", "dep:sys-locale"]
+# Builds Bevy and its dependencies once into a separate `bevy_dylib` library, so
+# a change to our code relinks only the small executable. For development only:
+# a release build omits it (see the `release` alias in `.cargo/config.toml`).
+dynamic_linking = ["desktop", "bevy/dynamic_linking"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -28,3 +32,9 @@ egui_dock = { version = "0.18", features = ["serde"], optional = true }
 rfd = { version = "0.15", optional = true }
 sys-locale = { version = "0.3", optional = true }
 i_overlay = "9.1.0"
+
+# Dependencies are built once, so optimize them even in dev builds: Bevy runs
+# much faster, and generics are no longer shared across crates, which keeps
+# `bevy_dylib` under the 65,535-export limit of a Windows DLL.
+[profile.dev.package."*"]
+opt-level = 3

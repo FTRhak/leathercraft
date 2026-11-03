@@ -29,9 +29,13 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Rectangle => "Rectangle",
         Label::Ellipse => "Ellipse",
         Label::Polygon => "Polygon",
+        Label::RegularPolygon => "Regular polygon",
         Label::RectangleHint => "Drag from corner to corner. Esc cancels.",
         Label::EllipseHint => "Drag from the center outward. Hold Shift for a circle. Esc cancels.",
-        Label::NewPieceMode => "New piece: Draw, Rectangle and Ellipse create a piece",
+        Label::RegularPolygonHint => {
+            "Drag from the center to a vertex. Hold Shift to turn in 15° steps. Esc cancels."
+        }
+        Label::NewPieceMode => "New piece: drawing tools create a piece",
         Label::Operation(op) => operation(op),
         Label::OperationHint(op) => operation_hint(op),
         Label::Base => "Base",
@@ -41,6 +45,8 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Height => "Height",
         Label::RadiusX => "Radius X",
         Label::RadiusY => "Radius Y",
+        Label::Radius => "Radius",
+        Label::Sides => "Sides",
         Label::Rotation => "Rotation, °",
         Label::MoveUp => "Apply earlier",
         Label::MoveDown => "Apply later",

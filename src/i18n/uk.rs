@@ -29,9 +29,13 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Rectangle => "Прямокутник",
         Label::Ellipse => "Овал",
         Label::Polygon => "Полігон",
+        Label::RegularPolygon => "Багатокутник",
         Label::RectangleHint => "Перетягуйте від кута до кута. Esc скасовує.",
         Label::EllipseHint => "Перетягуйте від центру назовні. Shift — коло. Esc скасовує.",
-        Label::NewPieceMode => "Нова деталь: Малювання, Прямокутник і Овал створюють деталь",
+        Label::RegularPolygonHint => {
+            "Перетягуйте від центру до вершини. Shift — поворот кроком 15°. Esc скасовує."
+        }
+        Label::NewPieceMode => "Нова деталь: інструменти малювання створюють деталь",
         Label::Operation(op) => operation(op),
         Label::OperationHint(op) => operation_hint(op),
         Label::Base => "Основа",
@@ -41,6 +45,8 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Height => "Висота",
         Label::RadiusX => "Радіус X",
         Label::RadiusY => "Радіус Y",
+        Label::Radius => "Радіус",
+        Label::Sides => "Кількість граней",
         Label::Rotation => "Поворот, °",
         Label::MoveUp => "Застосувати раніше",
         Label::MoveDown => "Застосувати пізніше",

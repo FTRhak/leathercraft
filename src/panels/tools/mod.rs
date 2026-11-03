@@ -2,7 +2,7 @@ use crate::icons::icon_button;
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::model::{BooleanOp, Point};
-use leathercraft::shapes::Shape;
+use leathercraft::shapes::{REGULAR_POLYGON_SIDES, Shape};
 use std::f32::consts::{PI, TAU};
 
 const ICON_BUTTON_SIZE: f32 = 32.0;
@@ -17,10 +17,17 @@ pub enum Tool {
     Draw,
     Rectangle,
     Ellipse,
+    RegularPolygon,
 }
 
 impl Tool {
-    const ALL: [Self; 4] = [Self::Select, Self::Draw, Self::Rectangle, Self::Ellipse];
+    const ALL: [Self; 5] = [
+        Self::Select,
+        Self::Draw,
+        Self::Rectangle,
+        Self::Ellipse,
+        Self::RegularPolygon,
+    ];
 
     fn label(self) -> Label {
         match self {
@@ -28,6 +35,7 @@ impl Tool {
             Self::Draw => Label::Draw,
             Self::Rectangle => Label::Rectangle,
             Self::Ellipse => Label::Ellipse,
+            Self::RegularPolygon => Label::RegularPolygon,
         }
     }
 
@@ -37,15 +45,19 @@ impl Tool {
             Self::Draw => Label::DrawHint,
             Self::Rectangle => Label::RectangleHint,
             Self::Ellipse => Label::EllipseHint,
+            Self::RegularPolygon => Label::RegularPolygonHint,
         }
     }
 
     /// The shape dragged from `start` to `end`, for the tools that draw by dragging.
-    /// `circle` keeps an ellipse round.
-    pub fn shape(self, start: Point, end: Point, circle: bool) -> Option<Shape> {
+    /// `constrained` keeps an ellipse round and turns a regular polygon in steps.
+    pub fn shape(self, start: Point, end: Point, constrained: bool, sides: usize) -> Option<Shape> {
         match self {
             Self::Rectangle => Shape::rectangle_from_corners(start, end),
-            Self::Ellipse => Shape::ellipse_from_center(start, end, circle),
+            Self::Ellipse => Shape::ellipse_from_center(start, end, constrained),
+            Self::RegularPolygon => {
+                Shape::regular_polygon_from_center(start, end, sides, constrained)
+            }
             Self::Select | Self::Draw => None,
         }
     }
@@ -87,6 +99,14 @@ impl Tool {
                                 angle.sin() * rect.height() / 3.0,
                             )
                     })
+                    .collect();
+                painter.add(egui::Shape::closed_line(points, stroke));
+            }
+            Self::RegularPolygon => {
+                let center = rect.center();
+                let radius = rect.width() / 2.0;
+                let points = (0..6)
+                    .map(|index| center + egui::Vec2::angled(TAU * index as f32 / 6.0) * radius)
                     .collect();
                 painter.add(egui::Shape::closed_line(points, stroke));
             }
@@ -157,6 +177,7 @@ fn paint_new_piece_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui:
 pub fn show_panel(
     ui: &mut egui::Ui,
     tool: &mut Tool,
+    polygon_sides: &mut usize,
     op_mode: &mut Option<BooleanOp>,
     language: Language,
 ) {
@@ -198,4 +219,10 @@ pub fn show_panel(
             }
         }
     });
+    if *tool == Tool::RegularPolygon {
+        ui.horizontal(|ui| {
+            ui.label(language.label(Label::Sides));
+            ui.add(egui::DragValue::new(polygon_sides).range(REGULAR_POLYGON_SIDES));
+        });
+    }
 }

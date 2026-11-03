@@ -4,7 +4,7 @@ use bevy_egui::egui;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{PatternPiece, Project, Units};
-use leathercraft::shapes::Shape;
+use leathercraft::shapes::{REGULAR_POLYGON_SIDES, Shape};
 
 /// The canvas options of the 2D editor.
 pub struct EditorView<'a> {
@@ -189,6 +189,21 @@ fn shape_fields(ui: &mut egui::Ui, shape: &mut Shape, units: Units, language: La
             length(ui, Label::CenterY, &mut center.y, f64::MIN);
             length(ui, Label::RadiusX, radius_x, MIN_SIZE_MM);
             length(ui, Label::RadiusY, radius_y, MIN_SIZE_MM);
+            angle(ui, rotation);
+        }
+        Shape::RegularPolygon {
+            center,
+            radius,
+            sides,
+            rotation,
+        } => {
+            length(ui, Label::CenterX, &mut center.x, f64::MIN);
+            length(ui, Label::CenterY, &mut center.y, f64::MIN);
+            length(ui, Label::Radius, radius, MIN_SIZE_MM);
+            ui.horizontal(|ui| {
+                ui.label(language.label(Label::Sides));
+                ui.add(egui::DragValue::new(sides).range(REGULAR_POLYGON_SIDES));
+            });
             angle(ui, rotation);
         }
     }

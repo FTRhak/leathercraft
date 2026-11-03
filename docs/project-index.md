@@ -38,7 +38,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/icons/mod.rs` | 87 | 760 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
 | `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
-| `src/panels/tools/mod.rs` | 201 | 1,750 | bin | `Tool`, painted tool and operation icons, Tools panel |
+| `src/panels/tools/mod.rs` | 228 | 1,950 | bin | `Tool`, painted tool and operation icons, Tools panel with the regular polygon's sides field |
 | `src/panels/layout/mod.rs` | 252 | 2,600 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
@@ -53,7 +53,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/exports/mod.rs` | 187 | 1,200 | lib | `ExportError`, shared helpers, tests |
 | `src/exports/svg.rs` | 45 | 430 | lib | `to_svg` |
 | `src/exports/dxf.rs` | 25 | 200 | lib | `to_dxf` |
-| `src/shapes.rs` | 364 | 3,050 | lib | `Shape`: rings, handles, constructors from a drag |
+| `src/shapes.rs` | 498 | 4,200 | lib | `Shape`: rings, handles, constructors from a drag |
 | `src/i18n/en.rs` | 428 | 4,550 | lib | English catalog |
 | `src/history.rs` | 508 | 4,350 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
 | `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
@@ -79,9 +79,9 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 143-262 | `PatternPiece`: `bounds`, `child`, `child_index`, `next_child_id`, `translate`, `validate_shape`, `validate_ring`, `validate_shapes` |
 | | 265-353 | `Project`: `bounds`, `validate` (301), `next_piece_id`, `add_piece`, `remove_piece` |
 | | 355-476 | Tests |
-| `shapes.rs` | 6-43 | `CIRCLE_SEGMENTS`, `Shape`, `to_world`, `to_local` |
-| | 45-232 | `rectangle_from_corners`, `ellipse_from_center`, `ring`, `bounds`, `contains`, `center`, `translate`, `handles`, `with_handle_at`, `has_valid_size` |
-| | 234-364 | Tests |
+| `shapes.rs` | 6-56 | `CIRCLE_SEGMENTS`, `REGULAR_POLYGON_SIDES` (3..=64), `ROTATION_SNAP`, `Shape` (`Polygon`, `Rectangle`, `Ellipse`, `RegularPolygon`), `to_world`, `to_local` |
+| | 58-307 | `rectangle_from_corners`, `ellipse_from_center`, `regular_polygon_from_center`, `ring`, `bounds`, `contains`, `center`, `translate`, `handles`, `with_handle_at`, `has_valid_size` |
+| | 309-498 | Tests |
 | `boolean.rs` | 11-53 | `ROUND_PRECISION_MM`, `Region`: `rings`, `vertices`, `hole_indices`, `bounds`, `contains` |
 | | 67-96 | `PatternPiece::region` |
 | | 98-221 | Tests |
@@ -155,9 +155,9 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
 | | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
 | `tools/mod.rs` | 8-11 | Icon constants |
-| | 14-95 | `Tool`: `ALL`, `label`, `hint`, `shape`, `paint_icon` |
-| | 99-155 | `arc`, `paint_operation_icon`, `paint_new_piece_icon` |
-| | 157 | `show_panel`: tools, then the new-piece and operation modes |
+| | 14-115 | `Tool` (Select, Draw, Rectangle, Ellipse, RegularPolygon): `ALL`, `label`, `hint`, `shape`, `paint_icon` |
+| | 119-175 | `arc`, `paint_operation_icon`, `paint_new_piece_icon` |
+| | 177 | `show_panel`: tools, the new-piece and operation modes, then the sides field while the Regular polygon tool is active (`EditorState::polygon_sides`) |
 | `layout/mod.rs` | 9-10 | Constants |
 | | 14 | `expand_toggle`: expands or collapses a piece's children |
 | | 31-52 | `paint_trash` (icon font), `paint_arrow`, `shape_label`; the lock button uses the font's lock and unlock glyphs |
@@ -202,16 +202,24 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
 | Change the 3D look or mesh | `preview/mod.rs` 49-123, 159-261 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
 | Add a dockable panel | `panels/dock/mod.rs`, `editor/panel_viewer.rs` | A `PanelTab` variant, its `CLOSEABLE` and `label` entries, `default_state`, and arms in `PanelViewer::ui` and `scroll_bars` |
+| Change how the app is compiled or linked | `Cargo.toml`, `.cargo/config.toml` | See [Build configuration](#build-configuration) |
 | Change system scheduling | `main.rs`, `document.rs` | Keep the ordering rule in `CLAUDE.md` |
+
+## Build configuration
+
+| File | Holds |
+|---|---|
+| `Cargo.toml` | The `dynamic_linking` feature (on by default) builds Bevy into a separate `bevy_dylib` DLL, so a code change relinks only the small `leathercraft.exe`. `[profile.dev.package."*"]` sets `opt-level = 3` for dependencies, which also keeps that DLL under the 65,535-export limit of Windows. |
+| `.cargo/config.toml` | `rust-lld` as the Windows linker; the `cargo release` alias, a static build without `dynamic_linking`. |
 
 ## Tests
 
-There are 60 tests, all inline in the library crate:
+There are 63 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
 | `model` | 6 |
-| `shapes` | 7 |
+| `shapes` | 10 |
 | `boolean` | 7 |
 | `material` | 3 |
 | `events` | 11 |
