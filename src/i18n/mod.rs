@@ -145,7 +145,10 @@ pub enum Label {
     AlignToSelection,
     AlignToKeyObject,
     AlignToProject,
+    AlignToParent,
     KeyObjectHint,
+    KeyShapeHint,
+    ParentHint,
     Spacing,
     SpacingAuto,
     Undo,
@@ -214,6 +217,7 @@ pub enum Message {
     PieceNotFound { id: u64 },
     PieceLocked { name: String },
     AlreadyArranged,
+    ShapesAlreadyArranged,
     UnsupportedVersion { found: u32, expected: u32 },
     TooManyPieces { max: usize },
     InvalidPieceId { name: String },
@@ -254,6 +258,8 @@ pub enum Message {
     ActionReorderChild { name: String },
     ActionRemoveChild { name: String },
     ActionMoveChildren { name: String, count: usize },
+    ActionAlignChildren { name: String, count: usize },
+    ActionDistributeChildren { name: String, count: usize },
     ActionRemoveChildren { name: String, count: usize },
 }
 

@@ -34,13 +34,13 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/drag.rs` | 181 | 1,450 | bin | `begin_drag`, `begin_handle_drag`, `update_drag`, `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
 | `src/editor/ui.rs` | 328 | 3,000 | bin | `editor_ui`, `file_menu`, `edit_menu`, `window_menu`, `handle_delete_key`, `handle_select_all_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete and Ctrl+A keys (children of the selected piece first), language picker |
-| `src/editor/panel_viewer.rs` | 139 | 1,150 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History tab title has an icon |
+| `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History tab title has an icon; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/icons/mod.rs` | 87 | 760 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
 | `src/panels/dock/mod.rs` | 178 | 1,500 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
 | `src/panels/tools/mod.rs` | 242 | 2,100 | bin | `Tool`, painted tool and operation icons, Tools panel with the regular polygon's sides field |
 | `src/panels/layout/mod.rs` | 267 | 2,750 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls; Shift+click toggles a piece or child |
-| `src/panels/align/mod.rs` | 230 | 1,900 | bin | Align panel: `Reference` (Align To), `AlignOptions` (kept in `EditorState::align`), painted align, distribute and spacing icons, `show_panel` |
+| `src/panels/align/mod.rs` | 293 | 2,300 | bin | Align panel: `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), painted align, distribute and spacing icons, `show_panel` |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
 | `src/panels/properties/mod.rs` | 256 | 2,000 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, selected edge's length, To Polygon button |
@@ -48,10 +48,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/model.rs` | 476 | 3,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation |
 | `src/boolean.rs` | 221 | 1,900 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes |
 | `src/material.rs` | 462 | 2,800 | lib | `Material` and the scales of its properties |
-| `src/events.rs` | 792 | 6,100 | lib | `ProjectEvent` (including the group `MovePieces`, `RemovePieces`, `ArrangePieces`, `MoveChildren`, `RemoveChildren`), `ProjectChange`, `Project::apply` |
-| `src/align.rs` | 464 | 3,600 | lib | `Axis`, `Edge`, `Arrange` (Illustrator's align, distribute and spacing operations), `AlignTo`, `Spacing`, `piece_box`, `offsets` |
-| `src/i18n/uk.rs` | 466 | 5,900 | lib | Ukrainian catalog, `plural` helper |
-| `src/i18n/mod.rs` | 284 | 2,000 | lib | `Language`, `Label`, `Message` |
+| `src/events.rs` | 980 | 6,650 | lib | `ProjectEvent` (including the group `MovePieces`, `RemovePieces`, `ArrangePieces`, `MoveChildren`, `ArrangeChildren`, `RemoveChildren`), `ProjectChange`, `Project::apply` |
+| `src/align.rs` | 633 | 4,950 | lib | `Axis`, `Edge`, `Arrange` (Illustrator's align, distribute and spacing operations), `AlignTo` (including `Parent`, the base shape of the children's piece), `Spacing`, `piece_box`, `offsets` (pieces), `child_offsets` (children of one piece), shared `arrange_items` |
+| `src/i18n/uk.rs` | 552 | 6,200 | lib | Ukrainian catalog, `plural` helper |
+| `src/i18n/mod.rs` | 318 | 2,150 | lib | `Language`, `Label`, `Message` |
 | `src/exports/mod.rs` | 187 | 1,200 | lib | `ExportError`, shared helpers, tests |
 | `src/exports/svg.rs` | 45 | 430 | lib | `to_svg` |
 | `src/exports/dxf.rs` | 25 | 200 | lib | `to_dxf` |
@@ -60,8 +60,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/shapes/ellipse.rs` | 123 | 900 | lib | `Ellipse`, `CIRCLE_SEGMENTS` |
 | `src/shapes/regular_polygon.rs` | 142 | 1,050 | lib | `RegularPolygon`, `REGULAR_POLYGON_SIDES` |
 | `src/shapes/polygon.rs` | 98 | 750 | lib | `Polygon`, its edges and their lengths |
-| `src/i18n/en.rs` | 435 | 4,550 | lib | English catalog |
-| `src/history.rs` | 546 | 4,650 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
+| `src/i18n/en.rs` | 497 | 4,750 | lib | English catalog |
+| `src/history.rs` | 725 | 4,950 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
 | `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings.rs` | 71 | 500 | bin | Saved language and panel layout in the OS config directory |
 | `src/document.rs` | 64 | 500 | bin | `ActiveProject` (project and history), `ProjectMessage`, `HistoryMessage`, `apply_project_events` |
@@ -95,13 +95,13 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `boolean.rs` | 11-53 | `ROUND_PRECISION_MM`, `Region`: `rings`, `vertices`, `hole_indices`, `bounds`, `contains` |
 | | 67-96 | `PatternPiece::region` |
 | | 98-221 | Tests |
-| `events.rs` | 10-88 | `ProjectEvent`, `ProjectChange` |
-| | 92-185 | `Project::apply` |
-| | 187-229 | `edit` (validates a copy), `piece_mut`, `unlocked_piece_mut`, `child_mut`, `child_index` |
-| | 231-631 | Tests |
+| `events.rs` | 10-128 | `ProjectEvent`, `ProjectChange` |
+| | 130-314 | `Project::apply` |
+| | 316-358 | `edit` (validates a copy), `piece_mut`, `unlocked_piece_mut`, `child_mut`, `child_index` |
+| | 360-980 | Tests |
 | `history.rs` | 6-48 | `MAX_HISTORY`, `HistoryCommand`, `MergeKey`, `Entry`, `History` |
-| | 50-220 | `new`, `record`, `apply`, `actions`, `position`, `can_undo`, `can_redo`, `describe` |
-| | 222-508 | Tests |
+| | 50-268 | `new`, `record`, `apply`, `actions`, `position`, `can_undo`, `can_redo`, `describe` |
+| | 270-725 | Tests |
 | `persistence.rs` | 7-34 | `save_project`, `load_project`, `write_export` |
 | | 36-169 | Tests |
 | `exports/mod.rs` | 14-38 | `ExportError`, conversion to `Message` |
@@ -211,7 +211,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Change the file format | `model.rs` 119-160, 265-278, `shapes/mod.rs` 14-23 and the shape structs, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
 | Change the 3D look or mesh | `preview/mod.rs` 49-123, 159-261 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
-| Change align or distribute | `align.rs` `offsets`, `panels/align/mod.rs` | The rules live in `offsets`; the panel only builds an `ArrangePieces` event |
+| Change align or distribute | `align.rs` `arrange_items`, `panels/align/mod.rs` | The rules live in `arrange_items`, shared by `offsets` (pieces) and `child_offsets` (children); the panel only builds an `ArrangePieces` or `ArrangeChildren` event |
 | Add a dockable panel | `panels/dock/mod.rs`, `editor/panel_viewer.rs` | A `PanelTab` variant, its `CLOSEABLE` and `label` entries, `default_state`, and arms in `PanelViewer::ui` and `scroll_bars` |
 | Change how the app is compiled or linked | `Cargo.toml`, `.cargo/config.toml` | See [Build configuration](#build-configuration) |
 | Change system scheduling | `main.rs`, `document.rs` | Keep the ordering rule in `CLAUDE.md` |
@@ -225,7 +225,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 84 tests, all inline in the library crate:
+There are 90 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
@@ -233,8 +233,8 @@ There are 84 tests, all inline in the library crate:
 | `shapes` | 16 |
 | `boolean` | 7 |
 | `material` | 3 |
-| `align` | 8 |
-| `events` | 15 |
+| `align` | 13 |
+| `events` | 16 |
 | `history` | 13 |
 | `i18n` | 5 |
 | `exports` | 7 |

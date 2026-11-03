@@ -91,7 +91,10 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::AlignToSelection => "Виділення",
         Label::AlignToKeyObject => "Ключовий об’єкт",
         Label::AlignToProject => "Межі проєкту",
+        Label::AlignToParent => "Батьківська фігура",
         Label::KeyObjectHint => "Ключовий об’єкт — основна вибрана деталь; вона лишається на місці",
+        Label::KeyShapeHint => "Ключовий об’єкт — основна вибрана фігура; вона лишається на місці",
+        Label::ParentHint => "Фігури вирівнюються відносно базової фігури своєї деталі",
         Label::Spacing => "Проміжок",
         Label::SpacingAuto => "Авто",
         Label::Undo => "Скасувати",
@@ -370,6 +373,7 @@ pub(super) fn message(message: &Message) -> String {
         Message::PieceNotFound { id } => format!("Деталь {id} не існує."),
         Message::PieceLocked { name } => format!("Деталь «{name}» заблоковано."),
         Message::AlreadyArranged => "Деталі вже так розташовані.".to_owned(),
+        Message::ShapesAlreadyArranged => "Фігури вже так розташовані.".to_owned(),
         Message::ChildAdded { name } => format!("Додано фігуру в деталь «{name}»."),
         Message::ChildDeleted => "Фігуру видалено.".to_owned(),
         Message::ChildrenDeleted { count } => {
@@ -472,6 +476,14 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionMoveChildren { name, count } => {
             let noun = plural(*count, "фігуру", "фігури", "фігур");
             format!("Переміщено {count} {noun} у «{name}»")
+        }
+        Message::ActionAlignChildren { name, count } => {
+            let noun = plural(*count, "фігуру", "фігури", "фігур");
+            format!("Вирівняно {count} {noun} у «{name}»")
+        }
+        Message::ActionDistributeChildren { name, count } => {
+            let noun = plural(*count, "фігуру", "фігури", "фігур");
+            format!("Розподілено {count} {noun} у «{name}»")
         }
         Message::ActionRemoveChildren { name, count } => {
             let noun = plural(*count, "фігуру", "фігури", "фігур");

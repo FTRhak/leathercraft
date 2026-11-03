@@ -233,6 +233,25 @@ impl History {
                 },
                 None,
             ),
+            ProjectEvent::ArrangeChildren {
+                id,
+                children,
+                arrange: Arrange::Align(..),
+                ..
+            } => (
+                Message::ActionAlignChildren {
+                    name: name(*id),
+                    count: children.len(),
+                },
+                None,
+            ),
+            ProjectEvent::ArrangeChildren { id, children, .. } => (
+                Message::ActionDistributeChildren {
+                    name: name(*id),
+                    count: children.len(),
+                },
+                None,
+            ),
             ProjectEvent::RemoveChildren { id, children } => (
                 Message::ActionRemoveChildren {
                     name: name(*id),
@@ -535,6 +554,22 @@ mod tests {
                 dy: 0.0,
             },
         );
+        for arrange in [
+            Arrange::Align(Axis::Horizontal, Edge::Min),
+            Arrange::Distribute(Axis::Horizontal, Edge::Min),
+        ] {
+            run(
+                &mut project,
+                &mut history,
+                ProjectEvent::ArrangeChildren {
+                    id: 1,
+                    children: vec![1, 2],
+                    arrange,
+                    to: AlignTo::Parent,
+                    spacing: Spacing::Auto,
+                },
+            );
+        }
         run(
             &mut project,
             &mut history,
@@ -549,6 +584,14 @@ mod tests {
             actions,
             [
                 &Message::ActionMoveChildren {
+                    name: name(),
+                    count: 2
+                },
+                &Message::ActionAlignChildren {
+                    name: name(),
+                    count: 2
+                },
+                &Message::ActionDistributeChildren {
                     name: name(),
                     count: 2
                 },

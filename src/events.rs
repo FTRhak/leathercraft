@@ -97,6 +97,14 @@ pub enum ProjectEvent {
         dx: f64,
         dy: f64,
     },
+    /// Aligns or distributes several children of one piece, as one edit. The key object stays.
+    ArrangeChildren {
+        id: u64,
+        children: Vec<u64>,
+        arrange: Arrange,
+        to: AlignTo,
+        spacing: Spacing,
+    },
     /// Removes several children of one piece as one edit.
     RemoveChildren {
         id: u64,
@@ -268,6 +276,27 @@ impl Project {
                     if children.contains(&child.id) {
                         child.shape.translate(dx, dy);
                     }
+                }
+                Ok(ProjectChange::Edited)
+            }),
+            ProjectEvent::ArrangeChildren {
+                id,
+                children,
+                arrange,
+                to,
+                spacing,
+            } => self.edit(|project| {
+                let piece = project.unlocked_piece_mut(id)?;
+                for child in &children {
+                    child_index(piece, *child)?;
+                }
+                let offsets = align::child_offsets(project, id, &children, arrange, to, spacing);
+                // Rejected rather than recorded, so that the history gets no empty entry.
+                if offsets.is_empty() {
+                    return Err(Message::ShapesAlreadyArranged);
+                }
+                for (child, dx, dy) in offsets {
+                    project.child_mut(id, child)?.shape.translate(dx, dy);
                 }
                 Ok(ProjectChange::Edited)
             }),
@@ -702,6 +731,51 @@ mod tests {
             }),
             Err(Message::PieceNotFound { id: 9 })
         );
+    }
+
+    #[test]
+    fn arranging_children_moves_them_within_their_piece() {
+        let mut project = project_with_piece();
+        project.apply(add_child(BooleanOp::Subtract)).unwrap();
+        let center = ProjectEvent::ArrangeChildren {
+            id: 1,
+            children: vec![1],
+            arrange: Arrange::Align(align::Axis::Horizontal, align::Edge::Center),
+            to: AlignTo::Parent,
+            spacing: Spacing::Auto,
+        };
+        assert_eq!(project.apply(center.clone()), Ok(ProjectChange::Edited));
+        assert_eq!(
+            project.pieces[0].children[0].shape.ring()[0],
+            Point::new(4.0, 1.0)
+        );
+
+        let before = project.clone();
+        assert_eq!(
+            project.apply(center.clone()),
+            Err(Message::ShapesAlreadyArranged)
+        );
+        assert_eq!(
+            project.apply(ProjectEvent::ArrangeChildren {
+                id: 1,
+                children: vec![1, 9],
+                arrange: Arrange::Align(align::Axis::Vertical, align::Edge::Min),
+                to: AlignTo::Parent,
+                spacing: Spacing::Auto,
+            }),
+            Err(Message::ChildNotFound {
+                name: "Деталь 1".to_owned()
+            })
+        );
+        assert_eq!(project, before);
+
+        project
+            .apply(ProjectEvent::SetPieceLocked {
+                id: 1,
+                locked: true,
+            })
+            .unwrap();
+        assert_eq!(project.apply(center), locked());
     }
 
     #[test]

@@ -8,24 +8,65 @@ use leathercraft::model::Units;
 const ICON_BUTTON_SIZE: f32 = 32.0;
 const ICON_MARGIN: f32 = 6.0;
 
-/// The Align To choice; the key object itself is the primary selected piece.
+/// The Align To choice; the key object itself is the primary selected piece or child.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Reference {
     #[default]
     Selection,
     KeyObject,
     Project,
+    /// The base shape of the selected children's piece; offered only for children.
+    Parent,
 }
 
 impl Reference {
-    const ALL: [Self; 3] = [Self::Selection, Self::KeyObject, Self::Project];
+    const ALL: [Self; 4] = [
+        Self::Selection,
+        Self::KeyObject,
+        Self::Project,
+        Self::Parent,
+    ];
 
     fn label(self) -> Label {
         match self {
             Self::Selection => Label::AlignToSelection,
             Self::KeyObject => Label::AlignToKeyObject,
             Self::Project => Label::AlignToProject,
+            Self::Parent => Label::AlignToParent,
         }
+    }
+}
+
+/// What the panel arranges: the selected pieces, or the selected children of one piece.
+/// `key` is the primary one.
+#[derive(Clone, Copy, Debug)]
+pub enum Targets<'a> {
+    Pieces {
+        ids: &'a [u64],
+        key: Option<u64>,
+    },
+    Children {
+        piece: u64,
+        ids: &'a [u64],
+        key: Option<u64>,
+    },
+}
+
+impl Targets<'_> {
+    fn ids(&self) -> &[u64] {
+        match self {
+            Self::Pieces { ids, .. } | Self::Children { ids, .. } => ids,
+        }
+    }
+
+    fn key(&self) -> Option<u64> {
+        match self {
+            Self::Pieces { key, .. } | Self::Children { key, .. } => *key,
+        }
+    }
+
+    fn children(&self) -> bool {
+        matches!(self, Self::Children { .. })
     }
 }
 
@@ -140,19 +181,21 @@ fn arrange_row(
     clicked
 }
 
-/// The Align panel. `pieces` is the selection and `key` its primary piece.
+/// The Align panel, acting on `targets`.
 pub fn show_panel(
     ui: &mut egui::Ui,
     units: Units,
-    pieces: &[u64],
-    key: Option<u64>,
+    targets: Targets,
     options: &mut AlignOptions,
     language: Language,
 ) -> Option<ProjectEvent> {
+    let children = targets.children();
     let to = match options.reference {
         Reference::Selection => Some(AlignTo::Selection),
-        Reference::KeyObject => key.map(AlignTo::KeyObject),
+        Reference::KeyObject => targets.key().map(AlignTo::KeyObject),
         Reference::Project => Some(AlignTo::Project),
+        Reference::Parent if children => Some(AlignTo::Parent),
+        Reference::Parent => None,
     };
     // As in Illustrator, a fixed gap is measured from the key object.
     let fixed = options.reference == Reference::KeyObject && !options.spacing_auto;
@@ -161,8 +204,9 @@ pub fn show_panel(
     } else {
         Spacing::Auto
     };
-    // Against the project's bounds, fewer pieces are enough, since they are not the reference.
-    let to_project = options.reference == Reference::Project;
+    // Against the project's or the parent's bounds, fewer items are enough, since they are not
+    // the reference.
+    let to_project = matches!(to, Some(AlignTo::Project | AlignTo::Parent));
     let enabled = |arrange: Arrange| {
         let minimum = match arrange {
             Arrange::Align(..) if to_project => 1,
@@ -171,7 +215,7 @@ pub fn show_panel(
             Arrange::Distribute(..) | Arrange::Space(_) if to_project => 2,
             Arrange::Distribute(..) | Arrange::Space(_) => 3,
         };
-        to.is_some() && pieces.len() >= minimum
+        to.is_some() && targets.ids().len() >= minimum
     };
 
     ui.strong(language.label(Label::AlignObjects));
@@ -208,6 +252,9 @@ pub fn show_panel(
             .selected_text(language.label(options.reference.label()))
             .show_ui(ui, |ui| {
                 for reference in Reference::ALL {
+                    if reference == Reference::Parent && !children {
+                        continue;
+                    }
                     ui.selectable_value(
                         &mut options.reference,
                         reference,
@@ -216,15 +263,31 @@ pub fn show_panel(
                 }
             });
     });
-    if options.reference == Reference::KeyObject {
-        ui.label(egui::RichText::new(language.label(Label::KeyObjectHint)).weak());
+    let hint = match options.reference {
+        Reference::KeyObject if children => Some(Label::KeyShapeHint),
+        Reference::KeyObject => Some(Label::KeyObjectHint),
+        Reference::Parent if children => Some(Label::ParentHint),
+        _ => None,
+    };
+    if let Some(hint) = hint {
+        ui.label(egui::RichText::new(language.label(hint)).weak());
     }
 
     let arrange = clicked?;
-    Some(ProjectEvent::ArrangePieces {
-        ids: pieces.to_vec(),
-        arrange,
-        to: to?,
-        spacing,
+    let to = to?;
+    Some(match targets {
+        Targets::Pieces { ids, .. } => ProjectEvent::ArrangePieces {
+            ids: ids.to_vec(),
+            arrange,
+            to,
+            spacing,
+        },
+        Targets::Children { piece, ids, .. } => ProjectEvent::ArrangeChildren {
+            id: piece,
+            children: ids.to_vec(),
+            arrange,
+            to,
+            spacing,
+        },
     })
 }

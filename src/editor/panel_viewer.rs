@@ -73,11 +73,23 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
             PanelTab::Align => {
                 ui.add_enabled_ui(editing, |ui| {
                     let state = &mut *self.state;
+                    // With children selected, the panel arranges them within their piece.
+                    let children = state.selected_children().to_vec();
+                    let targets = match state.selected {
+                        Some(piece) if !children.is_empty() => align::Targets::Children {
+                            piece,
+                            ids: &children,
+                            key: state.selected_child_id(),
+                        },
+                        _ => align::Targets::Pieces {
+                            ids: &state.pieces,
+                            key: state.selected,
+                        },
+                    };
                     let event = align::show_panel(
                         ui,
                         self.project.units,
-                        &state.pieces,
-                        state.selected,
+                        targets,
                         &mut state.align,
                         language,
                     );

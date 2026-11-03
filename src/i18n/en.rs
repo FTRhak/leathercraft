@@ -89,7 +89,10 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::AlignToSelection => "Selection",
         Label::AlignToKeyObject => "Key object",
         Label::AlignToProject => "Project bounds",
+        Label::AlignToParent => "Parent shape",
         Label::KeyObjectHint => "The key object is the primary selected piece; it stays in place",
+        Label::KeyShapeHint => "The key object is the primary selected shape; it stays in place",
+        Label::ParentHint => "Shapes are aligned to the base shape of their piece",
         Label::Spacing => "Spacing",
         Label::SpacingAuto => "Auto",
         Label::Undo => "Undo",
@@ -363,6 +366,7 @@ pub(super) fn message(message: &Message) -> String {
         Message::PieceNotFound { id } => format!("Piece {id} does not exist."),
         Message::PieceLocked { name } => format!("Piece '{name}' is locked."),
         Message::AlreadyArranged => "The pieces are already arranged.".to_owned(),
+        Message::ShapesAlreadyArranged => "The shapes are already arranged.".to_owned(),
         Message::ChildAdded { name } => format!("Added a shape to '{name}'."),
         Message::ChildDeleted => "Shape deleted.".to_owned(),
         Message::ChildrenDeleted { count } => format!("{count} shapes deleted."),
@@ -435,6 +439,12 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionRemoveChild { name } => format!("Deleted a shape from '{name}'"),
         Message::ActionMoveChildren { name, count } => {
             format!("Moved {count} shapes of '{name}'")
+        }
+        Message::ActionAlignChildren { name, count } => {
+            format!("Aligned {count} shapes of '{name}'")
+        }
+        Message::ActionDistributeChildren { name, count } => {
+            format!("Distributed {count} shapes of '{name}'")
         }
         Message::ActionRemoveChildren { name, count } => {
             format!("Deleted {count} shapes from '{name}'")
