@@ -21,8 +21,8 @@ fn target_on_selected(
     child_at(piece, start).map(DragTarget::Child)
 }
 
-/// Grabbing a whole piece that is selected moves the whole selection; with Shift, an
-/// unselected piece is added to it first.
+/// Grabbing a whole piece or a child that is selected moves the whole selection of pieces or
+/// children; with Shift, an unselected one is added to it first.
 pub(super) fn begin_drag(
     origin: egui::Pos2,
     shift: bool,
@@ -53,11 +53,16 @@ pub(super) fn begin_drag(
         }
         _ => None,
     };
-    match target {
-        Some(_) => state.select(Some(piece_id), child),
-        None if state.is_selected(piece_id) => state.focus(piece_id),
-        None if shift => state.toggle_piece(piece_id),
-        None => state.select(Some(piece_id), None),
+    let child_selected = |state: &EditorState, child: u64| {
+        state.selected == Some(piece_id) && state.selected_children().contains(&child)
+    };
+    match (target, child) {
+        (Some(_), Some(child)) if child_selected(state, child) => state.focus_child(child),
+        (Some(DragTarget::Child(_)), Some(child)) if shift => state.toggle_child(piece_id, child),
+        (Some(_), _) => state.select(Some(piece_id), child),
+        (None, _) if state.is_selected(piece_id) => state.focus(piece_id),
+        (None, _) if shift => state.toggle_piece(piece_id),
+        (None, _) => state.select(Some(piece_id), None),
     }
     if piece.locked {
         return;
@@ -71,10 +76,20 @@ pub(super) fn begin_drag(
             .map(|other| other.id)
             .collect(),
     };
+    let child_group = match target {
+        Some(DragTarget::Child(child)) => state
+            .selected_children()
+            .iter()
+            .copied()
+            .filter(|other| *other != child)
+            .collect(),
+        _ => Vec::new(),
+    };
     state.drag = Some(DragState {
         piece_id,
         target: target.unwrap_or(DragTarget::Piece),
         group,
+        child_group,
         start,
         offset: (0.0, 0.0),
         original: piece.clone(),
@@ -107,6 +122,7 @@ pub(super) fn begin_handle_drag(
         piece_id: piece.id,
         target: DragTarget::Handle(shape, handle),
         group: Vec::new(),
+        child_group: Vec::new(),
         start: view.to_world(origin),
         offset: (0.0, 0.0),
         original: piece.clone(),
@@ -126,8 +142,10 @@ pub(super) fn update_drag(cursor: Point, state: &mut EditorState) {
     match drag.target {
         DragTarget::Piece => current.translate(dx, dy),
         DragTarget::Child(child) => {
-            if let Some(shape) = ShapeRef::Child(child).get_mut(&mut current) {
-                shape.translate(dx, dy);
+            for child in [child].iter().chain(&drag.child_group) {
+                if let Some(shape) = ShapeRef::Child(*child).get_mut(&mut current) {
+                    shape.translate(dx, dy);
+                }
             }
         }
         DragTarget::Handle(shape, handle) => {
@@ -161,6 +179,23 @@ pub(super) fn finish_drag(events: &mut MessageWriter<ProjectMessage>, state: &mu
                 ProjectEvent::MovePieces { ids, dx, dy }
             };
             send(events, event);
+            return;
+        }
+        DragTarget::Child(child) if !drag.child_group.is_empty() => {
+            let (dx, dy) = drag.offset;
+            let children = [child]
+                .into_iter()
+                .chain(drag.child_group.iter().copied())
+                .collect();
+            send(
+                events,
+                ProjectEvent::MoveChildren {
+                    id,
+                    children,
+                    dx,
+                    dy,
+                },
+            );
             return;
         }
         DragTarget::Child(child) => ShapeRef::Child(child),

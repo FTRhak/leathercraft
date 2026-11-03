@@ -30,6 +30,10 @@ pub struct EditorState {
     /// Piece id and child id. Read through `selected_child_id`, since it only counts
     /// while that piece is the selected one.
     pub(super) selected_child: Option<(u64, u64)>,
+    /// Every selected child of the piece in `selected_child`, in the order selected. It contains
+    /// that child, and has more than one only through Shift+click or Ctrl+A. Read through
+    /// `selected_children`.
+    pub(super) children: Vec<u64>,
     /// Piece id, shape and edge index, picked with the Edge tool. Read through
     /// `selected_edge`, since it only counts while that shape is the one shown in Properties.
     pub(super) selected_edge: Option<(u64, ShapeRef, usize)>,
@@ -61,6 +65,7 @@ impl Default for EditorState {
             selected: None,
             pieces: Vec::new(),
             selected_child: None,
+            children: Vec::new(),
             selected_edge: None,
             drag: None,
             pan: egui::Vec2::ZERO,
@@ -113,7 +118,7 @@ impl EditorState {
         self.shape_draft = None;
         self.selected = None;
         self.pieces.clear();
-        self.selected_child = None;
+        self.clear_children();
         self.selected_edge = None;
         self.drag = None;
         self.rename_buffer = None;
@@ -152,7 +157,7 @@ impl EditorState {
                     self.selected = self.pieces.last().copied();
                 }
                 // The id can be given to the next new piece.
-                self.selected_child = None;
+                self.clear_children();
                 self.selected_edge = None;
                 if self.drag.as_ref().is_some_and(|drag| drag.piece_id == id) {
                     self.drag = None;
@@ -163,7 +168,7 @@ impl EditorState {
                 let count = self.pieces.len();
                 self.prune_selection(project);
                 let count = count - self.pieces.len();
-                self.selected_child = None;
+                self.clear_children();
                 self.selected_edge = None;
                 if self.drag.as_ref().is_some_and(|drag| {
                     !project.pieces.iter().any(|piece| piece.id == drag.piece_id)
@@ -184,10 +189,17 @@ impl EditorState {
             }
             ProjectChange::ChildRemoved { id } => {
                 if self.selected_child.is_some_and(|(piece, _)| piece == id) {
-                    self.selected_child = None;
+                    self.clear_children();
                 }
                 self.selected_edge = None;
                 self.report(Message::ChildDeleted);
+            }
+            ProjectChange::ChildrenRemoved { id, count } => {
+                if self.selected_child.is_some_and(|(piece, _)| piece == id) {
+                    self.clear_children();
+                }
+                self.selected_edge = None;
+                self.report(Message::ChildrenDeleted { count });
             }
         }
     }
@@ -200,15 +212,21 @@ impl EditorState {
         self.drag = None;
         self.rename_buffer = None;
         self.prune_selection(project);
-        let child_exists = |(id, child): (u64, u64)| {
-            project
-                .pieces
-                .iter()
-                .any(|piece| piece.id == id && piece.child(child).is_some())
-        };
-        self.selected_child = self
+        let piece = self
             .selected_child
-            .filter(|selected| child_exists(*selected));
+            .and_then(|(id, _)| project.pieces.iter().find(|piece| piece.id == id));
+        match piece {
+            Some(piece) => {
+                self.children.retain(|child| piece.child(*child).is_some());
+                if self
+                    .selected_child
+                    .is_some_and(|(_, child)| piece.child(child).is_none())
+                {
+                    self.selected_child = self.children.last().map(|child| (piece.id, *child));
+                }
+            }
+            None => self.clear_children(),
+        }
         self.report(status);
     }
 
@@ -218,11 +236,68 @@ impl EditorState {
             .map(|(_, child)| child)
     }
 
+    /// The selected children, if their piece is the selected one.
+    pub(super) fn selected_children(&self) -> &[u64] {
+        match self.selected_child {
+            Some((id, _)) if self.selected == Some(id) => &self.children,
+            _ => &[],
+        }
+    }
+
+    fn clear_children(&mut self) {
+        self.selected_child = None;
+        self.children.clear();
+    }
+
     pub(super) fn select(&mut self, piece: Option<u64>, child: Option<u64>) {
         self.selected = piece;
         self.pieces = piece.into_iter().collect();
         self.selected_child = piece.zip(child);
+        self.children = child.into_iter().collect();
         self.selected_edge = None;
+    }
+
+    /// Adds a child of the selected piece to the selection as its primary child, or removes it,
+    /// after which the child selected before it becomes primary. A child of another piece starts
+    /// a new selection. Either way the selection narrows to the child's piece.
+    pub(super) fn toggle_child(&mut self, piece: u64, child: u64) {
+        if self.selected_children().is_empty() || self.selected != Some(piece) {
+            self.select(Some(piece), Some(child));
+            return;
+        }
+        if self.children.contains(&child) {
+            self.children.retain(|selected| *selected != child);
+            if self.selected_child == Some((piece, child)) {
+                self.selected_child = self.children.last().map(|child| (piece, *child));
+            }
+        } else {
+            self.children.push(child);
+            self.selected_child = Some((piece, child));
+        }
+        self.pieces = vec![piece];
+        self.selected_edge = None;
+    }
+
+    /// Makes an already selected child the primary one, keeping the rest of the selection.
+    pub(super) fn focus_child(&mut self, child: u64) {
+        if let Some((piece, _)) = self.selected_child {
+            self.selected_child = Some((piece, child));
+        }
+        self.selected_edge = None;
+    }
+
+    /// Selects every child of the selected piece; the primary child stays.
+    pub(super) fn select_all_children(&mut self, project: &Project) {
+        let Some((id, _)) = self
+            .selected_child
+            .filter(|(id, _)| self.selected == Some(*id))
+        else {
+            return;
+        };
+        if let Some(piece) = project.pieces.iter().find(|piece| piece.id == id) {
+            self.children = piece.children.iter().map(|child| child.id).collect();
+            self.pieces = vec![id];
+        }
     }
 
     pub(super) fn is_selected(&self, piece: u64) -> bool {
@@ -241,14 +316,14 @@ impl EditorState {
             self.pieces.push(piece);
             self.selected = Some(piece);
         }
-        self.selected_child = None;
+        self.clear_children();
         self.selected_edge = None;
     }
 
     /// Makes an already selected piece the primary one, keeping the rest of the selection.
     pub(super) fn focus(&mut self, piece: u64) {
         self.selected = Some(piece);
-        self.selected_child = None;
+        self.clear_children();
         self.selected_edge = None;
     }
 

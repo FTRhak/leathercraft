@@ -42,6 +42,8 @@ pub(super) struct DragState {
     pub(super) target: DragTarget,
     /// Other pieces moved by a whole-piece drag.
     pub(super) group: Vec<u64>,
+    /// Other children of the piece moved by a child drag.
+    pub(super) child_group: Vec<u64>,
     pub(super) start: Point,
     /// The snapped offset of a whole-piece drag.
     pub(super) offset: (f64, f64),

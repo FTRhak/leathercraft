@@ -90,6 +90,18 @@ pub enum ProjectEvent {
         id: u64,
         child: u64,
     },
+    /// Moves several children of one piece by the same offset, as one edit.
+    MoveChildren {
+        id: u64,
+        children: Vec<u64>,
+        dx: f64,
+        dy: f64,
+    },
+    /// Removes several children of one piece as one edit.
+    RemoveChildren {
+        id: u64,
+        children: Vec<u64>,
+    },
 }
 
 /// What an applied event did, so that listeners can react without inspecting the project.
@@ -104,6 +116,7 @@ pub enum ProjectChange {
     PiecesRemoved,
     ChildAdded { id: u64, child: u64 },
     ChildRemoved { id: u64 },
+    ChildrenRemoved { id: u64, count: usize },
 }
 
 impl Project {
@@ -239,6 +252,34 @@ impl Project {
                 let index = child_index(piece, child)?;
                 piece.children.remove(index);
                 Ok(ProjectChange::ChildRemoved { id })
+            }),
+            // Each id is checked first, so a repeated id still moves its child only once.
+            ProjectEvent::MoveChildren {
+                id,
+                children,
+                dx,
+                dy,
+            } => self.edit(|project| {
+                let piece = project.unlocked_piece_mut(id)?;
+                for child in &children {
+                    child_index(piece, *child)?;
+                }
+                for child in &mut piece.children {
+                    if children.contains(&child.id) {
+                        child.shape.translate(dx, dy);
+                    }
+                }
+                Ok(ProjectChange::Edited)
+            }),
+            ProjectEvent::RemoveChildren { id, children } => self.edit(|project| {
+                let piece = project.unlocked_piece_mut(id)?;
+                for child in &children {
+                    child_index(piece, *child)?;
+                }
+                let before = piece.children.len();
+                piece.children.retain(|child| !children.contains(&child.id));
+                let count = before - piece.children.len();
+                Ok(ProjectChange::ChildrenRemoved { id, count })
             }),
         }
     }
@@ -565,6 +606,69 @@ mod tests {
     }
 
     #[test]
+    fn group_child_edits_reach_only_the_named_children() {
+        let mut project = project_with_piece();
+        for op in [BooleanOp::Subtract, BooleanOp::Union, BooleanOp::Subtract] {
+            project.apply(add_child(op)).unwrap();
+        }
+        let first = small_square().ring()[0];
+        project
+            .apply(ProjectEvent::MoveChildren {
+                id: 1,
+                children: vec![1, 3, 3],
+                dx: 2.0,
+                dy: 1.0,
+            })
+            .unwrap();
+        let children = &project.pieces[0].children;
+        assert_eq!(
+            children[0].shape.ring()[0],
+            Point::new(first.x + 2.0, first.y + 1.0)
+        );
+        assert_eq!(children[1].shape.ring()[0], first);
+        assert_eq!(
+            children[2].shape.ring()[0],
+            Point::new(first.x + 2.0, first.y + 1.0)
+        );
+
+        let before = project.clone();
+        assert_eq!(
+            project.apply(ProjectEvent::MoveChildren {
+                id: 1,
+                children: vec![1, 9],
+                dx: 1.0,
+                dy: 0.0,
+            }),
+            Err(Message::ChildNotFound {
+                name: "Деталь 1".to_owned()
+            })
+        );
+        assert!(
+            project
+                .apply(ProjectEvent::RemoveChildren {
+                    id: 1,
+                    children: vec![2, 9],
+                })
+                .is_err()
+        );
+        assert_eq!(project, before);
+
+        assert_eq!(
+            project.apply(ProjectEvent::RemoveChildren {
+                id: 1,
+                children: vec![1, 3],
+            }),
+            Ok(ProjectChange::ChildrenRemoved { id: 1, count: 2 })
+        );
+        let ids: Vec<u64> = project.pieces[0]
+            .children
+            .iter()
+            .map(|child| child.id)
+            .collect();
+        assert_eq!(ids, vec![2]);
+    }
+
+    #[test]
     fn arranging_moves_pieces_or_rejects_a_no_op() {
         let mut project = project_with_three_pieces();
         let align_left = ProjectEvent::ArrangePieces {
@@ -663,6 +767,16 @@ mod tests {
                 index: 0,
             },
             ProjectEvent::RemoveChild { id: 1, child: 1 },
+            ProjectEvent::MoveChildren {
+                id: 1,
+                children: vec![1],
+                dx: 1.0,
+                dy: 0.0,
+            },
+            ProjectEvent::RemoveChildren {
+                id: 1,
+                children: vec![1],
+            },
         ];
         for event in shape_edits {
             assert_eq!(project.apply(event), locked());

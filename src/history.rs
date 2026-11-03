@@ -226,6 +226,20 @@ impl History {
             ProjectEvent::RemoveChild { id, .. } => {
                 (Message::ActionRemoveChild { name: name(*id) }, None)
             }
+            ProjectEvent::MoveChildren { id, children, .. } => (
+                Message::ActionMoveChildren {
+                    name: name(*id),
+                    count: children.len(),
+                },
+                None,
+            ),
+            ProjectEvent::RemoveChildren { id, children } => (
+                Message::ActionRemoveChildren {
+                    name: name(*id),
+                    count: children.len(),
+                },
+                None,
+            ),
             // These are handled by their `ProjectChange` before describing.
             ProjectEvent::New { .. } | ProjectEvent::Open { .. } | ProjectEvent::Save { .. } => {
                 (Message::ActionNewProject, None)
@@ -491,6 +505,61 @@ mod tests {
         );
         history.apply(HistoryCommand::Undo, &mut project);
         assert_eq!(project.pieces.len(), 2);
+    }
+
+    #[test]
+    fn a_group_child_edit_is_one_entry_counting_its_shapes() {
+        let mut project = Project::default();
+        let mut history = History::default();
+        run(&mut project, &mut history, add_piece("Flap"));
+        for _ in 0..2 {
+            let shape =
+                Shape::rectangle_from_corners(Point::new(1.0, 1.0), Point::new(2.0, 2.0)).unwrap();
+            run(
+                &mut project,
+                &mut history,
+                ProjectEvent::AddChild {
+                    id: 1,
+                    op: BooleanOp::Subtract,
+                    shape,
+                },
+            );
+        }
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::MoveChildren {
+                id: 1,
+                children: vec![1, 2],
+                dx: 1.0,
+                dy: 0.0,
+            },
+        );
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::RemoveChildren {
+                id: 1,
+                children: vec![1, 2],
+            },
+        );
+        let name = || "Flap".to_owned();
+        let actions: Vec<&Message> = history.actions().skip(4).collect();
+        assert_eq!(
+            actions,
+            [
+                &Message::ActionMoveChildren {
+                    name: name(),
+                    count: 2
+                },
+                &Message::ActionRemoveChildren {
+                    name: name(),
+                    count: 2
+                }
+            ]
+        );
+        history.apply(HistoryCommand::Undo, &mut project);
+        assert_eq!(project.pieces[0].children.len(), 2);
     }
 
     #[test]

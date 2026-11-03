@@ -120,13 +120,22 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                 let selection = layout::Selection {
                     primary: state.selected,
                     pieces: &state.pieces,
-                    child: state.selected_child_id(),
+                    children: state.selected_children(),
                 };
                 let (event, pick) = layout::show_panel(ui, self.project, selection, language);
                 match pick {
                     Some(layout::Pick::Piece { id, toggle: true }) => state.toggle_piece(id),
                     Some(layout::Pick::Piece { id, toggle: false }) => state.select(Some(id), None),
-                    Some(layout::Pick::Child { id, child }) => state.select(Some(id), Some(child)),
+                    Some(layout::Pick::Child {
+                        id,
+                        child,
+                        toggle: true,
+                    }) => state.toggle_child(id, child),
+                    Some(layout::Pick::Child {
+                        id,
+                        child,
+                        toggle: false,
+                    }) => state.select(Some(id), Some(child)),
                     None => {}
                 }
                 if let Some(event) = event {

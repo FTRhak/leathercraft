@@ -264,6 +264,13 @@ fn handle_delete_key(
     if !delete_pressed {
         return;
     }
+    if let Some(id) = state.selected
+        && state.selected_children().len() > 1
+    {
+        let children = state.selected_children().to_vec();
+        send(events, ProjectEvent::RemoveChildren { id, children });
+        return;
+    }
     if state.pieces.len() > 1 {
         let mut ids: Vec<u64> = project
             .pieces
@@ -294,7 +301,12 @@ fn handle_select_all_key(ctx: &egui::Context, project: &Project, state: &mut Edi
         return;
     }
     if ctx.input_mut(|input| input.consume_shortcut(&SELECT_ALL)) {
-        state.select_all(project);
+        // Within a piece whose shape is selected, Ctrl+A selects its other shapes.
+        if state.selected_children().is_empty() {
+            state.select_all(project);
+        } else {
+            state.select_all_children(project);
+        }
     }
 }
 

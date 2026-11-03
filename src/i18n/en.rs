@@ -365,6 +365,7 @@ pub(super) fn message(message: &Message) -> String {
         Message::AlreadyArranged => "The pieces are already arranged.".to_owned(),
         Message::ChildAdded { name } => format!("Added a shape to '{name}'."),
         Message::ChildDeleted => "Shape deleted.".to_owned(),
+        Message::ChildrenDeleted { count } => format!("{count} shapes deleted."),
         Message::SelectPieceForChild => "Select a piece to add the shape to.".to_owned(),
         Message::ChildNotFound { name } => format!("Piece '{name}' has no such shape."),
         Message::TooManyChildren { name, max } => {
@@ -432,6 +433,12 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionSetChildOp { name } => format!("Changed an operation of '{name}'"),
         Message::ActionReorderChild { name } => format!("Reordered the shapes of '{name}'"),
         Message::ActionRemoveChild { name } => format!("Deleted a shape from '{name}'"),
+        Message::ActionMoveChildren { name, count } => {
+            format!("Moved {count} shapes of '{name}'")
+        }
+        Message::ActionRemoveChildren { name, count } => {
+            format!("Deleted {count} shapes from '{name}'")
+        }
     }
 }
 

@@ -200,6 +200,7 @@ pub enum Message {
     PiecesDeleted { count: usize },
     ChildAdded { name: String },
     ChildDeleted,
+    ChildrenDeleted { count: usize },
     SelectPieceForChild,
     ChildNotFound { name: String },
     TooManyChildren { name: String, max: usize },
@@ -252,6 +253,8 @@ pub enum Message {
     ActionSetChildOp { name: String },
     ActionReorderChild { name: String },
     ActionRemoveChild { name: String },
+    ActionMoveChildren { name: String, count: usize },
+    ActionRemoveChildren { name: String, count: usize },
 }
 
 impl fmt::Display for Message {

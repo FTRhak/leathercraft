@@ -139,8 +139,13 @@ fn handle_select(
     {
         let point = view.to_world(position);
         if ui.input(|input| input.modifiers.shift) {
-            if let Some(piece) = piece_at(project, point) {
-                state.toggle_piece(piece);
+            match child_of_selected_at(project, point, state) {
+                Some((piece, child)) => state.toggle_child(piece, child),
+                None => {
+                    if let Some(piece) = piece_at(project, point) {
+                        state.toggle_piece(piece);
+                    }
+                }
             }
         } else {
             select_at(project, point, state);
@@ -184,13 +189,21 @@ fn handle_edge(
     }
 }
 
-/// A child of the selected piece takes the click; otherwise it selects a piece.
-fn select_at(project: &Project, point: Point, state: &mut EditorState) {
-    let child = state
+/// The child of the selected piece under the point, with its piece id.
+fn child_of_selected_at(
+    project: &Project,
+    point: Point,
+    state: &EditorState,
+) -> Option<(u64, u64)> {
+    state
         .selected
         .and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
-        .and_then(|piece| child_at(piece, point).map(|child| (piece.id, child)));
-    match child {
+        .and_then(|piece| child_at(piece, point).map(|child| (piece.id, child)))
+}
+
+/// A child of the selected piece takes the click; otherwise it selects a piece.
+fn select_at(project: &Project, point: Point, state: &mut EditorState) {
+    match child_of_selected_at(project, point, state) {
         Some((piece, child)) => state.select(Some(piece), Some(child)),
         None => state.select(piece_at(project, point), None),
     }
@@ -522,7 +535,7 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
         for child in &piece.children {
             let screen = to_screen(view, &child.shape.ring());
             let color = op_color(child.op);
-            if selected_child == Some(child.id) {
+            if state.selected_children().contains(&child.id) {
                 painter.add(egui::Shape::closed_line(
                     screen,
                     egui::Stroke::new(2.0, color),

@@ -372,6 +372,10 @@ pub(super) fn message(message: &Message) -> String {
         Message::AlreadyArranged => "Деталі вже так розташовані.".to_owned(),
         Message::ChildAdded { name } => format!("Додано фігуру в деталь «{name}»."),
         Message::ChildDeleted => "Фігуру видалено.".to_owned(),
+        Message::ChildrenDeleted { count } => {
+            let noun = plural(*count, "фігуру", "фігури", "фігур");
+            format!("Видалено {count} {noun}.")
+        }
         Message::SelectPieceForChild => "Виберіть деталь, до якої треба додати фігуру.".to_owned(),
         Message::ChildNotFound { name } => format!("У деталі «{name}» немає такої фігури."),
         Message::TooManyChildren { name, max } => {
@@ -465,6 +469,14 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionSetChildOp { name } => format!("Змінено операцію «{name}»"),
         Message::ActionReorderChild { name } => format!("Змінено порядок фігур «{name}»"),
         Message::ActionRemoveChild { name } => format!("Видалено фігуру з «{name}»"),
+        Message::ActionMoveChildren { name, count } => {
+            let noun = plural(*count, "фігуру", "фігури", "фігур");
+            format!("Переміщено {count} {noun} у «{name}»")
+        }
+        Message::ActionRemoveChildren { name, count } => {
+            let noun = plural(*count, "фігуру", "фігури", "фігур");
+            format!("Видалено {count} {noun} з «{name}»")
+        }
     }
 }
 

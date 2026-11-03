@@ -51,17 +51,17 @@ fn shape_label(shape: &Shape) -> Label {
     }
 }
 
-/// The selected pieces, and the child selected in the primary piece.
+/// The selected pieces, and the children selected in the primary piece.
 pub struct Selection<'a> {
     pub primary: Option<u64>,
     pub pieces: &'a [u64],
-    pub child: Option<u64>,
+    pub children: &'a [u64],
 }
 
-/// A clicked row. With Shift, a piece is added to or removed from the selection.
+/// A clicked row. With Shift, a piece or child is added to or removed from the selection.
 pub enum Pick {
     Piece { id: u64, toggle: bool },
-    Child { id: u64, child: u64 },
+    Child { id: u64, child: u64, toggle: bool },
 }
 
 /// What a row did: an edit to send, and a row to select.
@@ -127,7 +127,7 @@ fn child_row(
             });
         }
     });
-    let selected = selection.primary == Some(id) && selection.child == Some(child_id);
+    let selected = selection.primary == Some(id) && selection.children.contains(&child_id);
     let text = format!(
         "{}. {}",
         index + 1,
@@ -136,9 +136,10 @@ fn child_row(
     let row = egui::Button::selectable(selected, (text, egui::Atom::grow()))
         .truncate()
         .min_size(egui::vec2(ui.available_width(), 0.0));
-    let pick = ui.add(row).clicked().then_some(Pick::Child {
+    let pick = ui.add(row).clicked().then(|| Pick::Child {
         id,
         child: child_id,
+        toggle: ui.input(|input| input.modifiers.shift),
     });
     (event, pick)
 }
@@ -192,7 +193,7 @@ fn piece_row(
             locked: !piece.locked,
         });
     }
-    let child_shown = selection.primary == Some(piece.id) && selection.child.is_some();
+    let child_shown = selection.primary == Some(piece.id) && !selection.children.is_empty();
     let selected = selection.pieces.contains(&piece.id) && !child_shown;
     let row = egui::Button::selectable(selected, (piece.name.as_str(), egui::Atom::grow()))
         .truncate()
