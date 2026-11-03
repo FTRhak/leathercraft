@@ -30,6 +30,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Ellipse => "Ellipse",
         Label::Polygon => "Polygon",
         Label::RegularPolygon => "Regular polygon",
+        Label::Edge => "Edge",
         Label::RectangleHint => "Drag from corner to corner. Esc cancels.",
         Label::EllipseHint => "Drag from the center outward. Hold Shift for a circle. Esc cancels.",
         Label::RegularPolygonHint => {
@@ -48,12 +49,16 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Radius => "Radius",
         Label::Sides => "Sides",
         Label::Rotation => "Rotation, °",
+        Label::EdgeLength => "Length",
         Label::ToPolygon => "To Polygon",
         Label::MoveUp => "Apply earlier",
         Label::MoveDown => "Apply later",
         Label::DeleteChild => "Delete shape",
         Label::DrawHint => {
             "Click to add points. Click the first point or press Enter to close; Esc cancels."
+        }
+        Label::EdgeHint => {
+            "Click an edge of a polygon to select it, then set its length in Properties. Drag a vertex to move it. Esc clears."
         }
         Label::SelectHint => {
             "Drag a piece or a vertex of the selected piece. Del removes the selected piece."
@@ -338,6 +343,7 @@ pub(super) fn message(message: &Message) -> String {
         Message::PieceDeleted => "Piece deleted.".to_owned(),
         Message::PointCount { count: 1 } => "1 point".to_owned(),
         Message::PointCount { count } => format!("{count} points"),
+        Message::SelectedEdge { number } => format!("Edge {number}"),
         Message::DefaultPieceName { id } => format!("Piece {id}"),
         Message::PieceNotFound { id } => format!("Piece {id} does not exist."),
         Message::PieceLocked { name } => format!("Piece '{name}' is locked."),

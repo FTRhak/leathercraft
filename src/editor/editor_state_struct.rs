@@ -1,3 +1,4 @@
+use super::drag_state_struct::ShapeRef;
 use super::{DragState, ShapeDraft};
 use crate::panels::tools::Tool;
 use bevy::prelude::*;
@@ -22,6 +23,9 @@ pub struct EditorState {
     /// Piece id and child id. Read through `selected_child_id`, since it only counts
     /// while that piece is the selected one.
     pub(super) selected_child: Option<(u64, u64)>,
+    /// Piece id, shape and edge index, picked with the Edge tool. Read through
+    /// `selected_edge`, since it only counts while that shape is the one shown in Properties.
+    pub(super) selected_edge: Option<(u64, ShapeRef, usize)>,
     pub(super) drag: Option<DragState>,
     pub(super) pan: egui::Vec2,
     pub(super) zoom: f32,
@@ -48,6 +52,7 @@ impl Default for EditorState {
             op_mode: None,
             selected: None,
             selected_child: None,
+            selected_edge: None,
             drag: None,
             pan: egui::Vec2::ZERO,
             zoom: 2.0,
@@ -99,6 +104,7 @@ impl EditorState {
         self.shape_draft = None;
         self.selected = None;
         self.selected_child = None;
+        self.selected_edge = None;
         self.drag = None;
         self.rename_buffer = None;
         self.fit_requested = true;
@@ -136,6 +142,7 @@ impl EditorState {
                 }
                 // The id can be given to the next new piece.
                 self.selected_child = None;
+                self.selected_edge = None;
                 if self.drag.as_ref().is_some_and(|drag| drag.piece_id == id) {
                     self.drag = None;
                 }
@@ -156,6 +163,7 @@ impl EditorState {
                 if self.selected_child.is_some_and(|(piece, _)| piece == id) {
                     self.selected_child = None;
                 }
+                self.selected_edge = None;
                 self.report(Message::ChildDeleted);
             }
         }
@@ -195,6 +203,28 @@ impl EditorState {
     pub(super) fn select(&mut self, piece: Option<u64>, child: Option<u64>) {
         self.selected = piece;
         self.selected_child = piece.zip(child);
+        self.selected_edge = None;
+    }
+
+    /// Selects the edge along with its piece, and its child if it belongs to one.
+    pub(super) fn select_edge(&mut self, piece: u64, shape: ShapeRef, edge: usize) {
+        let child = match shape {
+            ShapeRef::Base => None,
+            ShapeRef::Child(child) => Some(child),
+        };
+        self.select(Some(piece), child);
+        self.selected_edge = Some((piece, shape, edge));
+    }
+
+    /// The selected edge, if its shape is the one selected. The index may be out of range
+    /// after an undo, so readers check it against the shape.
+    pub(super) fn selected_edge(&self) -> Option<(ShapeRef, usize)> {
+        let (piece, shape, edge) = self.selected_edge?;
+        let shown = match self.selected_child_id() {
+            Some(child) => ShapeRef::Child(child),
+            None => ShapeRef::Base,
+        };
+        (self.selected == Some(piece) && shape == shown).then_some((shape, edge))
     }
 
     pub fn clear_released_drag(&mut self) {

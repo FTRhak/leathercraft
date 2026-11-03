@@ -14,6 +14,7 @@ const ICON_ARC_SEGMENTS: usize = 48;
 pub enum Tool {
     #[default]
     Select,
+    Edge,
     Draw,
     Rectangle,
     Ellipse,
@@ -21,8 +22,9 @@ pub enum Tool {
 }
 
 impl Tool {
-    const ALL: [Self; 5] = [
+    const ALL: [Self; 6] = [
         Self::Select,
+        Self::Edge,
         Self::Draw,
         Self::Rectangle,
         Self::Ellipse,
@@ -32,6 +34,7 @@ impl Tool {
     fn label(self) -> Label {
         match self {
             Self::Select => Label::Select,
+            Self::Edge => Label::Edge,
             Self::Draw => Label::Draw,
             Self::Rectangle => Label::Rectangle,
             Self::Ellipse => Label::Ellipse,
@@ -42,6 +45,7 @@ impl Tool {
     pub fn hint(self) -> Label {
         match self {
             Self::Select => Label::SelectHint,
+            Self::Edge => Label::EdgeHint,
             Self::Draw => Label::DrawHint,
             Self::Rectangle => Label::RectangleHint,
             Self::Ellipse => Label::EllipseHint,
@@ -58,7 +62,7 @@ impl Tool {
             Self::RegularPolygon => {
                 Shape::regular_polygon_from_center(start, end, sides, constrained)
             }
-            Self::Select | Self::Draw => None,
+            Self::Select | Self::Edge | Self::Draw => None,
         }
     }
 
@@ -77,6 +81,16 @@ impl Tool {
                     at(0.85, 0.52),
                 ];
                 painter.add(egui::Shape::closed_line(arrow, stroke));
+            }
+            Self::Edge => {
+                let outline = vec![at(0.0, 0.85), at(0.15, 0.1), at(0.85, 0.0), at(1.0, 0.75)];
+                let faded = egui::Stroke::new(1.0, stroke.color.gamma_multiply(0.35));
+                painter.add(egui::Shape::closed_line(outline.clone(), faded));
+                let edge = [outline[3], outline[0]];
+                painter.line_segment(edge, egui::Stroke::new(stroke.width * 2.0, stroke.color));
+                for vertex in edge {
+                    painter.circle_filled(vertex, ICON_VERTEX_RADIUS, stroke.color);
+                }
             }
             Self::Draw => {
                 let vertices = vec![at(0.0, 1.0), at(0.3, 0.2), at(0.7, 0.7), at(1.0, 0.0)];

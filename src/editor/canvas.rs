@@ -1,4 +1,4 @@
-use super::drag::{begin_drag, finish_drag, update_drag};
+use super::drag::{begin_drag, begin_handle_drag, finish_drag, update_drag};
 use super::drag_state_struct::ShapeRef;
 use super::grid::draw_grid;
 use super::{EditorState, ShapeDraft, format_length, send};
@@ -15,6 +15,7 @@ use leathercraft::shapes::{Ellipse, Polygon, Rectangle, RegularPolygon, Shape};
 const MIN_ZOOM: f32 = 0.05;
 const MAX_ZOOM: f32 = 100.0;
 const VERTEX_HIT_RADIUS_PX: f32 = 8.0;
+const EDGE_HIT_RADIUS_PX: f32 = 6.0;
 const CLOSE_HIT_RADIUS_PX: f32 = 10.0;
 const MAX_POINTS_WITH_EDGE_LABELS: usize = 64;
 
@@ -79,6 +80,7 @@ pub(super) fn canvas(
     }
     match state.tool {
         Tool::Select => handle_select(ui, &response, view, project, events, state),
+        Tool::Edge => handle_edge(ui, &response, view, project, events, state),
         Tool::Draw => handle_draw(ui, &response, view, project, events, state),
         Tool::Rectangle | Tool::Ellipse | Tool::RegularPolygon => {
             handle_shape(ui, &response, view, project, events, state);
@@ -88,6 +90,7 @@ pub(super) fn canvas(
     painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
     draw_grid(&painter, rect, view);
     draw_pieces(&painter, view, project, state);
+    draw_edges(&painter, response.hover_pos(), view, project, state);
     draw_draft(&painter, response.hover_pos(), view, project.units, state);
     draw_shape_draft(&painter, view, project.units, state);
 }
@@ -134,6 +137,42 @@ fn handle_select(
         && let Some(position) = response.interact_pointer_pos()
     {
         select_at(project, view.to_world(position), state);
+    }
+}
+
+/// A click picks the polygon edge under the cursor, or else selects as the Select tool does.
+/// Vertices of the selected piece can be dragged as with the Select tool.
+fn handle_edge(
+    ui: &egui::Ui,
+    response: &egui::Response,
+    view: Viewport,
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
+    state: &mut EditorState,
+) {
+    if response.drag_started_by(egui::PointerButton::Primary)
+        && let Some(origin) = ui.input(|input| input.pointer.press_origin())
+    {
+        begin_handle_drag(origin, view, project, state);
+    }
+    if response.dragged_by(egui::PointerButton::Primary)
+        && let Some(position) = response.interact_pointer_pos()
+    {
+        update_drag(view.to_world(position), state);
+    }
+    if response.drag_stopped() {
+        finish_drag(events, state);
+    }
+    if response.clicked()
+        && let Some(position) = response.interact_pointer_pos()
+    {
+        match edge_at(project, state, position, view) {
+            Some((piece, shape, edge)) => state.select_edge(piece, shape, edge),
+            None => select_at(project, view.to_world(position), state),
+        }
+    }
+    if !ui.ctx().wants_keyboard_input() && ui.input(|input| input.key_pressed(egui::Key::Escape)) {
+        state.selected_edge = None;
     }
 }
 
@@ -318,6 +357,64 @@ pub(super) fn handle_at(
         })
 }
 
+fn segment_distance(point: egui::Pos2, a: egui::Pos2, b: egui::Pos2) -> f32 {
+    let along = b - a;
+    let t = if along.length_sq() > 0.0 {
+        ((point - a).dot(along) / along.length_sq()).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    point.distance(a + along * t)
+}
+
+/// The polygon edge nearest the cursor, within reach. The selected piece goes first, then the
+/// others from the top; within a piece the selected child, then the other children, then the base.
+fn edge_at(
+    project: &Project,
+    state: &EditorState,
+    position: egui::Pos2,
+    view: Viewport,
+) -> Option<(u64, ShapeRef, usize)> {
+    let selected = state
+        .selected
+        .and_then(|id| project.pieces.iter().find(|piece| piece.id == id));
+    let others = project
+        .pieces
+        .iter()
+        .rev()
+        .filter(|piece| Some(piece.id) != state.selected);
+    selected.into_iter().chain(others).find_map(|piece| {
+        let selected_child = state
+            .selected_child_id()
+            .filter(|_| state.selected == Some(piece.id))
+            .map(ShapeRef::Child);
+        let children = piece
+            .children
+            .iter()
+            .rev()
+            .map(|child| ShapeRef::Child(child.id))
+            .filter(|shape| Some(*shape) != selected_child);
+        selected_child
+            .into_iter()
+            .chain(children)
+            .chain([ShapeRef::Base])
+            .find_map(|shape| {
+                let Shape::Polygon(polygon) = shape.get(piece)? else {
+                    return None;
+                };
+                (0..polygon.points.len())
+                    .filter_map(|edge| {
+                        let (a, b) = polygon.edge(edge)?;
+                        let distance =
+                            segment_distance(position, view.to_screen(a), view.to_screen(b));
+                        (distance <= EDGE_HIT_RADIUS_PX).then_some((edge, distance))
+                    })
+                    .min_by(|a, b| a.1.total_cmp(&b.1))
+                    .map(|(edge, _)| (piece.id, shape, edge))
+            })
+    })
+}
+
 fn op_color(op: BooleanOp) -> egui::Color32 {
     match op {
         BooleanOp::Subtract => egui::Color32::from_rgb(235, 110, 110),
@@ -449,6 +546,56 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
                     draw_edge_labels(painter, &region.outline, &outline, project.units, state);
                 }
             }
+        }
+    }
+}
+
+/// The selected edge, and with the Edge tool the edge under the cursor.
+fn draw_edges(
+    painter: &egui::Painter,
+    hover: Option<egui::Pos2>,
+    view: Viewport,
+    project: &Project,
+    state: &EditorState,
+) {
+    let color = egui::Color32::from_rgb(250, 215, 90);
+    let segment = |piece: u64, shape: ShapeRef, edge: usize| {
+        let piece = project
+            .pieces
+            .iter()
+            .find(|candidate| candidate.id == piece)?;
+        let piece = state.displayed(piece);
+        let Shape::Polygon(polygon) = shape.get(&piece)? else {
+            return None;
+        };
+        let (a, b) = polygon.edge(edge)?;
+        Some([view.to_screen(a), view.to_screen(b)])
+    };
+    // A vertex under the cursor is dragged rather than its edge picked, so it isn't highlighted.
+    let on_vertex = |hover: egui::Pos2| {
+        state
+            .selected
+            .and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
+            .filter(|piece| !piece.locked)
+            .and_then(|piece| handle_at(piece, state.selected_child_id(), hover, view))
+            .is_some()
+    };
+    if state.tool == Tool::Edge
+        && state.drag.is_none()
+        && let Some(hover) = hover
+        && !on_vertex(hover)
+        && let Some((piece, shape, edge)) = edge_at(project, state, hover, view)
+        && let Some(points) = segment(piece, shape, edge)
+    {
+        painter.line_segment(points, egui::Stroke::new(3.0, color.gamma_multiply(0.5)));
+    }
+    if let Some(piece) = state.selected
+        && let Some((shape, edge)) = state.selected_edge()
+        && let Some(points) = segment(piece, shape, edge)
+    {
+        painter.line_segment(points, egui::Stroke::new(4.0, color));
+        for point in points {
+            painter.circle_filled(point, 4.0, color);
         }
     }
 }

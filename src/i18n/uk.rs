@@ -30,6 +30,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Ellipse => "Овал",
         Label::Polygon => "Полігон",
         Label::RegularPolygon => "Багатокутник",
+        Label::Edge => "Грань",
         Label::RectangleHint => "Перетягуйте від кута до кута. Esc скасовує.",
         Label::EllipseHint => "Перетягуйте від центру назовні. Shift — коло. Esc скасовує.",
         Label::RegularPolygonHint => {
@@ -48,12 +49,16 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Radius => "Радіус",
         Label::Sides => "Кількість граней",
         Label::Rotation => "Поворот, °",
+        Label::EdgeLength => "Довжина",
         Label::ToPolygon => "У многокутник",
         Label::MoveUp => "Застосувати раніше",
         Label::MoveDown => "Застосувати пізніше",
         Label::DeleteChild => "Видалити фігуру",
         Label::DrawHint => {
             "Клацайте, щоб додавати точки. Клацніть першу точку або натисніть Enter, щоб замкнути контур; Esc скасовує."
+        }
+        Label::EdgeHint => {
+            "Клацніть грань полігона, щоб вибрати її, і задайте довжину на панелі властивостей. Перетягуйте вершину, щоб перемістити її. Esc знімає вибір."
         }
         Label::SelectHint => {
             "Перетягуйте деталь або вершину вибраної деталі. Del видаляє вибрану деталь."
@@ -342,6 +347,7 @@ pub(super) fn message(message: &Message) -> String {
             let noun = plural(*count, "точка", "точки", "точок");
             format!("{count} {noun}")
         }
+        Message::SelectedEdge { number } => format!("Грань {number}"),
         Message::DefaultPieceName { id } => format!("Деталь {id}"),
         Message::PieceNotFound { id } => format!("Деталь {id} не існує."),
         Message::PieceLocked { name } => format!("Деталь «{name}» заблоковано."),

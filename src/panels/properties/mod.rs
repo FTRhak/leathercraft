@@ -4,9 +4,7 @@ use bevy_egui::egui;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{PatternPiece, Project, Units};
-use leathercraft::shapes::{
-    Ellipse, Polygon, REGULAR_POLYGON_SIDES, Rectangle, RegularPolygon, Shape,
-};
+use leathercraft::shapes::{Ellipse, REGULAR_POLYGON_SIDES, Rectangle, RegularPolygon, Shape};
 
 /// The canvas options of the 2D editor.
 pub struct EditorView<'a> {
@@ -27,6 +25,8 @@ pub struct Selection<'a> {
     /// The selected piece as currently shown, so with a drag in progress applied.
     pub piece: Option<&'a PatternPiece>,
     pub child: Option<u64>,
+    /// The edge of the shown shape picked with the Edge tool.
+    pub edge: Option<usize>,
     /// The name being typed, kept while the name box has focus.
     pub rename_buffer: &'a mut Option<String>,
 }
@@ -115,7 +115,7 @@ fn selected_piece_details(
     ui.strong(title);
     let mut edited = shape.clone();
     ui.add_enabled_ui(!piece.locked, |ui| {
-        shape_fields(ui, &mut edited, units, language);
+        shape_fields(ui, &mut edited, selection.edge, units, language);
         if !matches!(shape, Shape::Polygon(_))
             && ui.button(language.label(Label::ToPolygon)).clicked()
         {
@@ -135,8 +135,15 @@ fn selected_piece_details(
     event
 }
 
-/// Fields for the parameters of a primitive, in display units; a polygon shows its point count.
-fn shape_fields(ui: &mut egui::Ui, shape: &mut Shape, units: Units, language: Language) {
+/// Fields for the parameters of a primitive, in display units; a polygon shows its point count
+/// and the length of the selected edge.
+fn shape_fields(
+    ui: &mut egui::Ui,
+    shape: &mut Shape,
+    edge: Option<usize>,
+    units: Units,
+    language: Language,
+) {
     let scale = units.from_millimeters(1.0);
     let symbol = language.unit_symbol(units);
     let length = |ui: &mut egui::Ui, label: Label, millimeters: &mut f64, min: f64| {
@@ -169,10 +176,22 @@ fn shape_fields(ui: &mut egui::Ui, shape: &mut Shape, units: Units, language: La
     // Sizes stay above zero, which the project would reject.
     const MIN_SIZE_MM: f64 = 0.01;
     match shape {
-        Shape::Polygon(Polygon { points }) => {
+        Shape::Polygon(polygon) => {
             ui.label(language.message(&Message::PointCount {
-                count: points.len(),
+                count: polygon.points.len(),
             }));
+            if let Some(edge) = edge
+                && let Some(current) = polygon.edge_length(edge)
+            {
+                ui.label(language.message(&Message::SelectedEdge { number: edge + 1 }));
+                let mut value = current;
+                length(ui, Label::EdgeLength, &mut value, MIN_SIZE_MM);
+                if value != current
+                    && let Some(resized) = polygon.with_edge_length(edge, value)
+                {
+                    *polygon = resized;
+                }
+            }
         }
         Shape::Rectangle(Rectangle {
             center,

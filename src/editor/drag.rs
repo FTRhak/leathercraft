@@ -65,6 +65,37 @@ pub(super) fn begin_drag(
     });
 }
 
+/// Starts dragging a handle of the selected piece without changing the selection, so that the
+/// Edge tool keeps its selected edge.
+pub(super) fn begin_handle_drag(
+    origin: egui::Pos2,
+    view: Viewport,
+    project: &Project,
+    state: &mut EditorState,
+) {
+    let Some(piece) = state
+        .selected
+        .and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
+    else {
+        return;
+    };
+    if piece.locked {
+        return;
+    }
+    let Some((shape, handle)) = handle_at(piece, state.selected_child_id(), origin, view) else {
+        return;
+    };
+    state.drag = Some(DragState {
+        piece_id: piece.id,
+        target: DragTarget::Handle(shape, handle),
+        start: view.to_world(origin),
+        offset: (0.0, 0.0),
+        original: piece.clone(),
+        current: piece.clone(),
+        released: false,
+    });
+}
+
 pub(super) fn update_drag(cursor: Point, state: &mut EditorState) {
     let Some(drag) = &state.drag else {
         return;

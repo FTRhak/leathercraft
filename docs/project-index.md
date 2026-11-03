@@ -26,23 +26,23 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
 | `src/editor/mod.rs` | 78 | 550 | bin | `ViewMode`, `send`, `export`, `format_length` |
-| `src/editor/editor_state_struct.rs` | 216 | 1,800 | bin | `EditorState` and its methods, `document_name` |
+| `src/editor/editor_state_struct.rs` | 249 | 2,100 | bin | `EditorState` and its methods, `document_name` |
 | `src/editor/drag_state_struct.rs` | 51 | 400 | bin | `ShapeRef`, `DragTarget`, `DragState` |
 | `src/editor/shape_draft_struct.rs` | 9 | 60 | bin | `ShapeDraft` |
-| `src/editor/canvas.rs` | 568 | 4,800 | bin | `canvas`, `Viewport`, tool behavior, hit testing, painting |
+| `src/editor/canvas.rs` | 728 | 6,100 | bin | `canvas`, `Viewport`, tool behavior, hit testing (pieces, children, handles, polygon edges), painting |
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
-| `src/editor/drag.rs` | 125 | 1,000 | bin | `begin_drag`, `update_drag`, `finish_drag`: dragging pieces, children and shape handles with the Select tool |
+| `src/editor/drag.rs` | 156 | 1,250 | bin | `begin_drag`, `begin_handle_drag`, `update_drag`, `finish_drag`: dragging pieces, children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
 | `src/editor/ui.rs` | 286 | 2,650 | bin | `editor_ui`, `file_menu`, `window_menu`, `handle_delete_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete key, language picker |
 | `src/editor/panel_viewer.rs` | 139 | 1,150 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History tab title has an icon |
 | `src/icons/mod.rs` | 87 | 760 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
 | `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
-| `src/panels/tools/mod.rs` | 228 | 1,950 | bin | `Tool`, painted tool and operation icons, Tools panel with the regular polygon's sides field |
+| `src/panels/tools/mod.rs` | 242 | 2,100 | bin | `Tool`, painted tool and operation icons, Tools panel with the regular polygon's sides field |
 | `src/panels/layout/mod.rs` | 252 | 2,600 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
-| `src/panels/properties/mod.rs` | 237 | 1,850 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, To Polygon button |
+| `src/panels/properties/mod.rs` | 256 | 2,000 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, selected edge's length, To Polygon button |
 | `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion |
 | `src/model.rs` | 476 | 3,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation |
 | `src/boolean.rs` | 221 | 1,900 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes |
@@ -57,7 +57,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/shapes/rectangle.rs` | 113 | 800 | lib | `Rectangle` |
 | `src/shapes/ellipse.rs` | 123 | 900 | lib | `Ellipse`, `CIRCLE_SEGMENTS` |
 | `src/shapes/regular_polygon.rs` | 142 | 1,050 | lib | `RegularPolygon`, `REGULAR_POLYGON_SIDES` |
-| `src/shapes/polygon.rs` | 25 | 150 | lib | `Polygon` |
+| `src/shapes/polygon.rs` | 98 | 750 | lib | `Polygon`, its edges and their lengths |
 | `src/i18n/en.rs` | 435 | 4,550 | lib | English catalog |
 | `src/history.rs` | 508 | 4,350 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
 | `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
@@ -89,7 +89,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `shapes/rectangle.rs` | 5-53 | `Rectangle`: `from_corners`, `ring`, `with_handle_at`, `has_valid_size`; tests from 55 |
 | `shapes/ellipse.rs` | 6-79 | `CIRCLE_SEGMENTS`, `Ellipse`: `from_center`, `ring`, `handles`, `with_handle_at`, `has_valid_size`; tests from 81 |
 | `shapes/regular_polygon.rs` | 7-73 | `REGULAR_POLYGON_SIDES` (3..=64), `ROTATION_SNAP`, `RegularPolygon`: `from_center`, `ring`, `with_handle_at`, `has_valid_size`; tests from 75 |
-| `shapes/polygon.rs` | 4-25 | `Polygon`: `translate`, `with_handle_at` |
+| `shapes/polygon.rs` | 4-49 | `Polygon`: `translate`, `with_handle_at`, `edge`, `edge_length`, `with_edge_length` (moves the edge's end along it); tests from 51 |
 | `boolean.rs` | 11-53 | `ROUND_PRECISION_MM`, `Region`: `rings`, `vertices`, `hole_indices`, `bounds`, `contains` |
 | | 67-96 | `PatternPiece::region` |
 | | 98-221 | Tests |
@@ -127,9 +127,9 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 12-37 | Type | `EditorState`, with `op_mode` and `selected_child` |
+| 12-40 | Type | `EditorState`, with `op_mode`, `selected_child` and `selected_edge` |
 | 39-62 | Defaults | `Default` impl |
-| 64-209 | Methods | `new`, `report`, `report_error`, `snap`, `snap_point`, `reset_document`, `on_project_change`, `on_history_restore`, `selected_child_id`, `select`, `clear_released_drag`, `displayed` |
+| 67-242 | Methods | `new`, `report`, `report_error`, `snap`, `snap_point`, `reset_document`, `on_project_change`, `on_history_restore`, `selected_child_id`, `select`, `select_edge`, `selected_edge` (only while its shape is the one shown in Properties), `clear_released_drag`, `displayed` |
 | 211-216 | Helpers | `document_name` |
 
 ### `editor/canvas.rs`
@@ -139,10 +139,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | 15-19 | Constants | Zoom limits, hit radii, edge label limit |
 | 21-36 | Viewport | `Viewport` (`to_screen`, `to_world`) |
 | 38-109 | Canvas | `canvas`, `fit_view` |
-| 111-150 | Select tool | `handle_select`, `select_at` |
+| 114-190 | Select and Edge tools | `handle_select`, `handle_edge` (click picks a polygon edge, drag moves a vertex of the selected piece, Esc clears), `select_at` |
 | 152-262 | Drawing tools | `handle_draw`, `finish_draft`, `commit_shape` (new piece or `AddChild`), `handle_shape`, `add_piece` |
-| 265-314 | Hit testing | `piece_hit`, `piece_at`, `child_at`, `handle_at` |
-| 316-568 | Painting | `op_color`, `draft_color`, `dashed_ring`, `draw_handles`, `draw_pieces`, `draw_edge_labels`, `fill_polygon`, `draw_draft`, `draw_shape_draft` |
+| 293-401 | Hit testing | `piece_hit`, `piece_at`, `child_at`, `handle_at`, `segment_distance`, `edge_at` |
+| 403-702 | Painting | `op_color`, `draft_color`, `dashed_ring`, `draw_handles`, `draw_pieces`, `draw_edges` (selected and hovered edge), `draw_edge_labels`, `fill_polygon`, `draw_draft`, `draw_shape_draft` |
 
 ### `editor/ui.rs`
 
@@ -163,9 +163,9 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
 | | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
 | `tools/mod.rs` | 8-11 | Icon constants |
-| | 14-115 | `Tool` (Select, Draw, Rectangle, Ellipse, RegularPolygon): `ALL`, `label`, `hint`, `shape`, `paint_icon` |
+| | 14-129 | `Tool` (Select, Edge, Draw, Rectangle, Ellipse, RegularPolygon): `ALL`, `label`, `hint`, `shape`, `paint_icon` |
 | | 119-175 | `arc`, `paint_operation_icon`, `paint_new_piece_icon` |
-| | 177 | `show_panel`: tools, the new-piece and operation modes, then the sides field while the Regular polygon tool is active (`EditorState::polygon_sides`) |
+| | 191 | `show_panel`: tools, the new-piece and operation modes, then the sides field while the Regular polygon tool is active (`EditorState::polygon_sides`) |
 | `layout/mod.rs` | 9-10 | Constants |
 | | 14 | `expand_toggle`: expands or collapses a piece's children |
 | | 31-52 | `paint_trash` (icon font), `paint_arrow`, `shape_label`; the lock button uses the font's lock and unlock glyphs |
@@ -178,11 +178,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 105 | `material_fields`, shared by the dialog and the Material panel |
 | | 189 | `show_panel`, which returns the `ProjectEvent` to send |
 | | 214 | `new_project_dialog` |
-| `properties/mod.rs` | 10-29 | `EditorView`, `ViewControls` (editor or preview), `Selection` (displayed piece, child, rename buffer) |
+| `properties/mod.rs` | 10-31 | `EditorView`, `ViewControls` (editor or preview), `Selection` (displayed piece, child, selected edge, rename buffer) |
 | | 32-59 | `view_controls`, `units_control` |
 | | 63 | `selected_piece_details`: name, size or result error, fields of the selected base or child, To Polygon button for a primitive |
-| | 139 | `shape_fields`: center, size and rotation of a primitive in display units |
-| | 221 | `show_panel`, which returns the `ProjectEvent` to send |
+| | 140 | `shape_fields`: center, size and rotation of a primitive in display units; a polygon's point count and the selected edge's length |
+| | 240 | `show_panel`, which returns the `ProjectEvent` to send |
 
 ### `preview/mod.rs`
 
@@ -222,12 +222,12 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 65 tests, all inline in the library crate:
+There are 69 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
 | `model` | 6 |
-| `shapes` | 12 |
+| `shapes` | 16 |
 | `boolean` | 7 |
 | `material` | 3 |
 | `events` | 11 |
