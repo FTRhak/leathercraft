@@ -37,9 +37,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/panel_viewer.rs` | 139 | 1,150 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History tab title has an icon |
 | `src/icons/mod.rs` | 87 | 760 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
-| `src/panels/dock/mod.rs` | 163 | 1,400 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
+| `src/panels/dock/mod.rs` | 178 | 1,500 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
 | `src/panels/tools/mod.rs` | 242 | 2,100 | bin | `Tool`, painted tool and operation icons, Tools panel with the regular polygon's sides field |
 | `src/panels/layout/mod.rs` | 267 | 2,750 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls; Shift+click toggles a piece |
+| `src/panels/align/mod.rs` | 230 | 1,900 | bin | Align panel: `Reference` (Align To), `AlignOptions` (kept in `EditorState::align`), painted align, distribute and spacing icons, `show_panel` |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
 | `src/panels/properties/mod.rs` | 256 | 2,000 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, selected edge's length, To Polygon button |
@@ -47,7 +48,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/model.rs` | 476 | 3,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation |
 | `src/boolean.rs` | 221 | 1,900 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes |
 | `src/material.rs` | 462 | 2,800 | lib | `Material` and the scales of its properties |
-| `src/events.rs` | 729 | 5,600 | lib | `ProjectEvent` (including the group `MovePieces`, `RemovePieces`), `ProjectChange`, `Project::apply` |
+| `src/events.rs` | 792 | 6,100 | lib | `ProjectEvent` (including the group `MovePieces`, `RemovePieces`, `ArrangePieces`), `ProjectChange`, `Project::apply` |
+| `src/align.rs` | 464 | 3,600 | lib | `Axis`, `Edge`, `Arrange` (Illustrator's align, distribute and spacing operations), `AlignTo`, `Spacing`, `piece_box`, `offsets` |
 | `src/i18n/uk.rs` | 466 | 5,900 | lib | Ukrainian catalog, `plural` helper |
 | `src/i18n/mod.rs` | 284 | 2,000 | lib | `Language`, `Label`, `Message` |
 | `src/exports/mod.rs` | 187 | 1,200 | lib | `ExportError`, shared helpers, tests |
@@ -209,6 +211,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Change the file format | `model.rs` 119-160, 265-278, `shapes/mod.rs` 14-23 and the shape structs, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
 | Change the 3D look or mesh | `preview/mod.rs` 49-123, 159-261 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
+| Change align or distribute | `align.rs` `offsets`, `panels/align/mod.rs` | The rules live in `offsets`; the panel only builds an `ArrangePieces` event |
 | Add a dockable panel | `panels/dock/mod.rs`, `editor/panel_viewer.rs` | A `PanelTab` variant, its `CLOSEABLE` and `label` entries, `default_state`, and arms in `PanelViewer::ui` and `scroll_bars` |
 | Change how the app is compiled or linked | `Cargo.toml`, `.cargo/config.toml` | See [Build configuration](#build-configuration) |
 | Change system scheduling | `main.rs`, `document.rs` | Keep the ordering rule in `CLAUDE.md` |
@@ -222,7 +225,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 72 tests, all inline in the library crate:
+There are 82 tests, all inline in the library crate:
 
 | Module | Tests |
 |---|---:|
@@ -230,8 +233,9 @@ There are 72 tests, all inline in the library crate:
 | `shapes` | 16 |
 | `boolean` | 7 |
 | `material` | 3 |
-| `events` | 13 |
-| `history` | 11 |
+| `align` | 8 |
+| `events` | 14 |
+| `history` | 12 |
 | `i18n` | 5 |
 | `exports` | 7 |
 | `persistence` | 4 |

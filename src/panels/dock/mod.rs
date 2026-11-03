@@ -15,13 +15,15 @@ pub enum PanelTab {
     Layout,
     Material,
     History,
+    Align,
 }
 
 impl PanelTab {
     /// The panels the Window menu lists; the canvas always stays open.
-    pub const CLOSEABLE: [Self; 5] = [
+    pub const CLOSEABLE: [Self; 6] = [
         Self::Tools,
         Self::Properties,
+        Self::Align,
         Self::Layout,
         Self::Material,
         Self::History,
@@ -35,6 +37,7 @@ impl PanelTab {
             Self::Layout => Label::Layout,
             Self::Material => Label::Material,
             Self::History => Label::History,
+            Self::Align => Label::Align,
         }
     }
 }
@@ -162,7 +165,7 @@ fn default_state() -> DockState<PanelTab> {
     );
     surface.split_below(right, 0.35, vec![PanelTab::Material]);
     let [_, left] = surface.split_left(canvas, 0.2, vec![PanelTab::Tools]);
-    surface.split_below(left, 0.3, vec![PanelTab::Properties]);
+    surface.split_below(left, 0.3, vec![PanelTab::Properties, PanelTab::Align]);
     state
 }
 

@@ -1,5 +1,6 @@
 use super::drag_state_struct::ShapeRef;
 use super::{DragState, ShapeDraft};
+use crate::panels::align::AlignOptions;
 use crate::panels::tools::Tool;
 use bevy::prelude::*;
 use bevy_egui::egui;
@@ -19,6 +20,8 @@ pub struct EditorState {
     /// With an operation, the drawing tools add a child with it to the selected piece instead
     /// of adding a piece.
     pub(super) op_mode: Option<BooleanOp>,
+    /// The settings of the Align panel.
+    pub(super) align: AlignOptions,
     /// The primary selected piece: the one shown in Properties and reshaped with handles.
     pub(super) selected: Option<u64>,
     /// Every selected piece, in the order selected. It contains `selected` whenever that is set,
@@ -54,6 +57,7 @@ impl Default for EditorState {
             shape_draft: None,
             polygon_sides: 6,
             op_mode: None,
+            align: AlignOptions::default(),
             selected: None,
             pieces: Vec::new(),
             selected_child: None,

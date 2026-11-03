@@ -1,4 +1,5 @@
 use super::{Label, Message};
+use crate::align::{Arrange, Axis, Edge};
 use crate::material::{
     ColorGroup, Flexibility, HeatResistance, LeatherColor, MAX_THICKNESS_MM, MIN_THICKNESS_MM,
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
@@ -81,6 +82,18 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::FloatPanel => "Відкріпити",
         Label::ResetPanels => "Скинути панелі",
         Label::History => "Історія",
+        Label::Align => "Вирівнювання",
+        Label::AlignObjects => "Вирівнювання об’єктів",
+        Label::DistributeObjects => "Розподіл об’єктів",
+        Label::DistributeSpacing => "Розподіл проміжків",
+        Label::Arrange(arrange) => self::arrange(arrange),
+        Label::AlignTo => "Вирівняти відносно",
+        Label::AlignToSelection => "Виділення",
+        Label::AlignToKeyObject => "Ключовий об’єкт",
+        Label::AlignToProject => "Межі проєкту",
+        Label::KeyObjectHint => "Ключовий об’єкт — основна вибрана деталь; вона лишається на місці",
+        Label::Spacing => "Проміжок",
+        Label::SpacingAuto => "Авто",
         Label::Undo => "Скасувати",
         Label::Redo => "Повторити",
         Label::SelectAll => "Вибрати все",
@@ -356,6 +369,7 @@ pub(super) fn message(message: &Message) -> String {
         Message::DefaultPieceName { id } => format!("Деталь {id}"),
         Message::PieceNotFound { id } => format!("Деталь {id} не існує."),
         Message::PieceLocked { name } => format!("Деталь «{name}» заблоковано."),
+        Message::AlreadyArranged => "Деталі вже так розташовані.".to_owned(),
         Message::ChildAdded { name } => format!("Додано фігуру в деталь «{name}»."),
         Message::ChildDeleted => "Фігуру видалено.".to_owned(),
         Message::SelectPieceForChild => "Виберіть деталь, до якої треба додати фігуру.".to_owned(),
@@ -430,6 +444,14 @@ pub(super) fn message(message: &Message) -> String {
             let noun = plural(*count, "деталь", "деталі", "деталей");
             format!("Переміщено {count} {noun}")
         }
+        Message::ActionAlignPieces { count } => {
+            let noun = plural(*count, "деталь", "деталі", "деталей");
+            format!("Вирівняно {count} {noun}")
+        }
+        Message::ActionDistributePieces { count } => {
+            let noun = plural(*count, "деталь", "деталі", "деталей");
+            format!("Розподілено {count} {noun}")
+        }
         Message::ActionLockPiece { name } => format!("Заблоковано «{name}»"),
         Message::ActionUnlockPiece { name } => format!("Розблоковано «{name}»"),
         Message::ActionMaterial { name } => format!("Змінено матеріал «{name}»"),
@@ -443,6 +465,27 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionSetChildOp { name } => format!("Змінено операцію «{name}»"),
         Message::ActionReorderChild { name } => format!("Змінено порядок фігур «{name}»"),
         Message::ActionRemoveChild { name } => format!("Видалено фігуру з «{name}»"),
+    }
+}
+
+fn arrange(arrange: Arrange) -> &'static str {
+    match arrange {
+        Arrange::Align(Axis::Horizontal, Edge::Min) => "Вирівняти ліворуч",
+        Arrange::Align(Axis::Horizontal, Edge::Center) => "Вирівняти по центру горизонтально",
+        Arrange::Align(Axis::Horizontal, Edge::Max) => "Вирівняти праворуч",
+        Arrange::Align(Axis::Vertical, Edge::Min) => "Вирівняти вгору",
+        Arrange::Align(Axis::Vertical, Edge::Center) => "Вирівняти по центру вертикально",
+        Arrange::Align(Axis::Vertical, Edge::Max) => "Вирівняти вниз",
+        Arrange::Distribute(Axis::Vertical, Edge::Min) => "Розподілити за верхніми краями",
+        Arrange::Distribute(Axis::Vertical, Edge::Center) => "Розподілити за центрами вертикально",
+        Arrange::Distribute(Axis::Vertical, Edge::Max) => "Розподілити за нижніми краями",
+        Arrange::Distribute(Axis::Horizontal, Edge::Min) => "Розподілити за лівими краями",
+        Arrange::Distribute(Axis::Horizontal, Edge::Center) => {
+            "Розподілити за центрами горизонтально"
+        }
+        Arrange::Distribute(Axis::Horizontal, Edge::Max) => "Розподілити за правими краями",
+        Arrange::Space(Axis::Vertical) => "Рівні проміжки по вертикалі",
+        Arrange::Space(Axis::Horizontal) => "Рівні проміжки по горизонталі",
     }
 }
 

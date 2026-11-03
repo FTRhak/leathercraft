@@ -1,4 +1,5 @@
 use super::{Label, Message};
+use crate::align::{Arrange, Axis, Edge};
 use crate::material::{
     ColorGroup, Flexibility, HeatResistance, LeatherColor, MAX_THICKNESS_MM, MIN_THICKNESS_MM,
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
@@ -79,6 +80,18 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::FloatPanel => "Float",
         Label::ResetPanels => "Reset panels",
         Label::History => "History",
+        Label::Align => "Align",
+        Label::AlignObjects => "Align objects",
+        Label::DistributeObjects => "Distribute objects",
+        Label::DistributeSpacing => "Distribute spacing",
+        Label::Arrange(arrange) => self::arrange(arrange),
+        Label::AlignTo => "Align to",
+        Label::AlignToSelection => "Selection",
+        Label::AlignToKeyObject => "Key object",
+        Label::AlignToProject => "Project bounds",
+        Label::KeyObjectHint => "The key object is the primary selected piece; it stays in place",
+        Label::Spacing => "Spacing",
+        Label::SpacingAuto => "Auto",
         Label::Undo => "Undo",
         Label::Redo => "Redo",
         Label::SelectAll => "Select all",
@@ -349,6 +362,7 @@ pub(super) fn message(message: &Message) -> String {
         Message::DefaultPieceName { id } => format!("Piece {id}"),
         Message::PieceNotFound { id } => format!("Piece {id} does not exist."),
         Message::PieceLocked { name } => format!("Piece '{name}' is locked."),
+        Message::AlreadyArranged => "The pieces are already arranged.".to_owned(),
         Message::ChildAdded { name } => format!("Added a shape to '{name}'."),
         Message::ChildDeleted => "Shape deleted.".to_owned(),
         Message::SelectPieceForChild => "Select a piece to add the shape to.".to_owned(),
@@ -406,6 +420,8 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionEditBase { name } => format!("Changed the base of '{name}'"),
         Message::ActionMovePiece { name } => format!("Moved '{name}'"),
         Message::ActionMovePieces { count } => format!("Moved {count} pieces"),
+        Message::ActionAlignPieces { count } => format!("Aligned {count} pieces"),
+        Message::ActionDistributePieces { count } => format!("Distributed {count} pieces"),
         Message::ActionLockPiece { name } => format!("Locked '{name}'"),
         Message::ActionUnlockPiece { name } => format!("Unlocked '{name}'"),
         Message::ActionMaterial { name } => format!("Changed the material of '{name}'"),
@@ -416,6 +432,25 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionSetChildOp { name } => format!("Changed an operation of '{name}'"),
         Message::ActionReorderChild { name } => format!("Reordered the shapes of '{name}'"),
         Message::ActionRemoveChild { name } => format!("Deleted a shape from '{name}'"),
+    }
+}
+
+fn arrange(arrange: Arrange) -> &'static str {
+    match arrange {
+        Arrange::Align(Axis::Horizontal, Edge::Min) => "Horizontal align left",
+        Arrange::Align(Axis::Horizontal, Edge::Center) => "Horizontal align center",
+        Arrange::Align(Axis::Horizontal, Edge::Max) => "Horizontal align right",
+        Arrange::Align(Axis::Vertical, Edge::Min) => "Vertical align top",
+        Arrange::Align(Axis::Vertical, Edge::Center) => "Vertical align center",
+        Arrange::Align(Axis::Vertical, Edge::Max) => "Vertical align bottom",
+        Arrange::Distribute(Axis::Vertical, Edge::Min) => "Vertical distribute top",
+        Arrange::Distribute(Axis::Vertical, Edge::Center) => "Vertical distribute center",
+        Arrange::Distribute(Axis::Vertical, Edge::Max) => "Vertical distribute bottom",
+        Arrange::Distribute(Axis::Horizontal, Edge::Min) => "Horizontal distribute left",
+        Arrange::Distribute(Axis::Horizontal, Edge::Center) => "Horizontal distribute center",
+        Arrange::Distribute(Axis::Horizontal, Edge::Max) => "Horizontal distribute right",
+        Arrange::Space(Axis::Vertical) => "Vertical distribute space",
+        Arrange::Space(Axis::Horizontal) => "Horizontal distribute space",
     }
 }
 

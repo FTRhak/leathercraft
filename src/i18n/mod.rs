@@ -1,6 +1,7 @@
 mod en;
 mod uk;
 
+use crate::align::Arrange;
 use crate::material::{
     ColorGroup, Flexibility, HeatResistance, LeatherColor, Origin, Strength, Texture,
     ThicknessCategory, Treatment, WaterResistance,
@@ -134,6 +135,19 @@ pub enum Label {
     FloatPanel,
     ResetPanels,
     History,
+    Align,
+    AlignObjects,
+    DistributeObjects,
+    DistributeSpacing,
+    /// An Align panel button.
+    Arrange(Arrange),
+    AlignTo,
+    AlignToSelection,
+    AlignToKeyObject,
+    AlignToProject,
+    KeyObjectHint,
+    Spacing,
+    SpacingAuto,
     Undo,
     Redo,
     SelectAll,
@@ -198,6 +212,7 @@ pub enum Message {
     DefaultPieceName { id: u64 },
     PieceNotFound { id: u64 },
     PieceLocked { name: String },
+    AlreadyArranged,
     UnsupportedVersion { found: u32, expected: u32 },
     TooManyPieces { max: usize },
     InvalidPieceId { name: String },
@@ -225,6 +240,8 @@ pub enum Message {
     ActionEditBase { name: String },
     ActionMovePiece { name: String },
     ActionMovePieces { count: usize },
+    ActionAlignPieces { count: usize },
+    ActionDistributePieces { count: usize },
     ActionLockPiece { name: String },
     ActionUnlockPiece { name: String },
     ActionMaterial { name: String },

@@ -1,3 +1,4 @@
+pub mod align;
 pub mod dock;
 pub mod history;
 pub mod layout;

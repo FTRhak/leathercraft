@@ -36,6 +36,7 @@ The package has two crates with a deliberate boundary: geometry and file-format 
   - `persistence`: `.leathercraft` save/load as pretty-printed, versioned JSON.
   - `exports`: `to_svg` and `to_dxf` return strings; `persistence::write_export` writes them to disk.
   - `shapes`: `Shape` (polygon, or parametric rectangle, ellipse and regular polygon of 3 to 64 sides, with a rotation): its `ring`, `handles` and `with_handle_at` for reshaping.
+  - `align`: `Arrange`, `AlignTo`, `Spacing` and `offsets`, the Illustrator-style align and distribute rules behind `ProjectEvent::ArrangePieces`. Pieces are measured by their outline, or by all their shapes while the result is invalid; locked pieces and the key object stay put.
   - `history`: `History` keeps a `Project` snapshot after each accepted edit, for undo, redo and the History panel. Consecutive renames or material changes of the same piece share one entry, and `New`/`Open` start a new history.
   - `i18n`: `Language`, `Label` (fixed text) and `Message` (text with arguments), with one exhaustive catalog per language, so a missing translation is a compile error.
 - **Binary (`src/main.rs`), requires the `desktop` feature:** `document`, `editor`, `panels`, `preview` and `settings` are modules of the binary, not the library, and import the core via `leathercraft::model`. Code that needs Bevy, egui, `egui_dock`, `earcutr`, `rfd`, `dirs`, or `sys-locale` belongs here.

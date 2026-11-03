@@ -2,7 +2,7 @@ use super::{EditorState, ViewMode, canvas, send};
 use crate::document::{HistoryMessage, ProjectMessage};
 use crate::icons::{glyph, icon_text};
 use crate::panels::dock::PanelTab;
-use crate::panels::{history, layout, material, properties, tools};
+use crate::panels::{align, history, layout, material, properties, tools};
 use crate::preview::PreviewSettings;
 use bevy::prelude::*;
 use bevy_egui::egui;
@@ -68,6 +68,22 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                         &mut state.op_mode,
                         language,
                     );
+                });
+            }
+            PanelTab::Align => {
+                ui.add_enabled_ui(editing, |ui| {
+                    let state = &mut *self.state;
+                    let event = align::show_panel(
+                        ui,
+                        self.project.units,
+                        &state.pieces,
+                        state.selected,
+                        &mut state.align,
+                        language,
+                    );
+                    if let Some(event) = event {
+                        send(self.events, event);
+                    }
                 });
             }
             PanelTab::Properties => {
@@ -146,7 +162,7 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
 
     fn scroll_bars(&self, tab: &PanelTab) -> [bool; 2] {
         match tab {
-            PanelTab::Tools | PanelTab::Properties => [false, true],
+            PanelTab::Tools | PanelTab::Properties | PanelTab::Align => [false, true],
             // The canvas pans itself, and these two have their own scroll areas.
             PanelTab::Canvas | PanelTab::Layout | PanelTab::Material | PanelTab::History => {
                 [false, false]

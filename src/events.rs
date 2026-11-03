@@ -1,3 +1,4 @@
+use crate::align::{self, AlignTo, Arrange, Spacing};
 use crate::i18n::Message;
 use crate::material::Material;
 use crate::model::{BooleanOp, ChildShape, PatternPiece, Project, Units};
@@ -41,6 +42,13 @@ pub enum ProjectEvent {
         ids: Vec<u64>,
         dx: f64,
         dy: f64,
+    },
+    /// Aligns or distributes several pieces, as one edit. Locked pieces and the key object stay.
+    ArrangePieces {
+        ids: Vec<u64>,
+        arrange: Arrange,
+        to: AlignTo,
+        spacing: Spacing,
     },
     SetPieceLocked {
         id: u64,
@@ -155,6 +163,25 @@ impl Project {
                     if ids.contains(&piece.id) {
                         piece.translate(dx, dy);
                     }
+                }
+                Ok(ProjectChange::Edited)
+            }),
+            ProjectEvent::ArrangePieces {
+                ids,
+                arrange,
+                to,
+                spacing,
+            } => self.edit(|project| {
+                for id in &ids {
+                    project.piece_mut(*id)?;
+                }
+                let offsets = align::offsets(project, &ids, arrange, to, spacing);
+                // Rejected rather than recorded, so that the history gets no empty entry.
+                if offsets.is_empty() {
+                    return Err(Message::AlreadyArranged);
+                }
+                for (id, dx, dy) in offsets {
+                    project.piece_mut(id)?.translate(dx, dy);
                 }
                 Ok(ProjectChange::Edited)
             }),
@@ -535,6 +562,42 @@ mod tests {
             Err(Message::PieceNotFound { id: 9 })
         );
         assert_eq!(project, before);
+    }
+
+    #[test]
+    fn arranging_moves_pieces_or_rejects_a_no_op() {
+        let mut project = project_with_three_pieces();
+        let align_left = ProjectEvent::ArrangePieces {
+            ids: vec![1, 2, 3],
+            arrange: Arrange::Align(align::Axis::Horizontal, align::Edge::Min),
+            to: AlignTo::Selection,
+            spacing: Spacing::Auto,
+        };
+        let before = project.clone();
+        assert_eq!(
+            project.apply(align_left.clone()),
+            Err(Message::AlreadyArranged)
+        );
+        assert_eq!(project, before);
+
+        project
+            .apply(ProjectEvent::MovePiece {
+                id: 3,
+                dx: 5.0,
+                dy: 2.0,
+            })
+            .unwrap();
+        assert_eq!(project.apply(align_left), Ok(ProjectChange::Edited));
+        assert_eq!(project.pieces[2].base.ring()[0], Point::new(0.0, 2.0));
+        assert_eq!(
+            project.apply(ProjectEvent::ArrangePieces {
+                ids: vec![1, 9],
+                arrange: Arrange::Space(align::Axis::Vertical),
+                to: AlignTo::Project,
+                spacing: Spacing::Auto,
+            }),
+            Err(Message::PieceNotFound { id: 9 })
+        );
     }
 
     #[test]

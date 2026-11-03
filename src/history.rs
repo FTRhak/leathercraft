@@ -1,3 +1,4 @@
+use crate::align::Arrange;
 use crate::events::{ProjectChange, ProjectEvent};
 use crate::i18n::Message;
 use crate::model::Project;
@@ -185,6 +186,14 @@ impl History {
             ProjectEvent::MovePieces { ids, .. } => {
                 (Message::ActionMovePieces { count: ids.len() }, None)
             }
+            ProjectEvent::ArrangePieces {
+                ids,
+                arrange: Arrange::Align(..),
+                ..
+            } => (Message::ActionAlignPieces { count: ids.len() }, None),
+            ProjectEvent::ArrangePieces { ids, .. } => {
+                (Message::ActionDistributePieces { count: ids.len() }, None)
+            }
             ProjectEvent::SetPieceLocked { id, locked: true } => {
                 (Message::ActionLockPiece { name: name(*id) }, None)
             }
@@ -228,6 +237,7 @@ impl History {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::align::{AlignTo, Axis, Edge, Spacing};
     use crate::model::{BooleanOp, Point};
     use crate::shapes::{Polygon, Shape};
     use std::path::PathBuf;
@@ -481,6 +491,63 @@ mod tests {
         );
         history.apply(HistoryCommand::Undo, &mut project);
         assert_eq!(project.pieces.len(), 2);
+    }
+
+    #[test]
+    fn arranging_is_named_by_its_kind() {
+        let mut project = Project::default();
+        let mut history = History::default();
+        run(&mut project, &mut history, add_piece("Flap"));
+        run(&mut project, &mut history, add_piece("Strap"));
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::MovePiece {
+                id: 2,
+                dx: 30.0,
+                dy: 10.0,
+            },
+        );
+        let arrange = |arrange| ProjectEvent::ArrangePieces {
+            ids: vec![1, 2],
+            arrange,
+            to: AlignTo::Selection,
+            spacing: Spacing::Auto,
+        };
+        run(
+            &mut project,
+            &mut history,
+            arrange(Arrange::Align(Axis::Vertical, Edge::Min)),
+        );
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::AddPiece {
+                name: "Pocket".to_owned(),
+                base: triangle(),
+            },
+        );
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::ArrangePieces {
+                ids: vec![1, 2, 3],
+                arrange: Arrange::Distribute(Axis::Horizontal, Edge::Center),
+                to: AlignTo::Selection,
+                spacing: Spacing::Auto,
+            },
+        );
+        let actions: Vec<&Message> = history.actions().skip(4).collect();
+        assert_eq!(
+            actions,
+            [
+                &Message::ActionAlignPieces { count: 2 },
+                &Message::ActionAddPiece {
+                    name: "Pocket".to_owned()
+                },
+                &Message::ActionDistributePieces { count: 3 }
+            ]
+        );
     }
 
     #[test]

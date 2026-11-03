@@ -1,3 +1,4 @@
+pub mod align;
 pub mod boolean;
 pub mod events;
 pub mod exports;
