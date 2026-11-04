@@ -14,6 +14,12 @@ pub struct ActiveProject {
 }
 
 impl ActiveProject {
+    /// Starts with `project`, as the first entry of a new history.
+    pub fn new(project: Project) -> Self {
+        let history = History::new(&project, leathercraft::i18n::Message::ActionNewProject);
+        Self { project, history }
+    }
+
     pub fn history(&self) -> &History {
         &self.history
     }

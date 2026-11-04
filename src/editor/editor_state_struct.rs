@@ -1,6 +1,7 @@
 use super::drag_state_struct::ShapeRef;
 use super::{DragState, ShapeDraft};
 use crate::panels::align::AlignOptions;
+use crate::panels::settings::SettingsDraft;
 use crate::panels::tools::Tool;
 use bevy::prelude::*;
 use bevy_egui::egui;
@@ -46,6 +47,8 @@ pub struct EditorState {
     pub(super) rename_buffer: Option<String>,
     /// The material being chosen while the new-project dialog is open.
     pub(super) new_project_dialog: Option<Material>,
+    /// The preferences being edited while the Settings window is open.
+    pub(super) settings_dialog: Option<SettingsDraft>,
     pub(super) language: Language,
     /// Kept untranslated so that it follows a change of language.
     pub(super) status: Message,
@@ -75,6 +78,7 @@ impl Default for EditorState {
             snap_mm: 1.0,
             rename_buffer: None,
             new_project_dialog: None,
+            settings_dialog: None,
             language: Language::default(),
             status: Message::Ready,
             status_is_error: false,

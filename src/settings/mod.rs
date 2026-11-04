@@ -1,4 +1,10 @@
+mod hotkeys;
+
+pub use hotkeys::{Action, Hotkeys};
+
+use bevy::prelude::*;
 use leathercraft::i18n::Language;
+use leathercraft::material::Material;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io;
@@ -12,6 +18,52 @@ struct Settings {
     /// Kept as raw JSON, so that a layout that no longer parses doesn't lose the other settings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     dock: Option<serde_json::Value>,
+    /// The sections below are also kept as raw JSON, each parsed on its own with a fallback.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    default_material: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hotkeys: Option<serde_json::Value>,
+}
+
+/// The application preferences edited in the Settings window. Interface state, never part
+/// of a project.
+#[derive(Resource, Clone, Debug, Default, PartialEq)]
+pub struct Preferences {
+    /// The material the new-project dialog and the startup project start from.
+    pub default_material: Material,
+    pub hotkeys: Hotkeys,
+}
+
+/// The saved preferences; a missing or unusable section keeps its default.
+pub fn load_preferences() -> Preferences {
+    let Some(settings) = read_settings() else {
+        return Preferences::default();
+    };
+    let default_material = settings
+        .default_material
+        .and_then(|value| match serde_json::from_value::<Material>(value) {
+            Ok(material) => Some(material),
+            Err(error) => {
+                bevy::log::warn!("Ignoring saved default material: {error}");
+                None
+            }
+        })
+        .filter(Material::has_valid_thickness)
+        .unwrap_or_default();
+    let hotkeys = settings.hotkeys.map(Hotkeys::from_json).unwrap_or_default();
+    Preferences {
+        default_material,
+        hotkeys,
+    }
+}
+
+pub fn save_preferences(preferences: &Preferences) {
+    let material = serde_json::to_value(preferences.default_material).ok();
+    let hotkeys = preferences.hotkeys.to_json();
+    update_settings(|settings| {
+        settings.default_material = material;
+        settings.hotkeys = Some(hotkeys);
+    });
 }
 
 fn settings_path() -> Option<PathBuf> {

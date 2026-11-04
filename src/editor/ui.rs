@@ -5,8 +5,9 @@ use super::{
 use crate::document::{ActiveProject, HistoryMessage, ProjectMessage};
 use crate::panels::dock::{PanelDock, PanelTab};
 use crate::panels::material::{self, DialogResult};
+use crate::panels::settings::{SettingsDraft, SettingsResult, settings_dialog};
 use crate::preview::PreviewSettings;
-use crate::settings;
+use crate::settings::{self, Action, Hotkeys, Preferences};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
 use egui_dock::DockArea;
@@ -27,6 +28,7 @@ pub fn editor_ui(
     mut view_mode: ResMut<ViewMode>,
     mut settings: ResMut<PreviewSettings>,
     mut dock: ResMut<PanelDock>,
+    mut preferences: ResMut<Preferences>,
 ) -> Result {
     let ctx: &egui::Context = contexts.ctx_mut()?;
     let history = project.history();
@@ -38,11 +40,18 @@ pub fn editor_ui(
         ui.horizontal(|ui| {
             let language = state.language;
             ui.menu_button(language.label(Label::File), |ui| {
-                file_menu(ui, project, &mut events, state);
+                file_menu(ui, project, &preferences, &mut events, state);
             });
             ui.menu_button(language.label(Label::View), |_| {});
             ui.menu_button(language.label(Label::Edit), |ui| {
-                edit_menu(ui, project, history, &mut history_events, state);
+                edit_menu(
+                    ui,
+                    project,
+                    history,
+                    &preferences,
+                    &mut history_events,
+                    state,
+                );
             });
             // Stays open on a click, so that the toggled state can be seen.
             egui::containers::menu::MenuButton::new(language.label(Label::Window))
@@ -89,9 +98,15 @@ pub fn editor_ui(
         });
     });
 
-    handle_delete_key(ctx, project, &mut events, state);
-    handle_select_all_key(ctx, project, state);
-    handle_history_keys(ctx, &mut history_events, state);
+    handle_hotkeys(
+        ctx,
+        project,
+        &preferences,
+        &mut events,
+        &mut history_events,
+        state,
+        &mut view_mode,
+    );
 
     // The canvas sets this again if its tab is showing.
     state.cursor = None;
@@ -127,36 +142,50 @@ pub fn editor_ui(
             None => {}
         }
     }
+
+    if let Some(draft) = &mut state.settings_dialog {
+        match settings_dialog(ctx, draft, state.language) {
+            Some(SettingsResult::Save) => {
+                if *preferences != draft.preferences {
+                    *preferences = draft.preferences.clone();
+                    settings::save_preferences(&preferences);
+                }
+                state.settings_dialog = None;
+            }
+            Some(SettingsResult::Cancel) => state.settings_dialog = None,
+            None => {}
+        }
+    }
     Ok(())
+}
+
+/// A menu button showing the action's first shortcut.
+fn action_button(
+    ui: &mut egui::Ui,
+    hotkeys: &Hotkeys,
+    action: Action,
+    language: Language,
+    enabled: bool,
+) -> bool {
+    let mut button = egui::Button::new(language.label(action.label()));
+    if let Some(shortcut) = hotkeys.first(action) {
+        button = button.shortcut_text(ui.ctx().format_shortcut(shortcut));
+    }
+    ui.add_enabled(enabled, button).clicked()
 }
 
 fn file_menu(
     ui: &mut egui::Ui,
     project: &Project,
+    preferences: &Preferences,
     events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
 ) {
     let language = state.language;
-    if ui.button(language.label(Label::New)).clicked() && confirm_discard(project, language) {
-        // A draft would otherwise still react to Enter behind the dialog.
-        state.draft.clear();
-        state.shape_draft = None;
-        state.new_project_dialog = Some(project.default_material);
-    }
-    if ui.button(language.label(Label::Open)).clicked()
-        && confirm_discard(project, language)
-        && let Some(path) = project_dialog(language).pick_file()
-    {
-        send(events, ProjectEvent::Open { path });
-    }
-    if ui.button(language.label(Label::Save)).clicked() {
-        match project.path.clone() {
-            Some(path) => send(events, ProjectEvent::Save { path }),
-            None => save_as(events, language),
+    for action in [Action::New, Action::Open, Action::Save, Action::SaveAs] {
+        if action_button(ui, &preferences.hotkeys, action, language, true) {
+            file_command(action, project, preferences, events, state);
         }
-    }
-    if ui.button(language.label(Label::SaveAs)).clicked() {
-        save_as(events, language);
     }
     ui.separator();
     if ui.button(language.label(Label::ExportSvg)).clicked() {
@@ -167,66 +196,115 @@ fn file_menu(
     }
 }
 
-const UNDO: egui::KeyboardShortcut =
-    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Z);
-const REDO: egui::KeyboardShortcut = egui::KeyboardShortcut::new(
-    egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
-    egui::Key::Z,
-);
-const REDO_ALT: egui::KeyboardShortcut =
-    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Y);
-const SELECT_ALL: egui::KeyboardShortcut =
-    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::A);
+/// The File menu commands, shared by the menu and their hotkeys.
+fn file_command(
+    action: Action,
+    project: &Project,
+    preferences: &Preferences,
+    events: &mut MessageWriter<ProjectMessage>,
+    state: &mut EditorState,
+) {
+    let language = state.language;
+    match action {
+        Action::New => {
+            if confirm_discard(project, language) {
+                // A draft would otherwise still react to Enter behind the dialog.
+                state.draft.clear();
+                state.shape_draft = None;
+                state.new_project_dialog = Some(preferences.default_material);
+            }
+        }
+        Action::Open => {
+            if confirm_discard(project, language)
+                && let Some(path) = project_dialog(language).pick_file()
+            {
+                send(events, ProjectEvent::Open { path });
+            }
+        }
+        Action::Save => match project.path.clone() {
+            Some(path) => send(events, ProjectEvent::Save { path }),
+            None => save_as(events, language),
+        },
+        Action::SaveAs => save_as(events, language),
+        _ => {}
+    }
+}
 
 fn edit_menu(
     ui: &mut egui::Ui,
     project: &Project,
     history: &History,
+    preferences: &Preferences,
     events: &mut MessageWriter<HistoryMessage>,
     state: &mut EditorState,
 ) {
     let language = state.language;
+    let hotkeys = &preferences.hotkeys;
     let items = [
-        (Label::Undo, UNDO, history.can_undo(), HistoryCommand::Undo),
-        (Label::Redo, REDO, history.can_redo(), HistoryCommand::Redo),
+        (Action::Undo, history.can_undo(), HistoryCommand::Undo),
+        (Action::Redo, history.can_redo(), HistoryCommand::Redo),
     ];
-    for (label, shortcut, enabled, command) in items {
-        let button = egui::Button::new(language.label(label))
-            .shortcut_text(ui.ctx().format_shortcut(&shortcut));
-        if ui.add_enabled(enabled, button).clicked() {
+    for (action, enabled, command) in items {
+        if action_button(ui, hotkeys, action, language, enabled) {
             events.write(HistoryMessage(command));
         }
     }
     ui.separator();
-    let button = egui::Button::new(language.label(Label::SelectAll))
-        .shortcut_text(ui.ctx().format_shortcut(&SELECT_ALL));
-    if ui.add_enabled(!project.pieces.is_empty(), button).clicked() {
+    let any_pieces = !project.pieces.is_empty();
+    if action_button(ui, hotkeys, Action::SelectAll, language, any_pieces) {
         state.select_all(project);
+    }
+    ui.separator();
+    if ui.button(language.label(Label::Settings)).clicked() {
+        // A draft would otherwise still react to Enter behind the window.
+        state.draft.clear();
+        state.shape_draft = None;
+        state.settings_dialog = Some(SettingsDraft::new(preferences));
     }
 }
 
-/// Text fields keep their own undo, so the shortcuts only act outside them.
-fn handle_history_keys(
+/// Text fields keep their own keys (undo, select all, letters), so hotkeys only act outside
+/// them, and neither while drawing nor while a dialog is open.
+fn handle_hotkeys(
     ctx: &egui::Context,
-    events: &mut MessageWriter<HistoryMessage>,
-    state: &EditorState,
+    project: &Project,
+    preferences: &Preferences,
+    events: &mut MessageWriter<ProjectMessage>,
+    history_events: &mut MessageWriter<HistoryMessage>,
+    state: &mut EditorState,
+    view_mode: &mut ViewMode,
 ) {
     let drafting = !state.draft.is_empty() || state.shape_draft.is_some();
-    if drafting || state.new_project_dialog.is_some() || ctx.wants_keyboard_input() {
+    let dialog_open = state.new_project_dialog.is_some() || state.settings_dialog.is_some();
+    if drafting || dialog_open || ctx.wants_keyboard_input() {
         return;
     }
-    // Redo first: matching ignores an extra Shift, so Ctrl+Z would also take Ctrl+Shift+Z.
-    let command = ctx.input_mut(|input| {
-        if input.consume_shortcut(&REDO) || input.consume_shortcut(&REDO_ALT) {
-            Some(HistoryCommand::Redo)
-        } else if input.consume_shortcut(&UNDO) {
-            Some(HistoryCommand::Undo)
-        } else {
-            None
+    let Some(action) = preferences.hotkeys.triggered(ctx) else {
+        return;
+    };
+    if let Some(tool) = action.tool() {
+        state.tool = tool;
+        return;
+    }
+    match action {
+        Action::New | Action::Open | Action::Save | Action::SaveAs => {
+            file_command(action, project, preferences, events, state);
         }
-    });
-    if let Some(command) = command {
-        events.write(HistoryMessage(command));
+        Action::Undo => {
+            history_events.write(HistoryMessage(HistoryCommand::Undo));
+        }
+        Action::Redo => {
+            history_events.write(HistoryMessage(HistoryCommand::Redo));
+        }
+        Action::SelectAll => select_all(project, state),
+        Action::Delete => delete_selection(project, events, state),
+        Action::ToggleView => {
+            *view_mode = match *view_mode {
+                ViewMode::Editor2d => ViewMode::Preview3d,
+                ViewMode::Preview3d => ViewMode::Editor2d,
+            };
+        }
+        _ => {}
     }
 }
 
@@ -248,22 +326,11 @@ fn window_menu(ui: &mut egui::Ui, state: &EditorState, dock: &mut PanelDock) {
 }
 
 /// With several pieces selected, the locked ones stay.
-fn handle_delete_key(
-    ctx: &egui::Context,
+fn delete_selection(
     project: &Project,
     events: &mut MessageWriter<ProjectMessage>,
     state: &EditorState,
 ) {
-    let drafting = !state.draft.is_empty() || state.shape_draft.is_some();
-    if drafting || state.new_project_dialog.is_some() || ctx.wants_keyboard_input() {
-        return;
-    }
-    let delete_pressed = ctx.input(|input| {
-        input.key_pressed(egui::Key::Delete) || input.key_pressed(egui::Key::Backspace)
-    });
-    if !delete_pressed {
-        return;
-    }
     if let Some(id) = state.selected
         && state.selected_children().len() > 1
     {
@@ -295,18 +362,12 @@ fn handle_delete_key(
     }
 }
 
-fn handle_select_all_key(ctx: &egui::Context, project: &Project, state: &mut EditorState) {
-    let drafting = !state.draft.is_empty() || state.shape_draft.is_some();
-    if drafting || state.new_project_dialog.is_some() || ctx.wants_keyboard_input() {
-        return;
-    }
-    if ctx.input_mut(|input| input.consume_shortcut(&SELECT_ALL)) {
-        // Within a piece whose shape is selected, Ctrl+A selects its other shapes.
-        if state.selected_children().is_empty() {
-            state.select_all(project);
-        } else {
-            state.select_all_children(project);
-        }
+fn select_all(project: &Project, state: &mut EditorState) {
+    // Within a piece whose shape is selected, Ctrl+A selects its other shapes.
+    if state.selected_children().is_empty() {
+        state.select_all(project);
+    } else {
+        state.select_all_children(project);
     }
 }
 

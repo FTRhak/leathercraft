@@ -33,7 +33,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
 | `src/editor/drag.rs` | 181 | 1,450 | bin | `begin_drag`, `begin_handle_drag`, `update_drag`, `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
-| `src/editor/ui.rs` | 328 | 3,000 | bin | `editor_ui`, `file_menu`, `edit_menu`, `window_menu`, `handle_delete_key`, `handle_select_all_key`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus, Delete and Ctrl+A keys (children of the selected piece first), language picker |
+| `src/editor/ui.rs` | 401 | 3,700 | bin | `editor_ui`, `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
 | `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History tab title has an icon; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/icons/mod.rs` | 87 | 760 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
@@ -43,6 +43,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/align/mod.rs` | 293 | 2,300 | bin | Align panel: `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), painted align, distribute and spacing icons, `show_panel` |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
+| `src/panels/settings/mod.rs` | 281 | 2,300 | bin | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` with Default material and Hotkeys tabs, key capture |
 | `src/panels/properties/mod.rs` | 256 | 2,000 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, selected edge's length, To Polygon button |
 | `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion |
 | `src/model.rs` | 476 | 3,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation |
@@ -63,9 +64,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/i18n/en.rs` | 497 | 4,750 | lib | English catalog |
 | `src/history.rs` | 725 | 4,950 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
 | `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
-| `src/settings.rs` | 71 | 500 | bin | Saved language and panel layout in the OS config directory |
-| `src/document.rs` | 64 | 500 | bin | `ActiveProject` (project and history), `ProjectMessage`, `HistoryMessage`, `apply_project_events` |
-| `src/main.rs` | 44 | 300 | bin | App wiring and system schedule; the editor UI starts one pass after the icon font is installed |
+| `src/settings/mod.rs` | 123 | 1,000 | bin | `settings.json` in the OS config directory: language, panel layout, and `Preferences` (default material, hotkeys) with `load_preferences`, `save_preferences` |
+| `src/settings/hotkeys.rs` | 335 | 2,700 | bin | `Action` (bindable commands, default shortcuts), `Hotkeys` (`from_json`, `to_json`, `first`, conflicts, `triggered`), `format_shortcut`, `parse_shortcut`; tests |
+| `src/document.rs` | 70 | 550 | bin | `ActiveProject` (`new`, project and history), `ProjectMessage`, `HistoryMessage`, `apply_project_events` |
+| `src/main.rs` | 51 | 350 | bin | App wiring and system schedule; loads `Preferences` and starts the project with their default material; the editor UI starts one pass after the icon font is installed |
 | `src/lib.rs` | 9 | 40 | lib | Module declarations |
 
 ## Library crate (core, no Bevy)
@@ -150,17 +152,17 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 18-119 | Top-level layout | `editor_ui`, which also shows the dock area and the new-project dialog |
-| Search by name | Menus | `file_menu`, `edit_menu`, `window_menu` |
-| Search by name | Input | `handle_delete_key` (several children go as `RemoveChildren`, several pieces as `RemovePieces`, locked ones stay), `handle_select_all_key` (all children of the selected piece while one is selected), `handle_history_keys` and the `UNDO`/`REDO`/`SELECT_ALL` shortcuts |
-| 192-206 | Language | `language_control` |
-| 208-219 | File dialog | `project_dialog`, `save_as` |
+| 21-160 | Top-level layout | `editor_ui`, which also shows the dock area, the new-project dialog and the Settings window (OK saves `Preferences`) |
+| 163-266 | Menus | `action_button` (label plus the action's first shortcut), `file_menu`, `file_command` (New, Open, Save, Save As; shared with hotkeys), `edit_menu` (with Settings…), `window_menu` |
+| 268-372 | Input | `handle_hotkeys` (dispatches `Hotkeys::triggered`, skipped while drawing, in a dialog or in a text field), `delete_selection` (several children go as `RemoveChildren`, several pieces as `RemovePieces`, locked ones stay), `select_all` (all children of the selected piece while one is selected) |
+| 374-388 | Language | `language_control` |
+| 390-401 | File dialog | `project_dialog`, `save_as` |
 
 ### `panels/`
 
 | File | Lines | Symbols |
 |---|---:|---|
-| `mod.rs` | 1-6 | Module declarations |
+| `mod.rs` | 1-8 | Module declarations |
 | `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
 | | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
 | | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
@@ -180,6 +182,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 105 | `material_fields`, shared by the dialog and the Material panel |
 | | 189 | `show_panel`, which returns the `ProjectEvent` to send |
 | | 214 | `new_project_dialog` |
+| `settings/mod.rs` | 8-52 | Constants, `SettingsTab`, `Capture`, `SettingsDraft` (edited copy of `Preferences`), `SettingsResult` |
+| | 55 | `settings_dialog`: modal with Default material (`material_fields`) and Hotkeys tabs; OK is disabled while shortcuts conflict |
+| | 114 | `hotkeys_tab`, `shortcut_button` |
+| | 231 | `capture_keys` (next key press becomes the shortcut, Esc cancels), `normalize` (Ctrl saved as Command) |
 | `properties/mod.rs` | 10-31 | `EditorView`, `ViewControls` (editor or preview), `Selection` (displayed piece, child, selected edge, rename buffer) |
 | | 32-59 | `view_controls`, `units_control` |
 | | 63 | `selected_piece_details`: name, size or result error, fields of the selected base or child, To Polygon button for a primitive |
@@ -215,6 +221,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add a dockable panel | `panels/dock/mod.rs`, `editor/panel_viewer.rs` | A `PanelTab` variant, its `CLOSEABLE` and `label` entries, `default_state`, and arms in `PanelViewer::ui` and `scroll_bars` |
 | Change how the app is compiled or linked | `Cargo.toml`, `.cargo/config.toml` | See [Build configuration](#build-configuration) |
 | Change system scheduling | `main.rs`, `document.rs` | Keep the ordering rule in `CLAUDE.md` |
+| Add a hotkey or preference | `settings/hotkeys.rs`, `settings/mod.rs`, `editor/ui.rs` `handle_hotkeys` | A hotkey: an `Action` variant with `ALL`, `label`, `default_shortcuts`, and a dispatch arm. A preference: a field of `Preferences`, a raw-JSON section in `Settings` read in `load_preferences` and written in `save_preferences`, and a tab or field in `panels/settings` |
 
 ## Build configuration
 
@@ -225,7 +232,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 90 tests, all inline in the library crate:
+There are 90 tests inline in the library crate, plus 4 in the binary (`settings::hotkeys`, run with `cargo test --bin leathercraft`, which compiles Bevy):
 
 | Module | Tests |
 |---|---:|
@@ -240,7 +247,7 @@ There are 90 tests, all inline in the library crate:
 | `exports` | 7 |
 | `persistence` | 4 |
 
-`document`, `editor`, `preview`, `settings` and `panels` have no tests, so changes there need `cargo check` and a manual run.
+Apart from shortcut parsing, `document`, `editor`, `preview`, `settings` and `panels` have no tests, so changes there need `cargo check` and a manual run.
 
 ## Docs
 
