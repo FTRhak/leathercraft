@@ -25,11 +25,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
-| `src/editor/mod.rs` | 78 | 550 | bin | `ViewMode`, `send`, `export`, `format_length` |
-| `src/editor/editor_state_struct.rs` | 313 | 2,650 | bin | `EditorState` and its methods (primary piece plus multi-selection, primary child plus multi-selection of children in that piece), `document_name` |
+| `src/editor/mod.rs` | 86 | 600 | bin | `ViewMode`, `ShapePart` (edge or vertex picked with the Edge tool), `send`, `export`, `format_length` |
+| `src/editor/editor_state_struct.rs` | 397 | 3,300 | bin | `EditorState` and its methods (primary piece plus multi-selection, primary child plus multi-selection of children in that piece, selected edge or vertex), `document_name` |
 | `src/editor/drag_state_struct.rs` | 53 | 420 | bin | `ShapeRef`, `DragTarget`, `DragState` (with the `group` of pieces or `child_group` of children moved along) |
 | `src/editor/shape_draft_struct.rs` | 9 | 60 | bin | `ShapeDraft` |
-| `src/editor/canvas.rs` | 736 | 6,150 | bin | `canvas`, `Viewport`, tool behavior (Shift+click toggles a child of the selected piece, else a piece), hit testing (pieces, children, handles, polygon edges), painting |
+| `src/editor/canvas.rs` | 798 | 6,700 | bin | `canvas`, `Viewport`, tool behavior (Shift+click toggles a child of the selected piece, else a piece; the Edge tool picks a vertex or a polygon edge), hit testing (pieces, children, handles, vertices, polygon edges), painting |
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
 | `src/editor/drag.rs` | 181 | 1,450 | bin | `begin_drag`, `begin_handle_drag`, `update_drag`, `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
@@ -46,7 +46,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/settings/mod.rs` | 95 | 700 | bin | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` with Default material and Hotkeys tabs |
 | `src/panels/settings/material.rs` | 187 | 1,500 | bin | Default material tab: `material_tab`, its own material form with Reset to defaults |
 | `src/panels/settings/hotkeys.rs` | 190 | 1,600 | bin | Hotkeys tab: `Capture`, `hotkeys_tab`, `shortcut_button`, key capture |
-| `src/panels/properties/mod.rs` | 256 | 2,000 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, selected edge's length, To Polygon button |
+| `src/panels/properties/mod.rs` | 272 | 2,150 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, selected edge's length, selected vertex's corner radius, To Polygon button |
 | `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion |
 | `src/model.rs` | 476 | 3,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation |
 | `src/boolean.rs` | 221 | 1,900 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes |
@@ -58,11 +58,12 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/exports/mod.rs` | 187 | 1,200 | lib | `ExportError`, shared helpers, tests |
 | `src/exports/svg.rs` | 45 | 430 | lib | `to_svg` |
 | `src/exports/dxf.rs` | 25 | 200 | lib | `to_dxf` |
-| `src/shapes/mod.rs` | 214 | 1,600 | lib | `Shape`: dispatch to the shape structs, constructors from a drag |
-| `src/shapes/rectangle.rs` | 113 | 800 | lib | `Rectangle` |
+| `src/shapes/mod.rs` | 346 | 2,700 | lib | `Shape`: dispatch to the shape structs, constructors from a drag, `corners`, `corner_radius`, `with_corner_radius` |
+| `src/shapes/corners.rs` | 243 | 1,900 | lib | Rounded corners: `round_corners` (fillet arcs), `radius_at`, `set_radius`, `valid_radii` |
+| `src/shapes/rectangle.rs` | 128 | 900 | lib | `Rectangle` |
 | `src/shapes/ellipse.rs` | 123 | 900 | lib | `Ellipse`, `CIRCLE_SEGMENTS` |
-| `src/shapes/regular_polygon.rs` | 142 | 1,050 | lib | `RegularPolygon`, `REGULAR_POLYGON_SIDES` |
-| `src/shapes/polygon.rs` | 98 | 750 | lib | `Polygon`, its edges and their lengths |
+| `src/shapes/regular_polygon.rs` | 154 | 1,150 | lib | `RegularPolygon`, `REGULAR_POLYGON_SIDES` |
+| `src/shapes/polygon.rs` | 116 | 850 | lib | `Polygon`, its edges and their lengths |
 | `src/i18n/en.rs` | 497 | 4,750 | lib | English catalog |
 | `src/history.rs` | 725 | 4,950 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
 | `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
@@ -90,12 +91,13 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 265-353 | `Project`: `bounds`, `validate` (301), `next_piece_id`, `add_piece`, `remove_piece` |
 | | 355-476 | Tests |
 | `shapes/mod.rs` | 1-40 | Re-exports, `Shape` enum (`Polygon`, `Rectangle`, `Ellipse`, `RegularPolygon` wrapping the structs of the same name), `to_world`, `to_local`, `positive` |
-| | 42-147 | `rectangle_from_corners`, `ellipse_from_center`, `regular_polygon_from_center`, `ring`, `to_polygon`, `bounds`, `contains`, `center`, `translate`, `handles`, `with_handle_at`, `has_valid_size` |
-| | 149-214 | `test_support` (`validate`, `assert_near`), tests |
-| `shapes/rectangle.rs` | 5-53 | `Rectangle`: `from_corners`, `ring`, `with_handle_at`, `has_valid_size`; tests from 55 |
+| | 43-200 | `rectangle_from_corners`, `ellipse_from_center`, `regular_polygon_from_center`, `ring`, `to_polygon` (keeps corners and radii), `corners`, `corner_radius`, `with_corner_radius`, `bounds`, `contains`, `center`, `translate`, `handles` (corners, not ring points), `with_handle_at`, `has_valid_size` |
+| | 202-346 | `test_support` (`validate`, `assert_near`), tests |
+| `shapes/corners.rs` | 14-128 | `radius_at`, `set_radius` (keeps the list to the vertex count, empties it when all are 0), `valid_radii`, `round_corners`, `fillet` (radius reduced so an arc reaches at most halfway along each edge); tests from 130 |
+| `shapes/rectangle.rs` | 5-68 | `Rectangle` (with `radii`): `from_corners`, `ring`, `corners`, `with_handle_at`, `has_valid_size`; tests from 70 |
 | `shapes/ellipse.rs` | 6-79 | `CIRCLE_SEGMENTS`, `Ellipse`: `from_center`, `ring`, `handles`, `with_handle_at`, `has_valid_size`; tests from 81 |
-| `shapes/regular_polygon.rs` | 7-73 | `REGULAR_POLYGON_SIDES` (3..=64), `ROTATION_SNAP`, `RegularPolygon`: `from_center`, `ring`, `with_handle_at`, `has_valid_size`; tests from 75 |
-| `shapes/polygon.rs` | 4-49 | `Polygon`: `translate`, `with_handle_at`, `edge`, `edge_length`, `with_edge_length` (moves the edge's end along it); tests from 51 |
+| `shapes/regular_polygon.rs` | 7-85 | `REGULAR_POLYGON_SIDES` (3..=64), `ROTATION_SNAP`, `RegularPolygon` (with `radii`): `from_center`, `ring`, `corners`, `with_handle_at`, `has_valid_size`; tests from 87 |
+| `shapes/polygon.rs` | 4-67 | `Polygon` (`points`, `radii`): `new`, `ring` (rounded), `has_valid_size`, `translate`, `with_handle_at`, `edge`, `edge_length`, `with_edge_length` (moves the edge's end along it); tests from 69 |
 | `boolean.rs` | 11-53 | `ROUND_PRECISION_MM`, `Region`: `rings`, `vertices`, `hole_indices`, `bounds`, `contains` |
 | | 67-96 | `PatternPiece::region` |
 | | 98-221 | Tests |
@@ -124,7 +126,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 27-32 | Types | `ViewMode` |
+| 27-40 | Types | `ViewMode`, `ShapePart` (`Edge` or `Vertex`, by index into `Shape::corners`) |
 | 34-36 | Events | `send` |
 | 38-70 | Menu bar helpers | `export` |
 | 72-78 | Formatting | `format_length`, also used by the Properties panel |
@@ -133,9 +135,9 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 12-48 | Type | `EditorState`, with `op_mode`, `selected` (primary piece), `pieces` (every selected piece), `selected_child` (primary child), `children` (every selected child of that piece) and `selected_edge` |
+| 12-48 | Type | `EditorState`, with `op_mode`, `selected` (primary piece), `pieces` (every selected piece), `selected_child` (primary child), `children` (every selected child of that piece) and `selected_part` (edge or vertex) |
 | 39-62 | Defaults | `Default` impl |
-| 67-242 | Methods | `new`, `report`, `report_error`, `snap`, `snap_point`, `reset_document`, `on_project_change`, `on_history_restore`, `selected_child_id`, `selected_children`, `clear_children`, `select`, `toggle_child`, `focus_child`, `select_all_children`, `is_selected`, `toggle_piece`, `focus`, `select_all`, `prune_selection`, `select_edge`, `selected_edge` (only while its shape is the one shown in Properties), `clear_released_drag`, `displayed` |
+| 67-242 | Methods | `new`, `report`, `report_error`, `snap`, `snap_point`, `reset_document`, `on_project_change`, `on_history_restore`, `selected_child_id`, `selected_children`, `clear_children`, `select`, `toggle_child`, `focus_child`, `select_all_children`, `is_selected`, `toggle_piece`, `focus`, `select_all`, `prune_selection`, `select_part`, `selected_part` (only while its shape is the one shown in Properties), `clear_released_drag`, `displayed` |
 | 211-216 | Helpers | `document_name` |
 
 ### `editor/canvas.rs`
@@ -145,10 +147,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | 15-19 | Constants | Zoom limits, hit radii, edge label limit |
 | 21-36 | Viewport | `Viewport` (`to_screen`, `to_world`) |
 | 38-109 | Canvas | `canvas`, `fit_view` |
-| 114-190 | Select and Edge tools | `handle_select`, `handle_edge`, `child_of_selected_at` (click picks a polygon edge, drag moves a vertex of the selected piece, Esc clears), `select_at` |
+| 114-195 | Select and Edge tools | `handle_select`, `handle_edge` (click picks a vertex of the selected piece, else a polygon edge; drag moves a vertex; Esc clears), `child_of_selected_at`, `select_at` |
 | 152-262 | Drawing tools | `handle_draw`, `finish_draft`, `commit_shape` (new piece or `AddChild`), `handle_shape`, `add_piece` |
-| 293-401 | Hit testing | `piece_hit`, `piece_at`, `child_at`, `handle_at`, `segment_distance`, `edge_at` |
-| 403-702 | Painting | `op_color`, `draft_color`, `dashed_ring`, `draw_handles`, `draw_pieces`, `draw_edges` (selected and hovered edge), `draw_edge_labels`, `fill_polygon`, `draw_draft`, `draw_shape_draft` |
+| 300-440 | Hit testing | `piece_hit`, `piece_at`, `child_at`, `handle_at`, `segment_distance`, `edge_at`; `vertex_at` sits after `draw_edges` |
+| 403-702 | Painting | `op_color`, `draft_color`, `dashed_ring`, `draw_handles`, `draw_pieces`, `draw_edges` (selected and hovered edge, selected vertex), `draw_edge_labels` (by corners, so arcs get no labels), `fill_polygon`, `draw_draft`, `draw_shape_draft` |
 
 ### `editor/ui.rs`
 
@@ -191,10 +193,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `settings/hotkeys.rs` | 8-21 | `HOTKEYS_HEIGHT`, `Capture`, `HotkeyChange` |
 | | 23 | `hotkeys_tab`, `shortcut_button` |
 | | 140 | `capture_keys` (next key press becomes the shortcut, Esc cancels), `normalize` (Ctrl saved as Command) |
-| `properties/mod.rs` | 10-31 | `EditorView`, `ViewControls` (editor or preview), `Selection` (displayed piece, child, selected edge, rename buffer) |
+| `properties/mod.rs` | 10-31 | `EditorView`, `ViewControls` (editor or preview), `Selection` (displayed piece, child, selected edge or vertex, rename buffer) |
 | | 32-59 | `view_controls`, `units_control` |
 | | 63 | `selected_piece_details`: name, size or result error, fields of the selected base or child, To Polygon button for a primitive |
-| | 140 | `shape_fields`: center, size and rotation of a primitive in display units; a polygon's point count and the selected edge's length |
+| | 140 | `shape_fields`: center, size and rotation of a primitive in display units; a polygon's point count and the selected edge's length; the selected vertex's corner radius |
 | | 240 | `show_panel`, which returns the `ProjectEvent` to send |
 
 ### `preview/mod.rs`
@@ -237,20 +239,20 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 90 tests inline in the library crate, plus 4 in the binary (`settings::hotkeys`, run with `cargo test --bin leathercraft`, which compiles Bevy):
+There are 102 tests inline in the library crate, plus 4 in the binary (`settings::hotkeys`, run with `cargo test --bin leathercraft`, which compiles Bevy):
 
 | Module | Tests |
 |---|---:|
 | `model` | 6 |
-| `shapes` | 16 |
+| `shapes` | 26 |
 | `boolean` | 7 |
 | `material` | 3 |
 | `align` | 13 |
-| `events` | 16 |
+| `events` | 17 |
 | `history` | 13 |
 | `i18n` | 5 |
 | `exports` | 7 |
-| `persistence` | 4 |
+| `persistence` | 5 |
 
 Apart from shortcut parsing, `document`, `editor`, `preview`, `settings` and `panels` have no tests, so changes there need `cargo check` and a manual run.
 

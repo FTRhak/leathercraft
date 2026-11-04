@@ -1,4 +1,4 @@
-use crate::editor::format_length;
+use crate::editor::{ShapePart, format_length};
 use crate::preview::{self, PreviewSettings};
 use bevy_egui::egui;
 use leathercraft::events::ProjectEvent;
@@ -25,8 +25,8 @@ pub struct Selection<'a> {
     /// The selected piece as currently shown, so with a drag in progress applied.
     pub piece: Option<&'a PatternPiece>,
     pub child: Option<u64>,
-    /// The edge of the shown shape picked with the Edge tool.
-    pub edge: Option<usize>,
+    /// The edge or vertex of the shown shape picked with the Edge tool.
+    pub part: Option<ShapePart>,
     /// The name being typed, kept while the name box has focus.
     pub rename_buffer: &'a mut Option<String>,
 }
@@ -115,7 +115,7 @@ fn selected_piece_details(
     ui.strong(title);
     let mut edited = shape.clone();
     ui.add_enabled_ui(!piece.locked, |ui| {
-        shape_fields(ui, &mut edited, selection.edge, units, language);
+        shape_fields(ui, &mut edited, selection.part, units, language);
         if !matches!(shape, Shape::Polygon(_))
             && ui.button(language.label(Label::ToPolygon)).clicked()
         {
@@ -136,11 +136,11 @@ fn selected_piece_details(
 }
 
 /// Fields for the parameters of a primitive, in display units; a polygon shows its point count
-/// and the length of the selected edge.
+/// and the length of the selected edge. A selected vertex shows the radius of its corner.
 fn shape_fields(
     ui: &mut egui::Ui,
     shape: &mut Shape,
-    edge: Option<usize>,
+    part: Option<ShapePart>,
     units: Units,
     language: Language,
 ) {
@@ -180,7 +180,7 @@ fn shape_fields(
             ui.label(language.message(&Message::PointCount {
                 count: polygon.points.len(),
             }));
-            if let Some(edge) = edge
+            if let Some(ShapePart::Edge(edge)) = part
                 && let Some(current) = polygon.edge_length(edge)
             {
                 ui.label(language.message(&Message::SelectedEdge { number: edge + 1 }));
@@ -198,6 +198,7 @@ fn shape_fields(
             width,
             height,
             rotation,
+            ..
         }) => {
             length(ui, Label::CenterX, &mut center.x, f64::MIN);
             length(ui, Label::CenterY, &mut center.y, f64::MIN);
@@ -222,6 +223,7 @@ fn shape_fields(
             radius,
             sides,
             rotation,
+            ..
         }) => {
             length(ui, Label::CenterX, &mut center.x, f64::MIN);
             length(ui, Label::CenterY, &mut center.y, f64::MIN);
@@ -231,6 +233,20 @@ fn shape_fields(
                 ui.add(egui::DragValue::new(sides).range(REGULAR_POLYGON_SIDES));
             });
             angle(ui, rotation);
+        }
+    }
+    // The radius is kept as typed; the ring reduces it where the corner's edges are too short.
+    if let Some(ShapePart::Vertex(vertex)) = part
+        && let Some(current) = shape.corner_radius(vertex)
+    {
+        ui.separator();
+        ui.label(language.message(&Message::SelectedVertex { number: vertex + 1 }));
+        let mut value = current;
+        length(ui, Label::CornerRadius, &mut value, 0.0);
+        if value != current
+            && let Some(rounded) = shape.with_corner_radius(vertex, value)
+        {
+            *shape = rounded;
         }
     }
 }

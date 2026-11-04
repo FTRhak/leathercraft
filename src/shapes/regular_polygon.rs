@@ -17,6 +17,9 @@ pub struct RegularPolygon {
     pub radius: f64,
     pub sides: usize,
     pub rotation: f64,
+    /// Corner radii by vertex; a missing one is 0. See `corners::round_corners`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub radii: Vec<f64>,
 }
 
 impl RegularPolygon {
@@ -37,10 +40,17 @@ impl RegularPolygon {
             radius,
             sides: sides.clamp(*REGULAR_POLYGON_SIDES.start(), *REGULAR_POLYGON_SIDES.end()),
             rotation,
+            radii: Vec::new(),
         })
     }
 
+    /// The outline, with rounded corners.
     pub fn ring(&self) -> Vec<Point> {
+        super::corners::round_corners(&self.corners(), &self.radii)
+    }
+
+    /// The vertices, before rounding.
+    pub fn corners(&self) -> Vec<Point> {
         (0..self.sides)
             .map(|index| {
                 let angle = TAU * index as f64 / self.sides as f64;
@@ -69,6 +79,7 @@ impl RegularPolygon {
         super::positive(self.radius)
             && REGULAR_POLYGON_SIDES.contains(&self.sides)
             && self.rotation.is_finite()
+            && super::corners::valid_radii(&self.radii)
     }
 }
 
@@ -121,6 +132,7 @@ mod tests {
             radius: 10.0,
             sides: 65,
             rotation: 0.0,
+            radii: Vec::new(),
         });
         assert!(validate(too_many).is_err());
     }

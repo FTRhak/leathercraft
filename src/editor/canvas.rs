@@ -1,7 +1,7 @@
 use super::drag::{begin_drag, begin_handle_drag, finish_drag, update_drag};
 use super::drag_state_struct::ShapeRef;
 use super::grid::draw_grid;
-use super::{EditorState, ShapeDraft, format_length, send};
+use super::{EditorState, ShapeDraft, ShapePart, format_length, send};
 use crate::document::ProjectMessage;
 use crate::panels::tools::Tool;
 use bevy::prelude::*;
@@ -153,8 +153,9 @@ fn handle_select(
     }
 }
 
-/// A click picks the polygon edge under the cursor, or else selects as the Select tool does.
-/// Vertices of the selected piece can be dragged as with the Select tool.
+/// A click picks the vertex of the selected piece under the cursor, which can then be rounded,
+/// or else the polygon edge under it, or else selects as the Select tool does. Vertices of the
+/// selected piece can be dragged as with the Select tool.
 fn handle_edge(
     ui: &egui::Ui,
     response: &egui::Response,
@@ -179,13 +180,16 @@ fn handle_edge(
     if response.clicked()
         && let Some(position) = response.interact_pointer_pos()
     {
-        match edge_at(project, state, position, view) {
-            Some((piece, shape, edge)) => state.select_edge(piece, shape, edge),
-            None => select_at(project, view.to_world(position), state),
+        if let Some((piece, shape, vertex)) = vertex_at(project, state, position, view) {
+            state.select_part(piece, shape, ShapePart::Vertex(vertex));
+        } else if let Some((piece, shape, edge)) = edge_at(project, state, position, view) {
+            state.select_part(piece, shape, ShapePart::Edge(edge));
+        } else {
+            select_at(project, view.to_world(position), state);
         }
     }
     if !ui.ctx().wants_keyboard_input() && ui.input(|input| input.key_pressed(egui::Key::Escape)) {
-        state.selected_edge = None;
+        state.selected_part = None;
     }
 }
 
@@ -248,7 +252,7 @@ fn finish_draft(
     state: &mut EditorState,
 ) {
     let points = state.draft.clone();
-    commit_shape(project, events, state, Shape::Polygon(Polygon { points }));
+    commit_shape(project, events, state, Shape::Polygon(Polygon::new(points)));
 }
 
 /// A finished shape becomes a child of the selected piece when an operation is chosen,
@@ -552,7 +556,7 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
                 if !piece.locked {
                     draw_handles(painter, view, &child.shape, op_color(child.op));
                 }
-                let ring = child.shape.ring();
+                let ring = child.shape.corners().unwrap_or_else(|| child.shape.ring());
                 draw_edge_labels(
                     painter,
                     &ring,
@@ -562,7 +566,14 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
                 );
             }
             None => {
-                if let Ok(region) = &region {
+                // Without children the outline is the base, labeled by its corners so that a
+                // rounded corner's arc doesn't get labels of its own.
+                if piece.children.is_empty()
+                    && let Some(corners) = piece.base.corners()
+                {
+                    let screen = to_screen(view, &corners);
+                    draw_edge_labels(painter, &corners, &screen, project.units, state);
+                } else if let Ok(region) = &region {
                     let outline = to_screen(view, &region.outline);
                     draw_edge_labels(painter, &region.outline, &outline, project.units, state);
                 }
@@ -610,15 +621,53 @@ fn draw_edges(
     {
         painter.line_segment(points, egui::Stroke::new(3.0, color.gamma_multiply(0.5)));
     }
-    if let Some(piece) = state.selected
-        && let Some((shape, edge)) = state.selected_edge()
-        && let Some(points) = segment(piece, shape, edge)
-    {
-        painter.line_segment(points, egui::Stroke::new(4.0, color));
-        for point in points {
-            painter.circle_filled(point, 4.0, color);
+    let Some(piece) = state.selected else {
+        return;
+    };
+    match state.selected_part() {
+        Some((shape, ShapePart::Edge(edge))) => {
+            if let Some(points) = segment(piece, shape, edge) {
+                painter.line_segment(points, egui::Stroke::new(4.0, color));
+                for point in points {
+                    painter.circle_filled(point, 4.0, color);
+                }
+            }
         }
+        Some((shape, ShapePart::Vertex(vertex))) => {
+            let corner = project
+                .pieces
+                .iter()
+                .find(|candidate| candidate.id == piece)
+                .and_then(|piece| shape.get(&state.displayed(piece))?.corners())
+                .and_then(|corners| corners.get(vertex).copied());
+            if let Some(corner) = corner {
+                let center = view.to_screen(corner);
+                painter.circle_stroke(center, 7.0, egui::Stroke::new(2.0, color));
+                painter.circle_filled(center, 3.0, color);
+            }
+        }
+        None => {}
     }
+}
+
+/// The vertex of the selected, unlocked piece under the cursor, on a shape with corners: the
+/// selected child first, then the base.
+fn vertex_at(
+    project: &Project,
+    state: &EditorState,
+    position: egui::Pos2,
+    view: Viewport,
+) -> Option<(u64, ShapeRef, usize)> {
+    let piece = state
+        .selected
+        .and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
+        .filter(|piece| !piece.locked)?;
+    let (shape, vertex) = handle_at(piece, state.selected_child_id(), position, view)?;
+    shape
+        .get(piece)?
+        .corners()
+        .is_some()
+        .then_some((piece.id, shape, vertex))
 }
 
 fn draw_edge_labels(

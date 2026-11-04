@@ -1,3 +1,4 @@
+use super::ShapePart;
 use super::drag_state_struct::ShapeRef;
 use super::{DragState, ShapeDraft};
 use crate::panels::align::AlignOptions;
@@ -35,9 +36,9 @@ pub struct EditorState {
     /// that child, and has more than one only through Shift+click or Ctrl+A. Read through
     /// `selected_children`.
     pub(super) children: Vec<u64>,
-    /// Piece id, shape and edge index, picked with the Edge tool. Read through
-    /// `selected_edge`, since it only counts while that shape is the one shown in Properties.
-    pub(super) selected_edge: Option<(u64, ShapeRef, usize)>,
+    /// Piece id, shape, and the edge or vertex picked with the Edge tool. Read through
+    /// `selected_part`, since it only counts while that shape is the one shown in Properties.
+    pub(super) selected_part: Option<(u64, ShapeRef, ShapePart)>,
     pub(super) drag: Option<DragState>,
     pub(super) pan: egui::Vec2,
     pub(super) zoom: f32,
@@ -69,7 +70,7 @@ impl Default for EditorState {
             pieces: Vec::new(),
             selected_child: None,
             children: Vec::new(),
-            selected_edge: None,
+            selected_part: None,
             drag: None,
             pan: egui::Vec2::ZERO,
             zoom: 2.0,
@@ -123,7 +124,7 @@ impl EditorState {
         self.selected = None;
         self.pieces.clear();
         self.clear_children();
-        self.selected_edge = None;
+        self.selected_part = None;
         self.drag = None;
         self.rename_buffer = None;
         self.fit_requested = true;
@@ -162,7 +163,7 @@ impl EditorState {
                 }
                 // The id can be given to the next new piece.
                 self.clear_children();
-                self.selected_edge = None;
+                self.selected_part = None;
                 if self.drag.as_ref().is_some_and(|drag| drag.piece_id == id) {
                     self.drag = None;
                 }
@@ -173,7 +174,7 @@ impl EditorState {
                 self.prune_selection(project);
                 let count = count - self.pieces.len();
                 self.clear_children();
-                self.selected_edge = None;
+                self.selected_part = None;
                 if self.drag.as_ref().is_some_and(|drag| {
                     !project.pieces.iter().any(|piece| piece.id == drag.piece_id)
                 }) {
@@ -195,14 +196,14 @@ impl EditorState {
                 if self.selected_child.is_some_and(|(piece, _)| piece == id) {
                     self.clear_children();
                 }
-                self.selected_edge = None;
+                self.selected_part = None;
                 self.report(Message::ChildDeleted);
             }
             ProjectChange::ChildrenRemoved { id, count } => {
                 if self.selected_child.is_some_and(|(piece, _)| piece == id) {
                     self.clear_children();
                 }
-                self.selected_edge = None;
+                self.selected_part = None;
                 self.report(Message::ChildrenDeleted { count });
             }
         }
@@ -258,7 +259,7 @@ impl EditorState {
         self.pieces = piece.into_iter().collect();
         self.selected_child = piece.zip(child);
         self.children = child.into_iter().collect();
-        self.selected_edge = None;
+        self.selected_part = None;
     }
 
     /// Adds a child of the selected piece to the selection as its primary child, or removes it,
@@ -279,7 +280,7 @@ impl EditorState {
             self.selected_child = Some((piece, child));
         }
         self.pieces = vec![piece];
-        self.selected_edge = None;
+        self.selected_part = None;
     }
 
     /// Makes an already selected child the primary one, keeping the rest of the selection.
@@ -287,7 +288,7 @@ impl EditorState {
         if let Some((piece, _)) = self.selected_child {
             self.selected_child = Some((piece, child));
         }
-        self.selected_edge = None;
+        self.selected_part = None;
     }
 
     /// Selects every child of the selected piece; the primary child stays.
@@ -321,14 +322,14 @@ impl EditorState {
             self.selected = Some(piece);
         }
         self.clear_children();
-        self.selected_edge = None;
+        self.selected_part = None;
     }
 
     /// Makes an already selected piece the primary one, keeping the rest of the selection.
     pub(super) fn focus(&mut self, piece: u64) {
         self.selected = Some(piece);
         self.clear_children();
-        self.selected_edge = None;
+        self.selected_part = None;
     }
 
     /// The primary piece stays if there is one.
@@ -348,25 +349,25 @@ impl EditorState {
         }
     }
 
-    /// Selects the edge along with its piece, and its child if it belongs to one.
-    pub(super) fn select_edge(&mut self, piece: u64, shape: ShapeRef, edge: usize) {
+    /// Selects the edge or vertex along with its piece, and its child if it belongs to one.
+    pub(super) fn select_part(&mut self, piece: u64, shape: ShapeRef, part: ShapePart) {
         let child = match shape {
             ShapeRef::Base => None,
             ShapeRef::Child(child) => Some(child),
         };
         self.select(Some(piece), child);
-        self.selected_edge = Some((piece, shape, edge));
+        self.selected_part = Some((piece, shape, part));
     }
 
-    /// The selected edge, if its shape is the one selected. The index may be out of range
-    /// after an undo, so readers check it against the shape.
-    pub(super) fn selected_edge(&self) -> Option<(ShapeRef, usize)> {
-        let (piece, shape, edge) = self.selected_edge?;
+    /// The selected edge or vertex, if its shape is the one selected. The index may be out of
+    /// range after an undo, so readers check it against the shape.
+    pub(super) fn selected_part(&self) -> Option<(ShapeRef, ShapePart)> {
+        let (piece, shape, part) = self.selected_part?;
         let shown = match self.selected_child_id() {
             Some(child) => ShapeRef::Child(child),
             None => ShapeRef::Base,
         };
-        (self.selected == Some(piece) && shape == shown).then_some((shape, edge))
+        (self.selected == Some(piece) && shape == shown).then_some((shape, part))
     }
 
     pub fn clear_released_drag(&mut self) {

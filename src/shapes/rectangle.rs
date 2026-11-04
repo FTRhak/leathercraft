@@ -9,6 +9,9 @@ pub struct Rectangle {
     pub width: f64,
     pub height: f64,
     pub rotation: f64,
+    /// Corner radii by vertex; a missing one is 0. See `corners::round_corners`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub radii: Vec<f64>,
 }
 
 impl Rectangle {
@@ -22,10 +25,17 @@ impl Rectangle {
             width: (b.x - a.x).abs(),
             height: (b.y - a.y).abs(),
             rotation: 0.0,
+            radii: Vec::new(),
         })
     }
 
+    /// The outline, with rounded corners.
     pub fn ring(&self) -> Vec<Point> {
+        super::corners::round_corners(&self.corners(), &self.radii)
+    }
+
+    /// The four corners, before rounding.
+    pub fn corners(&self) -> Vec<Point> {
         let (x, y) = (self.width * 0.5, self.height * 0.5);
         [(-x, -y), (x, -y), (x, y), (-x, y)]
             .into_iter()
@@ -35,7 +45,7 @@ impl Rectangle {
 
     /// The handles are the corners; the opposite corner stays in place.
     pub fn with_handle_at(&self, handle: usize, to: Point) -> Self {
-        let Some(&fixed) = self.ring().get((handle + 2) % 4) else {
+        let Some(&fixed) = self.corners().get((handle + 2) % 4) else {
             return self.clone();
         };
         let (x, y) = to_local(fixed, self.rotation, to);
@@ -44,11 +54,15 @@ impl Rectangle {
             width: x.abs(),
             height: y.abs(),
             rotation: self.rotation,
+            radii: self.radii.clone(),
         }
     }
 
     pub(crate) fn has_valid_size(&self) -> bool {
-        super::positive(self.width) && super::positive(self.height) && self.rotation.is_finite()
+        super::positive(self.width)
+            && super::positive(self.height)
+            && self.rotation.is_finite()
+            && super::corners::valid_radii(&self.radii)
     }
 }
 
@@ -84,6 +98,7 @@ mod tests {
             width: 4.0,
             height: 2.0,
             rotation: std::f64::consts::FRAC_PI_2,
+            radii: Vec::new(),
         });
         let bounds = shape.bounds().unwrap();
         assert!((bounds.width() - 2.0).abs() < 1.0e-9);

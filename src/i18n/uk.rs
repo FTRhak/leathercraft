@@ -51,6 +51,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Sides => "Кількість граней",
         Label::Rotation => "Поворот, °",
         Label::EdgeLength => "Довжина",
+        Label::CornerRadius => "Радіус заокруглення",
         Label::ToPolygon => "У многокутник",
         Label::MoveUp => "Застосувати раніше",
         Label::MoveDown => "Застосувати пізніше",
@@ -59,7 +60,7 @@ pub(super) fn label(label: Label) -> &'static str {
             "Клацайте, щоб додавати точки. Клацніть першу точку або натисніть Enter, щоб замкнути контур; Esc скасовує."
         }
         Label::EdgeHint => {
-            "Клацніть грань полігона, щоб вибрати її, і задайте довжину на панелі властивостей. Перетягуйте вершину, щоб перемістити її. Esc знімає вибір."
+            "Клацніть грань полігона, щоб задати її довжину, або вершину вибраної деталі, щоб заокруглити кут, на панелі властивостей. Перетягуйте вершину, щоб перемістити її. Esc знімає вибір."
         }
         Label::SelectHint => {
             "Перетягуйте деталь або вершину вибраної деталі. Shift+клік додає або прибирає деталь, Ctrl+A вибирає всі. Del видаляє вибрані деталі."
@@ -381,6 +382,7 @@ pub(super) fn message(message: &Message) -> String {
             format!("{count} {noun}")
         }
         Message::SelectedEdge { number } => format!("Грань {number}"),
+        Message::SelectedVertex { number } => format!("Вершина {number}"),
         Message::DefaultPieceName { id } => format!("Деталь {id}"),
         Message::PieceNotFound { id } => format!("Деталь {id} не існує."),
         Message::PieceLocked { name } => format!("Деталь «{name}» заблоковано."),

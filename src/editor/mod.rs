@@ -31,6 +31,14 @@ pub enum ViewMode {
     Preview3d,
 }
 
+/// A part of a shape picked with the Edge tool: an edge of a polygon, or a vertex of any shape
+/// with corners, by index into `Shape::corners`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ShapePart {
+    Edge(usize),
+    Vertex(usize),
+}
+
 fn send(events: &mut MessageWriter<ProjectMessage>, event: ProjectEvent) {
     events.write(ProjectMessage(event));
 }

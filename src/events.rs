@@ -373,6 +373,7 @@ mod tests {
                 Point::new(10.0, 0.0),
                 Point::new(0.0, 10.0),
             ],
+            ..Default::default()
         })
     }
 
@@ -425,7 +426,7 @@ mod tests {
         let invalid = [
             ProjectEvent::AddPiece {
                 name: "Flap".to_owned(),
-                base: Shape::Polygon(Polygon { points: Vec::new() }),
+                base: Shape::Polygon(Polygon::default()),
             },
             ProjectEvent::AddPiece {
                 name: " ".to_owned(),
@@ -439,6 +440,7 @@ mod tests {
                 id: 1,
                 shape: Shape::Polygon(Polygon {
                     points: vec![Point::new(0.0, 0.0); 3],
+                    radii: Vec::new(),
                 }),
             },
             ProjectEvent::SetBaseShape {
@@ -464,6 +466,7 @@ mod tests {
                     width: -1.0,
                     height: 2.0,
                     rotation: 0.0,
+                    radii: Vec::new(),
                 }),
             },
             ProjectEvent::SetChildOp {
@@ -477,6 +480,43 @@ mod tests {
             assert!(project.apply(event.clone()).is_err(), "{event:?}");
             assert_eq!(project, before);
         }
+    }
+
+    #[test]
+    fn corners_can_be_rounded_and_made_sharp_again() {
+        let mut project = project_with_piece();
+        let rounded = triangle().with_corner_radius(0, 2.0).unwrap();
+        project
+            .apply(ProjectEvent::SetBaseShape {
+                id: 1,
+                shape: rounded.clone(),
+            })
+            .unwrap();
+        assert_eq!(project.pieces[0].base, rounded);
+        assert!(project.pieces[0].region().is_ok());
+
+        let mut invalid = triangle();
+        if let Shape::Polygon(polygon) = &mut invalid {
+            polygon.radii = vec![-1.0];
+        }
+        let before = project.clone();
+        assert!(
+            project
+                .apply(ProjectEvent::SetBaseShape {
+                    id: 1,
+                    shape: invalid,
+                })
+                .is_err()
+        );
+        assert_eq!(project, before);
+
+        project
+            .apply(ProjectEvent::SetBaseShape {
+                id: 1,
+                shape: triangle(),
+            })
+            .unwrap();
+        assert_eq!(project.pieces[0].base, triangle());
     }
 
     #[test]

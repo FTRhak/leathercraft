@@ -63,6 +63,7 @@ mod tests {
                     Point::new(50.0, 70.0),
                     Point::new(-2.0, 70.0),
                 ],
+                ..Default::default()
             }),
         )
     }
@@ -77,6 +78,28 @@ mod tests {
 
         save_project(&path, &project).unwrap();
         assert_eq!(load_project(&path).unwrap(), project);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn corner_radii_round_trip_and_sharp_shapes_save_without_them() {
+        let path = temp_path("radii");
+        let mut piece = flap();
+        piece.base = piece.base.with_corner_radius(1, 4.0).unwrap();
+        let project = Project {
+            pieces: vec![piece],
+            ..Project::default()
+        };
+        save_project(&path, &project).unwrap();
+        assert!(fs::read_to_string(&path).unwrap().contains("\"radii\""));
+        assert_eq!(load_project(&path).unwrap(), project);
+
+        let sharp = Project {
+            pieces: vec![flap()],
+            ..Project::default()
+        };
+        save_project(&path, &sharp).unwrap();
+        assert!(!fs::read_to_string(&path).unwrap().contains("radii"));
         fs::remove_file(path).unwrap();
     }
 
@@ -103,6 +126,7 @@ mod tests {
                     width: 10.0,
                     height: 8.0,
                     rotation: 0.0,
+                    radii: Vec::new(),
                 }),
             },
             ChildShape {

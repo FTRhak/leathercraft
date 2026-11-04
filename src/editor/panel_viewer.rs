@@ -105,7 +105,7 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                     .and_then(|id| self.project.pieces.iter().find(|piece| piece.id == id))
                     .map(|piece| state.displayed(piece));
                 let child = state.selected_child_id();
-                let edge = state.selected_edge().map(|(_, edge)| edge);
+                let part = state.selected_part().map(|(_, part)| part);
                 let view = if editing {
                     properties::ViewControls::Editor(properties::EditorView {
                         hint: state.tool.hint(),
@@ -119,7 +119,7 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                 let selection = properties::Selection {
                     piece: piece.as_deref(),
                     child,
-                    edge,
+                    part,
                     rename_buffer: &mut state.rename_buffer,
                 };
                 let event = properties::show_panel(ui, self.project, view, selection, language);

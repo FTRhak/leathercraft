@@ -51,6 +51,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Sides => "Sides",
         Label::Rotation => "Rotation, °",
         Label::EdgeLength => "Length",
+        Label::CornerRadius => "Corner radius",
         Label::ToPolygon => "To Polygon",
         Label::MoveUp => "Apply earlier",
         Label::MoveDown => "Apply later",
@@ -59,7 +60,7 @@ pub(super) fn label(label: Label) -> &'static str {
             "Click to add points. Click the first point or press Enter to close; Esc cancels."
         }
         Label::EdgeHint => {
-            "Click an edge of a polygon to select it, then set its length in Properties. Drag a vertex to move it. Esc clears."
+            "Click an edge of a polygon to set its length, or a vertex of the selected piece to round its corner, in Properties. Drag a vertex to move it. Esc clears."
         }
         Label::SelectHint => {
             "Drag a piece or a vertex of the selected piece. Shift+click adds or removes a piece, Ctrl+A selects all. Del removes the selected pieces."
@@ -374,6 +375,7 @@ pub(super) fn message(message: &Message) -> String {
         Message::PointCount { count: 1 } => "1 point".to_owned(),
         Message::PointCount { count } => format!("{count} points"),
         Message::SelectedEdge { number } => format!("Edge {number}"),
+        Message::SelectedVertex { number } => format!("Vertex {number}"),
         Message::DefaultPieceName { id } => format!("Piece {id}"),
         Message::PieceNotFound { id } => format!("Piece {id} does not exist."),
         Message::PieceLocked { name } => format!("Piece '{name}' is locked."),

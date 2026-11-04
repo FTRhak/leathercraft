@@ -282,6 +282,7 @@ mod tests {
                 Point::new(10.0, 0.0),
                 Point::new(0.0, 10.0),
             ],
+            ..Default::default()
         })
     }
 

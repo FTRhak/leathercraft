@@ -2,12 +2,32 @@ use crate::model::Point;
 use serde::{Deserialize, Serialize};
 
 /// A free outline; its vertices are its handles.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Polygon {
     pub points: Vec<Point>,
+    /// Corner radii by vertex; a missing one is 0. See `corners::round_corners`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub radii: Vec<f64>,
 }
 
 impl Polygon {
+    /// A polygon through `points` with sharp corners.
+    pub fn new(points: Vec<Point>) -> Self {
+        Self {
+            points,
+            radii: Vec::new(),
+        }
+    }
+
+    /// The outline, with rounded corners.
+    pub fn ring(&self) -> Vec<Point> {
+        super::corners::round_corners(&self.points, &self.radii)
+    }
+
+    pub(crate) fn has_valid_size(&self) -> bool {
+        super::corners::valid_radii(&self.radii)
+    }
+
     pub fn translate(&mut self, dx: f64, dy: f64) {
         for point in &mut self.points {
             point.x += dx;
@@ -54,14 +74,12 @@ mod tests {
     use crate::shapes::test_support::assert_near;
 
     fn square() -> Polygon {
-        Polygon {
-            points: vec![
-                Point::new(0.0, 0.0),
-                Point::new(10.0, 0.0),
-                Point::new(10.0, 10.0),
-                Point::new(0.0, 10.0),
-            ],
-        }
+        Polygon::new(vec![
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            Point::new(10.0, 10.0),
+            Point::new(0.0, 10.0),
+        ])
     }
 
     #[test]

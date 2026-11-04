@@ -421,6 +421,7 @@ mod tests {
                     Point::new(2.0, 2.0),
                     Point::new(4.0, 4.0),
                 ],
+                ..Default::default()
             }),
         )];
         assert_eq!(
