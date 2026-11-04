@@ -46,7 +46,16 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/settings/mod.rs` | 95 | 700 | bin | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` with Default material and Hotkeys tabs |
 | `src/panels/settings/material.rs` | 187 | 1,500 | bin | Default material tab: `material_tab`, its own material form with Reset to defaults |
 | `src/panels/settings/hotkeys.rs` | 190 | 1,600 | bin | Hotkeys tab: `Capture`, `hotkeys_tab`, `shortcut_button`, key capture |
-| `src/panels/properties/mod.rs` | 490 | 4,000 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, a line's ends, length, angle and style (`line_style_fields`, shared with the Tools panel), a stitch line's hole type, pitch and size (`stitch_fields`, shared with the Tools panel) and its length, hole count, actual pitch and thread hint (`stitch_details`), selected edge's length, selected vertex's corner radius, To Polygon button |
+| `src/panels/properties/mod.rs` | 96 | 800 | bin | Properties panel: `EditorView`, `ViewControls`, `Selection`, view or preview controls, display units, `show_panel`; re-exports `line_style_fields` and `stitch_fields` for the Tools panel |
+| `src/panels/properties/piece.rs` | 95 | 800 | bin | Selected piece's name, size or result error, title and fields of its base or child, To Polygon button |
+| `src/panels/properties/shape.rs` | 56 | 500 | bin | `shape_fields`: dispatch to the file of each shape type; the selected vertex's corner radius |
+| `src/panels/properties/fields.rs` | 80 | 600 | bin | Shared inputs: `MIN_SIZE_MM`, `length_field`, `bounded_length_field`, `angle_field`, `center_fields` |
+| `src/panels/properties/polygon.rs` | 38 | 300 | bin | Polygon's point count and the selected edge's length |
+| `src/panels/properties/rectangle.rs` | 25 | 200 | bin | Rectangle's center, width, height and rotation |
+| `src/panels/properties/ellipse.rs` | 24 | 200 | bin | Ellipse's center, radii and rotation |
+| `src/panels/properties/regular_polygon.rs` | 28 | 250 | bin | Regular polygon's center, radius, sides and rotation |
+| `src/panels/properties/line.rs` | 69 | 700 | bin | Centerline's ends, length, angle and style (`line_style_fields`, shared with the Tools panel) |
+| `src/panels/properties/stitch.rs` | 129 | 1,000 | bin | Stitch line's hole type, pitch and size (`stitch_fields`, shared with the Tools panel), and its length, hole count, actual pitch and thread hint (`stitch_details`) |
 | `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion from each piece's `punched_region` |
 | `src/model.rs` | 594 | 4,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation (a base must be closed; a line's ends and dash count; a stitch line's points, hole parameters, hole count and overlap in `validate_stitch_line`) |
 | `src/boolean.rs` | 290 | 2,500 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes, skipping open lines; `punched_region`: the region with stitch holes cut, for the preview |
@@ -196,11 +205,18 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `settings/hotkeys.rs` | 8-21 | `HOTKEYS_HEIGHT`, `Capture`, `HotkeyChange` |
 | | 23 | `hotkeys_tab`, `shortcut_button` |
 | | 140 | `capture_keys` (next key press becomes the shortcut, Esc cancels), `normalize` (Ctrl saved as Command) |
-| `properties/mod.rs` | 10-31 | `EditorView`, `ViewControls` (editor or preview), `Selection` (displayed piece, child, selected edge or vertex, rename buffer) |
-| | 32-59 | `view_controls`, `units_control` |
-| | 63 | `selected_piece_details`: name, size or result error, fields of the selected base or child, To Polygon button for a primitive |
-| | 140 | `shape_fields`: center, size and rotation of a primitive in display units; a polygon's point count and the selected edge's length; the selected vertex's corner radius |
-| | 240 | `show_panel`, which returns the `ProjectEvent` to send |
+| `properties/mod.rs` | 4-15 | Submodules; re-exports `line_style_fields`, `stitch_fields` |
+| | 24-47 | `EditorView`, `ViewControls` (editor or preview), `Selection` (displayed piece, child, selected edge or vertex, rename buffer) |
+| | 49-77 | `view_controls`, `units_control` |
+| | 80 | `show_panel`, which returns the `ProjectEvent` to send |
+| `properties/piece.rs` | 13 | `selected_piece_details`: name, size or result error, fields of the selected base or child, stitch details, To Polygon button for a primitive |
+| `properties/shape.rs` | 16 | `shape_fields`: calls `polygon_fields`, `rectangle_fields`, `ellipse_fields`, `regular_polygon_fields`, `line_fields` or `stitch_line_fields` |
+| | 36 | `corner_radius_field`: the selected vertex's corner radius |
+| `properties/fields.rs` | 6-80 | `MIN_SIZE_MM`, `length_field`, `bounded_length_field`, `angle_field` (degrees shown, radians kept), `center_fields` |
+| `properties/line.rs` | 8 | `line_fields`: ends, length and angle around the start, style |
+| | 35 | `line_style_fields` |
+| `properties/stitch.rs` | 12-30 | `stitch_line_fields`, `stitch_fields` |
+| | 90 | `stitch_details` |
 
 ### `preview/mod.rs`
 
@@ -221,7 +237,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add a validation rule | `model.rs` 8-13, 200-262, 301-333 | `validate`, plus a `Message` variant and both catalogs |
 | Add UI text | `i18n/mod.rs` 70-166 | A `Label` or `Message` variant and an arm in `en.rs` and `uk.rs`; the compiler flags missing arms |
 | Add a language | `i18n/mod.rs` 14-66 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
-| Add a canvas tool | `panels/tools/mod.rs`, `editor/canvas.rs` 38-93, 152-262, `settings/hotkeys.rs` | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`, an `Action::Tool…` hotkey; a new primitive also goes in `Shape` (`ring`, `handles`, `with_handle_at`, `has_valid_size`), `shape_label` and `shape_fields`; an open one also in `is_open`, `distance_to`, its own drawing and the exports (see `docs/centerline.md` and `docs/stitch-holes.md`). A click-by-click tool shares `EditorState::draft`, owned through `draft_tool` |
+| Add a canvas tool | `panels/tools/mod.rs`, `editor/canvas.rs` 38-93, 152-262, `settings/hotkeys.rs` | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`, an `Action::Tool…` hotkey; a new primitive also goes in `Shape` (`ring`, `handles`, `with_handle_at`, `has_valid_size`), `shape_label` and `shape_fields` (with its own file in `panels/properties/`); an open one also in `is_open`, `distance_to`, its own drawing and the exports (see `docs/centerline.md` and `docs/stitch-holes.md`). A click-by-click tool shares `EditorState::draft`, owned through `draft_tool` |
 | Add a boolean operation | `model.rs` `BooleanOp`, `boolean.rs` `region` | A `BooleanOp` variant and its `ALL`, its `OverlayRule`, catalog arms, `op_color` and `paint_operation_icon` |
 | Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material`, `material_fields` and the Settings form in `panels/settings/material.rs` |
 | Change the file format | `model.rs` 119-160, 265-278, `shapes/mod.rs` 14-23 and the shape structs, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
