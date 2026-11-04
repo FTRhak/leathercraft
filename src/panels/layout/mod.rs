@@ -2,7 +2,7 @@ use crate::icons::{glyph, icon_button, paint_glyph};
 use bevy_egui::egui;
 use bevy_egui::egui::collapsing_header::{CollapsingState, paint_default_icon};
 use leathercraft::events::ProjectEvent;
-use leathercraft::i18n::{Label, Language};
+use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{BooleanOp, ChildShape, PatternPiece, Project};
 use leathercraft::shapes::Shape;
 
@@ -49,6 +49,7 @@ fn shape_label(shape: &Shape) -> Label {
         Shape::Ellipse(_) => Label::Ellipse,
         Shape::RegularPolygon(_) => Label::RegularPolygon,
         Shape::Line(_) => Label::Centerline,
+        Shape::StitchLine(_) => Label::StitchHoles,
     }
 }
 
@@ -133,11 +134,13 @@ fn child_row(
         }
     });
     let selected = selection.primary == Some(id) && selection.children.contains(&child_id);
-    let text = format!(
-        "{}. {}",
-        index + 1,
-        language.label(shape_label(&child.shape))
-    );
+    let name = match &child.shape {
+        Shape::StitchLine(line) => language.message(&Message::StitchHolesRow {
+            count: line.hole_count(),
+        }),
+        shape => language.label(shape_label(shape)).to_owned(),
+    };
+    let text = format!("{}. {name}", index + 1);
     let row = egui::Button::selectable(selected, (text, egui::Atom::grow()))
         .truncate()
         .min_size(egui::vec2(ui.available_width(), 0.0));

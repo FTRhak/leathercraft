@@ -1017,4 +1017,39 @@ mod tests {
         );
         assert_eq!(project, before);
     }
+
+    #[test]
+    fn stitch_lines_are_added_and_an_invalid_pitch_is_rejected() {
+        use crate::shapes::{HoleKind, StitchLine};
+        let mut project = project_with_piece();
+        let line = |pitch| {
+            Shape::StitchLine(
+                StitchLine::new(
+                    vec![Point::new(1.0, 1.0), Point::new(9.0, 1.0)],
+                    HoleKind::Round,
+                    pitch,
+                    1.0,
+                )
+                .unwrap(),
+            )
+        };
+        project
+            .apply(ProjectEvent::AddChild {
+                id: 1,
+                op: BooleanOp::Subtract,
+                shape: line(2.0),
+            })
+            .unwrap();
+        assert_eq!(project.pieces[0].children.len(), 1);
+        let before = project.clone();
+        assert!(matches!(
+            project.apply(ProjectEvent::AddChild {
+                id: 1,
+                op: BooleanOp::Subtract,
+                shape: line(0.5),
+            }),
+            Err(Message::InvalidHoleParameters { .. })
+        ));
+        assert_eq!(project, before);
+    }
 }

@@ -5,6 +5,7 @@ use crate::material::{
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
 };
 use crate::model::{BooleanOp, Units};
+use crate::shapes::{HoleKind, MAX_HOLE_MM, MAX_PITCH_MM, MIN_HOLE_MM, MIN_PITCH_MM};
 
 pub(super) fn label(label: Label) -> &'static str {
     match label {
@@ -42,6 +43,18 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::LineDashDot => "Dash-dot",
         Label::DashLength => "Dash",
         Label::GapLength => "Gap",
+        Label::StitchHoles => "Stitch holes",
+        Label::StitchHolesHint => {
+            "Click each vertex of a stitch line on the selected piece. Double-click or Enter finishes, Backspace removes the last vertex, Shift turns in 15° steps, Esc cancels."
+        }
+        Label::HoleType => "Hole type",
+        Label::HoleKind(kind) => hole_kind(kind),
+        Label::Pitch => "Pitch",
+        Label::PitchPresets => "Iron",
+        Label::HoleSize => "Hole size",
+        Label::StitchLength => "Length",
+        Label::HoleCount => "Holes",
+        Label::ActualPitch => "Actual pitch",
         Label::StartX => "Start X",
         Label::StartY => "Start Y",
         Label::EndX => "End X",
@@ -416,6 +429,27 @@ pub(super) fn message(message: &Message) -> String {
         Message::TooManyDashes { name, max } => {
             format!("A line of piece '{name}' would have more than {max} dashes; make them longer.")
         }
+        Message::InvalidHoleParameters { name } => format!(
+            "Stitch holes of piece '{name}' need a size from {MIN_HOLE_MM} to {MAX_HOLE_MM} mm and a pitch from {MIN_PITCH_MM} to {MAX_PITCH_MM} mm."
+        ),
+        Message::HolesOverlap { name } => format!(
+            "Stitch holes of piece '{name}' would overlap; make them smaller or the pitch larger."
+        ),
+        Message::TooManyHoles { name, max } => format!(
+            "A stitch line of piece '{name}' would have more than {max} holes; make the pitch larger."
+        ),
+        Message::StitchHolesRow { count } => format!("Stitch holes ({count})"),
+        Message::StitchVertices { count: 1 } => "1 vertex".to_owned(),
+        Message::StitchVertices { count } => format!("{count} vertices"),
+        Message::ThreadHint { band } => format!(
+            "Thread {} mm, leather {} mm.",
+            range(band.thread_mm()),
+            range(band.leather_mm())
+        ),
+        Message::LeatherOutsideBand { band } => format!(
+            "The piece's leather is outside the {} mm that suits this pitch.",
+            range(band.leather_mm())
+        ),
         Message::ResultEmpty { name } => format!("Nothing is left of piece '{name}'."),
         Message::ResultSplit { name } => {
             format!("Piece '{name}' falls apart into several parts.")
@@ -528,5 +562,20 @@ pub(super) fn unit_symbol(units: Units) -> &'static str {
     match units {
         Units::Millimeters => "mm",
         Units::Inches => "in",
+    }
+}
+
+fn hole_kind(kind: HoleKind) -> &'static str {
+    match kind {
+        HoleKind::French => "French",
+        HoleKind::Diamond => "Diamond",
+        HoleKind::Round => "Round",
+    }
+}
+
+fn range((min, max): (f64, Option<f64>)) -> String {
+    match max {
+        Some(max) => format!("{min}–{max}"),
+        None => format!("{min}+"),
     }
 }

@@ -1,9 +1,9 @@
 use crate::icons::icon_button;
-use crate::panels::properties::line_style_fields;
+use crate::panels::properties::{line_style_fields, stitch_fields};
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::model::{BooleanOp, Point, Units};
-use leathercraft::shapes::{LineStyle, REGULAR_POLYGON_SIDES, Shape};
+use leathercraft::shapes::{DEFAULT_PITCH_MM, HoleKind, LineStyle, REGULAR_POLYGON_SIDES, Shape};
 use std::f32::consts::{PI, TAU};
 
 const ICON_BUTTON_SIZE: f32 = 32.0;
@@ -21,10 +21,11 @@ pub enum Tool {
     Ellipse,
     RegularPolygon,
     Centerline,
+    StitchHoles,
 }
 
 impl Tool {
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 8] = [
         Self::Select,
         Self::Edge,
         Self::Draw,
@@ -32,6 +33,7 @@ impl Tool {
         Self::Ellipse,
         Self::RegularPolygon,
         Self::Centerline,
+        Self::StitchHoles,
     ];
 
     fn label(self) -> Label {
@@ -43,6 +45,7 @@ impl Tool {
             Self::Ellipse => Label::Ellipse,
             Self::RegularPolygon => Label::RegularPolygon,
             Self::Centerline => Label::Centerline,
+            Self::StitchHoles => Label::StitchHoles,
         }
     }
 
@@ -55,6 +58,7 @@ impl Tool {
             Self::Ellipse => Label::EllipseHint,
             Self::RegularPolygon => Label::RegularPolygonHint,
             Self::Centerline => Label::CenterlineHint,
+            Self::StitchHoles => Label::StitchHolesHint,
         }
     }
 
@@ -75,7 +79,7 @@ impl Tool {
             Self::RegularPolygon => {
                 Shape::regular_polygon_from_center(start, end, sides, constrained)
             }
-            Self::Select | Self::Edge | Self::Draw => None,
+            Self::Select | Self::Edge | Self::Draw | Self::StitchHoles => None,
         }
     }
 
@@ -144,6 +148,17 @@ impl Tool {
                 painter.circle_filled(along(0.5), stroke.width, stroke.color);
                 painter.line_segment([along(0.6), along(1.0)], stroke);
             }
+            Self::StitchHoles => {
+                // Slanted holes along a faded diagonal path.
+                let along = |t: f32| at(t, 1.0 - t);
+                let faded = egui::Stroke::new(1.0, stroke.color.gamma_multiply(0.35));
+                painter.line_segment([along(0.0), along(1.0)], faded);
+                let slot = egui::Vec2::angled(-PI / 4.0 - PI / 4.0) * 3.0;
+                for index in 0..4 {
+                    let center = along(0.1 + 0.8 * index as f32 / 3.0);
+                    painter.line_segment([center - slot, center + slot], stroke);
+                }
+            }
         }
     }
 }
@@ -208,6 +223,25 @@ fn paint_new_piece_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui:
     );
 }
 
+/// The hole kind, pitch and size the Stitch holes tool draws with.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct StitchSettings {
+    pub hole: HoleKind,
+    pub pitch: f64,
+    pub size: f64,
+}
+
+impl Default for StitchSettings {
+    fn default() -> Self {
+        let hole = HoleKind::default();
+        Self {
+            hole,
+            pitch: DEFAULT_PITCH_MM,
+            size: hole.default_size(),
+        }
+    }
+}
+
 /// What the Tools panel edits: the tool and the settings of the tools that have any.
 pub struct ToolSettings<'a> {
     pub tool: &'a mut Tool,
@@ -215,6 +249,8 @@ pub struct ToolSettings<'a> {
     pub op_mode: &'a mut Option<BooleanOp>,
     /// The style of new centerlines.
     pub line_style: &'a mut LineStyle,
+    /// The holes of new stitch lines.
+    pub stitch: &'a mut StitchSettings,
 }
 
 pub fn show_panel(ui: &mut egui::Ui, settings: ToolSettings, units: Units, language: Language) {
@@ -223,6 +259,7 @@ pub fn show_panel(ui: &mut egui::Ui, settings: ToolSettings, units: Units, langu
         polygon_sides,
         op_mode,
         line_style,
+        stitch,
     } = settings;
     ui.horizontal_wrapped(|ui| {
         for option in Tool::ALL {
@@ -270,5 +307,15 @@ pub fn show_panel(ui: &mut egui::Ui, settings: ToolSettings, units: Units, langu
     }
     if *tool == Tool::Centerline {
         line_style_fields(ui, line_style, units, language);
+    }
+    if *tool == Tool::StitchHoles {
+        stitch_fields(
+            ui,
+            &mut stitch.hole,
+            &mut stitch.pitch,
+            &mut stitch.size,
+            units,
+            language,
+        );
     }
 }

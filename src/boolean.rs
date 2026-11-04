@@ -3,6 +3,7 @@ use crate::model::{
     BooleanOp, Bounds, MIN_POLYGON_AREA_MM2, PatternPiece, Point, ring_bounds, ring_contains,
     signed_area,
 };
+use crate::shapes::Shape;
 use i_overlay::core::fill_rule::FillRule;
 use i_overlay::core::overlay_rule::OverlayRule;
 use i_overlay::float::single::SingleFloatOverlay;
@@ -93,6 +94,38 @@ impl PatternPiece {
             }),
             _ => Err(Message::ResultSplit { name }),
         }
+    }
+
+    /// The region with every stitch hole punched through, for the 3D preview. Holes outside
+    /// the outline have no effect. If punching leaves nothing or splits the piece, the region
+    /// is returned as it is, so the piece is still shown.
+    pub fn punched_region(&self) -> Result<Region, Message> {
+        let region = self.region()?;
+        let holes: Vec<Vec<[f64; 2]>> = self
+            .children
+            .iter()
+            .filter_map(|child| match &child.shape {
+                Shape::StitchLine(line) => Some(line),
+                _ => None,
+            })
+            .flat_map(|line| {
+                line.holes()
+                    .into_iter()
+                    .map(|hole| contour(&line.hole_outline(&hole)))
+            })
+            .collect();
+        if holes.is_empty() {
+            return Ok(region);
+        }
+        let subject: Vec<Vec<[f64; 2]>> = region.rings().map(contour).collect();
+        let shapes = subject.overlay(&holes, OverlayRule::Difference, FillRule::NonZero);
+        Ok(match shapes.as_slice() {
+            [shape] if !shape.is_empty() => Region {
+                outline: ring(&shape[0]),
+                holes: shape[1..].iter().map(|hole| ring(hole)).collect(),
+            },
+            _ => region,
+        })
     }
 }
 
@@ -231,5 +264,27 @@ mod tests {
         .unwrap();
         let region = piece(vec![(BooleanOp::Intersect, line)]).region().unwrap();
         assert_eq!(region, piece(Vec::new()).region().unwrap());
+    }
+
+    #[test]
+    fn stitch_holes_are_punched_only_for_the_preview() {
+        use crate::shapes::{HoleKind, StitchLine};
+        // Six round holes at x = 0..=100 mm, y = 10: the first is half outside the piece and
+        // the last two outside it entirely.
+        let line = StitchLine::new(
+            vec![Point::new(0.0, 10.0), Point::new(100.0, 10.0)],
+            HoleKind::Round,
+            20.0,
+            2.0,
+        )
+        .unwrap();
+        let piece = piece(vec![(BooleanOp::Subtract, Shape::StitchLine(line))]);
+        let region = piece.region().unwrap();
+        assert_area(&region, 80.0 * 120.0);
+        let punched = piece.punched_region().unwrap();
+        assert_eq!(punched.holes.len(), 3);
+        assert!(area(&punched) < area(&region));
+        assert!(!punched.contains(Point::new(20.0, 10.0)));
+        assert!(punched.contains(Point::new(30.0, 10.0)));
     }
 }

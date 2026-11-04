@@ -10,7 +10,9 @@ use earcutr::earcut;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Language, Message};
 use leathercraft::model::{BooleanOp, PatternPiece, Point, Project, Units};
-use leathercraft::shapes::{Ellipse, Line, Polygon, Rectangle, RegularPolygon, Shape};
+use leathercraft::shapes::{
+    Ellipse, HoleKind, Line, Polygon, Rectangle, RegularPolygon, Shape, StitchLine,
+};
 
 const MIN_ZOOM: f32 = 0.05;
 const MAX_ZOOM: f32 = 100.0;
@@ -23,6 +25,9 @@ const CENTERLINE_WIDTH_PX: f32 = 0.8;
 const SELECTED_CENTERLINE_WIDTH_PX: f32 = 1.5;
 /// Below this period on screen, a dash pattern is drawn as a faded solid line.
 const MIN_DASH_PERIOD_PX: f32 = 3.0;
+/// Below this pitch on screen, stitch holes are drawn as a faded dotted path.
+const MIN_HOLE_PITCH_PX: f32 = 3.0;
+const HOLE_COLOR: egui::Color32 = egui::Color32::from_gray(205);
 
 #[derive(Clone, Copy)]
 pub(super) struct Viewport {
@@ -85,13 +90,16 @@ pub(super) fn canvas(
         .or_else(|| response.interact_pointer_pos())
         .map(|position| view.to_world(position));
 
-    if state.tool != Tool::Draw {
+    // The Draw and Stitch holes tools each click a draft; another tool drops it.
+    if state.tool != state.draft_tool {
         state.draft.clear();
+        state.draft_tool = state.tool;
     }
     match state.tool {
         Tool::Select => handle_select(ui, &response, view, project, events, state),
         Tool::Edge => handle_edge(ui, &response, view, project, events, state),
         Tool::Draw => handle_draw(ui, &response, view, project, events, state),
+        Tool::StitchHoles => handle_stitch(ui, &response, view, project, events, state),
         Tool::Rectangle | Tool::Ellipse | Tool::RegularPolygon | Tool::Centerline => {
             handle_shape(ui, &response, view, project, events, state);
         }
@@ -101,8 +109,20 @@ pub(super) fn canvas(
     draw_grid(&painter, rect, view);
     draw_pieces(&painter, view, project, state);
     draw_centerlines(&painter, view, project, state);
+    draw_stitch_holes(&painter, ui, response.hover_pos(), view, project, state);
     draw_edges(&painter, response.hover_pos(), view, project, state);
-    draw_draft(&painter, response.hover_pos(), view, project.units, state);
+    if state.tool == Tool::StitchHoles {
+        draw_stitch_draft(
+            &painter,
+            ui,
+            response.hover_pos(),
+            view,
+            project.units,
+            state,
+        );
+    } else {
+        draw_draft(&painter, response.hover_pos(), view, project.units, state);
+    }
     draw_shape_draft(&painter, view, project.units, state);
 }
 
@@ -272,6 +292,76 @@ fn finish_draft(
 ) {
     let points = state.draft.clone();
     commit_shape(project, events, state, Shape::Polygon(Polygon::new(points)));
+}
+
+/// Clicks place the vertices of a stitch line; a double-click or Enter adds it to the selected
+/// piece, Backspace drops the last vertex and Esc the draft. Shift turns the next segment in
+/// 15° steps.
+fn handle_stitch(
+    ui: &egui::Ui,
+    response: &egui::Response,
+    view: Viewport,
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
+    state: &mut EditorState,
+) {
+    if response.double_clicked() {
+        // The first click of the pair already placed the last vertex.
+        finish_stitch(project, events, state);
+        return;
+    }
+    if response.clicked()
+        && let Some(position) = response.interact_pointer_pos()
+    {
+        let shift = ui.input(|input| input.modifiers.shift);
+        let point = stitch_target(state, view.to_world(position), shift);
+        if state.draft.last() != Some(&point) {
+            state.draft.push(point);
+        }
+    }
+    if ui.ctx().wants_keyboard_input() {
+        return;
+    }
+    if ui.input(|input| input.key_pressed(egui::Key::Enter)) {
+        finish_stitch(project, events, state);
+    }
+    if ui.input(|input| input.key_pressed(egui::Key::Backspace)) {
+        state.draft.pop();
+    }
+    if ui.input(|input| input.key_pressed(egui::Key::Escape)) {
+        state.draft.clear();
+    }
+}
+
+/// Where the next vertex of a stitch line goes: snapped to the grid, and with Shift turned
+/// around the last vertex in 15° steps.
+fn stitch_target(state: &EditorState, point: Point, shift: bool) -> Point {
+    let point = state.snap_point(point);
+    match state.draft.last() {
+        Some(&last) if shift => StitchLine::snap(last, point),
+        _ => point,
+    }
+}
+
+/// The stitch line of the draft with the current settings, or `None` with fewer than two points.
+fn stitch_line(state: &EditorState, points: Vec<Point>) -> Option<StitchLine> {
+    StitchLine::new(
+        points,
+        state.stitch.hole,
+        state.stitch.pitch,
+        state.stitch.size,
+    )
+}
+
+fn finish_stitch(
+    project: &Project,
+    events: &mut MessageWriter<ProjectMessage>,
+    state: &mut EditorState,
+) {
+    let points = std::mem::take(&mut state.draft);
+    if let Some(line) = stitch_line(state, points) {
+        commit_shape(project, events, state, Shape::StitchLine(line));
+    }
 }
 
 /// A finished shape becomes a child of the selected piece when an operation is chosen,
@@ -604,6 +694,12 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
                     draw_line_label(painter, view, line, project.units, state);
                     continue;
                 }
+                if let Shape::StitchLine(_) = &child.shape {
+                    if !piece.locked {
+                        draw_handles(painter, view, &child.shape, CENTERLINE_SELECTED_COLOR);
+                    }
+                    continue;
+                }
                 if !piece.locked {
                     draw_handles(painter, view, &child.shape, op_color(child.op));
                 }
@@ -658,6 +754,127 @@ fn draw_centerlines(
                 egui::Stroke::new(CENTERLINE_WIDTH_PX, CENTERLINE_COLOR.gamma_multiply(0.8))
             };
             draw_line(painter, view, line, stroke);
+        }
+    }
+}
+
+/// The holes of every stitch line, above all outlines and never clipped by them. The path is
+/// shown faintly only while its line is selected or under the cursor, so it can be grabbed.
+fn draw_stitch_holes(
+    painter: &egui::Painter,
+    ui: &egui::Ui,
+    hover: Option<egui::Pos2>,
+    view: Viewport,
+    project: &Project,
+    state: &EditorState,
+) {
+    let hover = hover.map(|position| view.to_world(position));
+    for piece in &project.pieces {
+        let piece = state.displayed(piece);
+        let primary = state.selected == Some(piece.id);
+        for child in &piece.children {
+            let Shape::StitchLine(line) = &child.shape else {
+                continue;
+            };
+            let selected = primary && state.selected_children().contains(&child.id);
+            let hovered =
+                hover.is_some_and(|point| line.distance_to(point) <= view.hit_tolerance());
+            let color = if selected {
+                CENTERLINE_SELECTED_COLOR
+            } else if state.is_selected(piece.id) {
+                HOLE_COLOR
+            } else {
+                HOLE_COLOR.gamma_multiply(0.8)
+            };
+            if selected || hovered {
+                let path = to_screen(view, &line.path());
+                painter.add(egui::Shape::line(
+                    path,
+                    egui::Stroke::new(CENTERLINE_WIDTH_PX, color.gamma_multiply(0.5)),
+                ));
+            }
+            draw_stitch_line(painter, ui, view, line, color);
+        }
+    }
+}
+
+/// The holes of a stitch line, filled with the canvas background so they read as punched. Too
+/// fine to show at this zoom, the path is drawn dotted and faded instead.
+fn draw_stitch_line(
+    painter: &egui::Painter,
+    ui: &egui::Ui,
+    view: Viewport,
+    line: &StitchLine,
+    color: egui::Color32,
+) {
+    if (line.pitch as f32) * view.zoom < MIN_HOLE_PITCH_PX {
+        let path = to_screen(view, &line.path());
+        painter.extend(egui::Shape::dotted_line(
+            &path,
+            color.gamma_multiply(0.6),
+            MIN_HOLE_PITCH_PX,
+            0.5,
+        ));
+        return;
+    }
+    let background = ui.visuals().extreme_bg_color;
+    let stroke = egui::Stroke::new(1.0, color);
+    for hole in line.holes() {
+        if line.hole == HoleKind::Round {
+            let radius = (line.size as f32 * 0.5 * view.zoom).max(0.5);
+            painter.circle(view.to_screen(hole.center), radius, background, stroke);
+        } else {
+            let outline = to_screen(view, &line.hole_outline(&hole));
+            painter.add(egui::Shape::convex_polygon(outline, background, stroke));
+        }
+    }
+}
+
+/// The stitch line being drawn: its vertices, the segment to the cursor, and its holes.
+fn draw_stitch_draft(
+    painter: &egui::Painter,
+    ui: &egui::Ui,
+    hover: Option<egui::Pos2>,
+    view: Viewport,
+    units: Units,
+    state: &EditorState,
+) {
+    let Some(&last) = state.draft.last() else {
+        return;
+    };
+    let mut points = state.draft.clone();
+    let target = hover.map(|position| {
+        let shift = ui.input(|input| input.modifiers.shift);
+        stitch_target(state, view.to_world(position), shift)
+    });
+    if let Some(target) = target
+        && target != last
+    {
+        points.push(target);
+    }
+    let color = CENTERLINE_SELECTED_COLOR;
+    let screen = to_screen(view, &points);
+    painter.add(egui::Shape::line(
+        screen,
+        egui::Stroke::new(1.0, color.gamma_multiply(0.6)),
+    ));
+    for position in to_screen(view, &state.draft) {
+        painter.circle_filled(position, 3.0, color);
+    }
+    if let Some(line) = stitch_line(state, points) {
+        draw_stitch_line(painter, ui, view, &line, color);
+        if let Some(target) = target {
+            painter.text(
+                view.to_screen(target) + egui::vec2(10.0, -10.0),
+                egui::Align2::LEFT_BOTTOM,
+                format!(
+                    "{} · {}",
+                    format_length(state.language, units, line.length()),
+                    line.hole_count()
+                ),
+                egui::FontId::proportional(12.0),
+                color,
+            );
         }
     }
 }
@@ -920,7 +1137,7 @@ fn draw_shape_draft(painter: &egui::Painter, view: Viewport, units: Units, state
             format!("{} × {}", length(width), length(height))
         }
         Shape::RegularPolygon(RegularPolygon { radius, .. }) => format!("R {}", length(radius)),
-        Shape::Polygon(_) => return,
+        Shape::Polygon(_) | Shape::StitchLine(_) => return,
     };
     painter.text(
         view.to_screen(draft.end) + egui::vec2(10.0, -10.0),

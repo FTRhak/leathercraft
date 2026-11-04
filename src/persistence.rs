@@ -227,4 +227,43 @@ mod tests {
         assert_eq!(line.style, LineStyle::Solid);
         fs::remove_file(path).unwrap();
     }
+
+    #[test]
+    fn stitch_lines_round_trip() {
+        use crate::shapes::{HoleKind, StitchLine};
+        let path = temp_path("stitch");
+        let mut piece = flap();
+        let mut stitch = StitchLine::new(
+            vec![
+                Point::new(3.0, 3.0),
+                Point::new(47.0, 3.0),
+                Point::new(47.0, 67.0),
+            ],
+            HoleKind::French,
+            3.38,
+            1.2,
+        )
+        .unwrap();
+        piece.children.push(ChildShape {
+            id: 1,
+            op: BooleanOp::Subtract,
+            shape: Shape::StitchLine(stitch.clone()),
+        });
+        let mut project = Project {
+            pieces: vec![piece],
+            ..Project::default()
+        };
+        save_project(&path, &project).unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains("\"kind\": \"stitch_line\""));
+        assert!(text.contains("\"hole\": \"french\""));
+        assert!(!text.contains("\"radii\""));
+        assert_eq!(load_project(&path).unwrap(), project);
+
+        stitch.radii = vec![0.0, 5.0, 0.0];
+        project.pieces[0].children[0].shape = Shape::StitchLine(stitch);
+        save_project(&path, &project).unwrap();
+        assert_eq!(load_project(&path).unwrap(), project);
+        fs::remove_file(path).unwrap();
+    }
 }

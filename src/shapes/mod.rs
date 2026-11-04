@@ -4,12 +4,18 @@ mod line;
 mod polygon;
 mod rectangle;
 mod regular_polygon;
+mod stitch;
 
 pub use ellipse::{CIRCLE_SEGMENTS, Ellipse};
 pub use line::{DOT_MM, Line, LineStyle, MAX_DASHES_PER_LINE, MIN_DASH_MM};
 pub use polygon::Polygon;
 pub use rectangle::Rectangle;
 pub use regular_polygon::{REGULAR_POLYGON_SIDES, RegularPolygon};
+pub use stitch::{
+    DEFAULT_PITCH_MM, HOLE_SEGMENTS, HOLE_SLANT, Hole, HoleKind, MAX_HOLE_MM, MAX_HOLES_PER_LINE,
+    MAX_PITCH_MM, MIN_HOLE_MM, MIN_PITCH_MM, PITCH_PRESETS, Run, StitchBand, StitchLine,
+    hole_outline,
+};
 
 use crate::model::{Bounds, Point, ring_bounds, ring_contains};
 use serde::{Deserialize, Serialize};
@@ -26,6 +32,8 @@ pub enum Shape {
     RegularPolygon(RegularPolygon),
     /// Open, so it is never a base and takes no part in a piece's outline.
     Line(Line),
+    /// Open, like a line: a path of stitch holes.
+    StitchLine(StitchLine),
 }
 
 /// Turns a point in a primitive's own axes into world coordinates.
@@ -73,22 +81,24 @@ impl Shape {
 
     /// Whether the shape is an open line rather than an outline.
     pub fn is_open(&self) -> bool {
-        matches!(self, Self::Line(_))
+        matches!(self, Self::Line(_) | Self::StitchLine(_))
     }
 
     /// The distance from the point to an open shape, or `None` for an outline.
     pub fn distance_to(&self, point: Point) -> Option<f64> {
         match self {
             Self::Line(line) => Some(line.distance_to(point)),
+            Self::StitchLine(line) => Some(line.distance_to(point)),
             _ => None,
         }
     }
 
     /// The closed polygon of the shape, without a repeated closing point. For an open line it
-    /// is just its two ends.
+    /// is just its two ends, and for a stitch line its path; neither is closed.
     pub fn ring(&self) -> Vec<Point> {
         match self {
             Self::Line(line) => vec![line.start, line.end],
+            Self::StitchLine(line) => line.path(),
             Self::Polygon(polygon) => polygon.ring(),
             Self::Rectangle(rectangle) => rectangle.ring(),
             Self::Ellipse(ellipse) => ellipse.ring(),
@@ -100,7 +110,7 @@ impl Shape {
     /// keeps its corners and their radii, and an ellipse becomes the points of its ring.
     pub fn to_polygon(&self) -> Self {
         match self {
-            Self::Polygon(_) | Self::Line(_) => self.clone(),
+            Self::Polygon(_) | Self::Line(_) | Self::StitchLine(_) => self.clone(),
             Self::Rectangle(Rectangle { radii, .. })
             | Self::RegularPolygon(RegularPolygon { radii, .. }) => Self::Polygon(Polygon {
                 points: self.corners().unwrap_or_default(),
@@ -111,10 +121,11 @@ impl Shape {
     }
 
     /// The vertices before their corners are rounded, or `None` for an ellipse or a line, which
-    /// have none.
+    /// have none. A stitch line's are its path's vertices, ends included.
     pub fn corners(&self) -> Option<Vec<Point>> {
         match self {
             Self::Polygon(polygon) => Some(polygon.points.clone()),
+            Self::StitchLine(line) => Some(line.points.clone()),
             Self::Rectangle(rectangle) => Some(rectangle.corners()),
             Self::RegularPolygon(polygon) => Some(polygon.corners()),
             Self::Ellipse(_) | Self::Line(_) => None,
@@ -125,15 +136,22 @@ impl Shape {
         match self {
             Self::Polygon(Polygon { radii, .. })
             | Self::Rectangle(Rectangle { radii, .. })
-            | Self::RegularPolygon(RegularPolygon { radii, .. }) => radii,
+            | Self::RegularPolygon(RegularPolygon { radii, .. })
+            | Self::StitchLine(StitchLine { radii, .. }) => radii,
             Self::Ellipse(_) | Self::Line(_) => &[],
         }
     }
 
-    /// The radius that rounds vertex `index` of `corners`, or `None` if there is no such vertex.
+    /// The radius that rounds vertex `index` of `corners`, or `None` if there is no such vertex
+    /// or it can't be rounded, as the ends of a stitch line.
     pub fn corner_radius(&self, index: usize) -> Option<f64> {
         let count = self.corners()?.len();
-        (index < count).then(|| corners::radius_at(self.radii(), index))
+        (index < count && self.can_round(index, count))
+            .then(|| corners::radius_at(self.radii(), index))
+    }
+
+    fn can_round(&self, index: usize, count: usize) -> bool {
+        !matches!(self, Self::StitchLine(_)) || (index > 0 && index + 1 < count)
     }
 
     /// The shape with vertex `index` rounded by `radius`; 0 makes it sharp. `None` if there is
@@ -141,14 +159,15 @@ impl Shape {
     /// corner's edges is kept, and reduced only where the ring is built.
     pub fn with_corner_radius(&self, index: usize, radius: f64) -> Option<Self> {
         let count = self.corners()?.len();
-        if index >= count || !radius.is_finite() || radius < 0.0 {
+        if index >= count || !self.can_round(index, count) || !radius.is_finite() || radius < 0.0 {
             return None;
         }
         let mut shape = self.clone();
         match &mut shape {
             Self::Polygon(Polygon { radii, .. })
             | Self::Rectangle(Rectangle { radii, .. })
-            | Self::RegularPolygon(RegularPolygon { radii, .. }) => {
+            | Self::RegularPolygon(RegularPolygon { radii, .. })
+            | Self::StitchLine(StitchLine { radii, .. }) => {
                 corners::set_radius(radii, index, count, radius);
             }
             Self::Ellipse(_) | Self::Line(_) => return None,
@@ -160,8 +179,9 @@ impl Shape {
         ring_bounds(&self.ring())
     }
 
+    /// Whether the point is inside the outline; always false for an open shape.
     pub fn contains(&self, point: Point) -> bool {
-        ring_contains(&self.ring(), point)
+        !self.is_open() && ring_contains(&self.ring(), point)
     }
 
     pub fn center(&self) -> Point {
@@ -170,12 +190,14 @@ impl Shape {
             | Self::Ellipse(Ellipse { center, .. })
             | Self::RegularPolygon(RegularPolygon { center, .. }) => *center,
             Self::Line(line) => line.midpoint(),
-            Self::Polygon(_) => self.bounds().map_or_else(Point::default, |bounds| {
-                Point::new(
-                    (bounds.min_x + bounds.max_x) * 0.5,
-                    (bounds.min_y + bounds.max_y) * 0.5,
-                )
-            }),
+            Self::Polygon(_) | Self::StitchLine(_) => {
+                self.bounds().map_or_else(Point::default, |bounds| {
+                    Point::new(
+                        (bounds.min_x + bounds.max_x) * 0.5,
+                        (bounds.min_y + bounds.max_y) * 0.5,
+                    )
+                })
+            }
         }
     }
 
@@ -183,6 +205,7 @@ impl Shape {
         match self {
             Self::Polygon(polygon) => polygon.translate(dx, dy),
             Self::Line(line) => line.translate(dx, dy),
+            Self::StitchLine(line) => line.translate(dx, dy),
             Self::Rectangle(Rectangle { center, .. })
             | Self::Ellipse(Ellipse { center, .. })
             | Self::RegularPolygon(RegularPolygon { center, .. }) => {
@@ -201,6 +224,7 @@ impl Shape {
             Self::RegularPolygon(polygon) => polygon.corners(),
             Self::Ellipse(ellipse) => ellipse.handles(),
             Self::Line(line) => line.handles(),
+            Self::StitchLine(line) => line.handles(),
         }
     }
 
@@ -216,6 +240,7 @@ impl Shape {
                 Self::RegularPolygon(polygon.with_handle_at(handle, to))
             }
             Self::Line(line) => Self::Line(line.with_handle_at(handle, to)),
+            Self::StitchLine(line) => Self::StitchLine(line.with_handle_at(handle, to)),
         }
     }
 
@@ -228,6 +253,7 @@ impl Shape {
             Self::Ellipse(ellipse) => ellipse.has_valid_size(),
             Self::RegularPolygon(polygon) => polygon.has_valid_size(),
             Self::Line(line) => line.has_valid_size(),
+            Self::StitchLine(line) => line.has_valid_size(),
         }
     }
 }
@@ -354,6 +380,26 @@ mod tests {
         assert_eq!(polygon.corners(), shape.corners());
         assert_eq!(polygon.corner_radius(1), Some(2.0));
         assert_eq!(polygon.to_polygon(), polygon);
+    }
+
+    #[test]
+    fn a_stitch_line_is_open_and_rounds_only_inner_vertices() {
+        let points = vec![
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            Point::new(10.0, 10.0),
+        ];
+        let shape = Shape::StitchLine(StitchLine::new(points, HoleKind::Round, 4.0, 1.2).unwrap());
+        assert!(shape.is_open());
+        assert!(!shape.contains(Point::new(8.0, 1.0)));
+        assert_eq!(shape.to_polygon(), shape);
+        assert_eq!(shape.corner_radius(0), None);
+        assert_eq!(shape.corner_radius(2), None);
+        assert_eq!(shape.corner_radius(1), Some(0.0));
+        assert_eq!(shape.with_corner_radius(0, 1.0), None);
+        let rounded = shape.with_corner_radius(1, 3.0).unwrap();
+        assert_eq!(rounded.corner_radius(1), Some(3.0));
+        assert!(rounded.ring().len() > 3);
     }
 
     #[test]

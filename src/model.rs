@@ -1,6 +1,6 @@
 use crate::i18n::Message;
 use crate::material::Material;
-use crate::shapes::{MAX_DASHES_PER_LINE, Shape};
+use crate::shapes::{MAX_DASHES_PER_LINE, MAX_HOLES_PER_LINE, Shape, StitchLine};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -215,8 +215,40 @@ impl PatternPiece {
                 }
                 Ok(())
             }
+            Shape::StitchLine(line) => self.validate_stitch_line(line),
             _ => self.validate_ring(&shape.ring()),
         }
+    }
+
+    fn validate_stitch_line(&self, line: &StitchLine) -> Result<(), Message> {
+        let name = || self.name.clone();
+        self.validate_coordinates(&line.points)?;
+        let coincident = line
+            .points
+            .windows(2)
+            .any(|pair| (pair[0].x - pair[1].x).hypot(pair[0].y - pair[1].y) < 1.0e-6);
+        if coincident {
+            return Err(Message::CoincidentPoints { name: name() });
+        }
+        if line.path().len() > MAX_POINTS_PER_PIECE {
+            return Err(Message::PointCountOutOfRange {
+                name: name(),
+                max: MAX_POINTS_PER_PIECE,
+            });
+        }
+        if !line.has_valid_parameters() {
+            return Err(Message::InvalidHoleParameters { name: name() });
+        }
+        if line.hole_count() > MAX_HOLES_PER_LINE {
+            return Err(Message::TooManyHoles {
+                name: name(),
+                max: MAX_HOLES_PER_LINE,
+            });
+        }
+        if line.holes_overlap() {
+            return Err(Message::HolesOverlap { name: name() });
+        }
+        Ok(())
     }
 
     fn validate_coordinates(&self, points: &[Point]) -> Result<(), Message> {

@@ -3,7 +3,7 @@ use super::drag_state_struct::ShapeRef;
 use super::{DragState, ShapeDraft};
 use crate::panels::align::AlignOptions;
 use crate::panels::settings::SettingsDraft;
-use crate::panels::tools::Tool;
+use crate::panels::tools::{StitchSettings, Tool};
 use bevy::prelude::*;
 use bevy_egui::egui;
 use leathercraft::events::ProjectChange;
@@ -22,6 +22,10 @@ pub struct EditorState {
     pub(super) polygon_sides: usize,
     /// The style the Centerline tool draws with.
     pub(super) line_style: LineStyle,
+    /// The holes the Stitch holes tool draws with.
+    pub(super) stitch: StitchSettings,
+    /// The tool that `draft` belongs to, so switching tools drops it.
+    pub(super) draft_tool: Tool,
     /// With an operation, the drawing tools add a child with it to the selected piece instead
     /// of adding a piece.
     pub(super) op_mode: Option<BooleanOp>,
@@ -68,6 +72,8 @@ impl Default for EditorState {
             shape_draft: None,
             polygon_sides: 6,
             line_style: LineStyle::dash_dot_default(),
+            stitch: StitchSettings::default(),
+            draft_tool: Tool::Draw,
             op_mode: None,
             align: AlignOptions::default(),
             selected: None,

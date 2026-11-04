@@ -1,4 +1,4 @@
-use super::{ExportError, centerlines, number, validate_export};
+use super::{ExportError, HoleOutput, centerlines, number, stitch_holes, validate_export};
 use crate::boolean::Region;
 use crate::model::Project;
 
@@ -30,6 +30,29 @@ pub fn to_dxf(project: &Project) -> Result<String, ExportError> {
                 number(b.x),
                 number(b.y)
             ));
+        }
+    }
+    for (_, _, hole) in stitch_holes(project) {
+        match hole {
+            HoleOutput::Circle(center, radius) => dxf.push_str(&format!(
+                "0\nCIRCLE\n8\nSTITCH_HOLES\n10\n{}\n20\n{}\n40\n{}\n",
+                number(center.x),
+                number(center.y),
+                number(radius)
+            )),
+            HoleOutput::Outline(ring) => {
+                dxf.push_str(&format!(
+                    "0\nLWPOLYLINE\n8\nSTITCH_HOLES\n90\n{}\n70\n1\n",
+                    ring.len()
+                ));
+                for point in ring {
+                    dxf.push_str(&format!(
+                        "10\n{}\n20\n{}\n",
+                        number(point.x),
+                        number(point.y)
+                    ));
+                }
+            }
         }
     }
     dxf.push_str("0\nENDSEC\n0\nEOF\n");

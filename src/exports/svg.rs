@@ -1,16 +1,25 @@
-use super::{ExportError, centerlines, number, validate_export};
-use crate::model::{Bounds, Project};
+use super::{ExportError, HoleOutput, centerlines, number, stitch_holes, validate_export};
+use crate::model::{Bounds, Point, Project, ring_bounds};
 use crate::shapes::Shape;
 
 pub fn to_svg(project: &Project) -> Result<String, ExportError> {
     let regions = validate_export(project)?;
-    // Centerlines may reach past their pieces, so they widen the drawing.
+    // Centerlines and stitch holes may reach past their pieces, so they widen the drawing.
     let line_bounds =
         centerlines(project).filter_map(|(_, _, line)| Shape::Line(line.clone()).bounds());
+    let holes = stitch_holes(project);
+    let hole_bounds = holes.iter().filter_map(|(_, _, hole)| match hole {
+        HoleOutput::Circle(center, radius) => ring_bounds(&[
+            Point::new(center.x - radius, center.y - radius),
+            Point::new(center.x + radius, center.y + radius),
+        ]),
+        HoleOutput::Outline(ring) => ring_bounds(ring),
+    });
     let bounds = regions
         .iter()
         .filter_map(|region| region.bounds())
         .chain(line_bounds)
+        .chain(hole_bounds)
         .reduce(Bounds::union)
         .ok_or(ExportError::EmptyProject)?;
     let (min_x, min_y) = (bounds.min_x, bounds.min_y);
@@ -61,6 +70,32 @@ pub fn to_svg(project: &Project) -> Result<String, ExportError> {
                 number(line.end.x - min_x),
                 number(line.end.y - min_y),
             ));
+        }
+        svg.push_str("  </g>\n");
+    }
+    if !holes.is_empty() {
+        svg.push_str("  <g fill=\"none\" stroke=\"#111827\" stroke-width=\"0.1\">\n");
+        for (piece, child, hole) in &holes {
+            match hole {
+                HoleOutput::Circle(center, radius) => svg.push_str(&format!(
+                    "    <circle data-piece=\"{piece}\" data-child=\"{child}\" cx=\"{}\" cy=\"{}\" r=\"{}\" />\n",
+                    number(center.x - min_x),
+                    number(center.y - min_y),
+                    number(*radius),
+                )),
+                HoleOutput::Outline(ring) => {
+                    let points: Vec<String> = ring
+                        .iter()
+                        .map(|point| {
+                            format!("{},{}", number(point.x - min_x), number(point.y - min_y))
+                        })
+                        .collect();
+                    svg.push_str(&format!(
+                        "    <polygon data-piece=\"{piece}\" data-child=\"{child}\" points=\"{}\" />\n",
+                        points.join(" ")
+                    ));
+                }
+            }
         }
         svg.push_str("  </g>\n");
     }

@@ -66,6 +66,7 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                         polygon_sides: &mut state.polygon_sides,
                         op_mode: &mut state.op_mode,
                         line_style: &mut state.line_style,
+                        stitch: &mut state.stitch,
                     };
                     tools::show_panel(ui, settings, self.project.units, language);
                 });

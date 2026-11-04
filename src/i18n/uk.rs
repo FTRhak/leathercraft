@@ -5,6 +5,7 @@ use crate::material::{
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
 };
 use crate::model::{BooleanOp, Units};
+use crate::shapes::{HoleKind, MAX_HOLE_MM, MAX_PITCH_MM, MIN_HOLE_MM, MIN_PITCH_MM};
 
 pub(super) fn label(label: Label) -> &'static str {
     match label {
@@ -42,6 +43,18 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::LineDashDot => "Штрихпунктирна",
         Label::DashLength => "Штрих",
         Label::GapLength => "Проміжок",
+        Label::StitchHoles => "Отвори для зшивання",
+        Label::StitchHolesHint => {
+            "Клацайте кожну вершину лінії шва на вибраній деталі. Подвійне клацання або Enter завершує, Backspace прибирає останню вершину, Shift — поворот кроком 15°. Esc скасовує."
+        }
+        Label::HoleType => "Тип отвору",
+        Label::HoleKind(kind) => hole_kind(kind),
+        Label::Pitch => "Крок",
+        Label::PitchPresets => "Пробійник",
+        Label::HoleSize => "Розмір отвору",
+        Label::StitchLength => "Довжина",
+        Label::HoleCount => "Отворів",
+        Label::ActualPitch => "Фактичний крок",
         Label::StartX => "Початок X",
         Label::StartY => "Початок Y",
         Label::EndX => "Кінець X",
@@ -426,6 +439,33 @@ pub(super) fn message(message: &Message) -> String {
         Message::TooManyDashes { name, max } => {
             format!("Лінія деталі «{name}» мала б понад {max} штрихів; збільште їх довжину.")
         }
+        Message::InvalidHoleParameters { name } => format!(
+            "Отвори деталі «{name}» повинні мати розмір від {} до {} мм і крок від {} до {} мм.",
+            decimal(MIN_HOLE_MM),
+            decimal(MAX_HOLE_MM),
+            decimal(MIN_PITCH_MM),
+            decimal(MAX_PITCH_MM)
+        ),
+        Message::HolesOverlap { name } => {
+            format!("Отвори деталі «{name}» накладалися б; зменште їх або збільште крок.")
+        }
+        Message::TooManyHoles { name, max } => {
+            format!("Лінія шва деталі «{name}» мала б понад {max} отворів; збільште крок.")
+        }
+        Message::StitchHolesRow { count } => format!("Отвори для зшивання ({count})"),
+        Message::StitchVertices { count } => {
+            let noun = plural(*count, "вершина", "вершини", "вершин");
+            format!("{count} {noun}")
+        }
+        Message::ThreadHint { band } => format!(
+            "Нитка {} мм, шкіра {} мм.",
+            range(band.thread_mm()),
+            range(band.leather_mm())
+        ),
+        Message::LeatherOutsideBand { band } => format!(
+            "Шкіра деталі не в межах {} мм, що підходять для цього кроку.",
+            range(band.leather_mm())
+        ),
         Message::ResultEmpty { name } => format!("Від деталі «{name}» нічого не лишилося."),
         Message::ResultSplit { name } => {
             format!("Деталь «{name}» розпадається на кілька частин.")
@@ -583,5 +623,20 @@ fn plural(count: usize, one: &'static str, few: &'static str, many: &'static str
         (1, _) => one,
         (2..=4, _) => few,
         _ => many,
+    }
+}
+
+fn hole_kind(kind: HoleKind) -> &'static str {
+    match kind {
+        HoleKind::French => "Французький",
+        HoleKind::Diamond => "Ромбоподібний",
+        HoleKind::Round => "Круглий",
+    }
+}
+
+fn range((min, max): (f64, Option<f64>)) -> String {
+    match max {
+        Some(max) => format!("{}–{}", decimal(min), decimal(max)),
+        None => format!("{}+", decimal(min)),
     }
 }

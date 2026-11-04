@@ -1,7 +1,8 @@
 use crate::boolean::Region;
 use crate::i18n::Message;
+use crate::model::Point;
 use crate::model::Project;
-use crate::shapes::{Line, Shape};
+use crate::shapes::{HoleKind, Line, Shape, StitchLine};
 use std::error::Error;
 use std::fmt;
 
@@ -64,6 +65,40 @@ pub(super) fn centerlines(project: &Project) -> impl Iterator<Item = (u64, u64, 
     })
 }
 
+/// Every stitch line of the project, in piece and child order, with its piece and child ids.
+pub(super) fn stitch_lines(project: &Project) -> impl Iterator<Item = (u64, u64, &StitchLine)> {
+    project.pieces.iter().flat_map(|piece| {
+        piece
+            .children
+            .iter()
+            .filter_map(move |child| match &child.shape {
+                Shape::StitchLine(line) => Some((piece.id, child.id, line)),
+                _ => None,
+            })
+    })
+}
+
+/// One exported hole: a circle (center, radius) for a round hole, else its closed outline.
+pub(super) enum HoleOutput {
+    Circle(Point, f64),
+    Outline(Vec<Point>),
+}
+
+/// Every stitch hole of the project, with its piece and child ids.
+pub(super) fn stitch_holes(project: &Project) -> Vec<(u64, u64, HoleOutput)> {
+    stitch_lines(project)
+        .flat_map(|(piece, child, line)| {
+            line.holes().into_iter().map(move |hole| {
+                let output = match line.hole {
+                    HoleKind::Round => HoleOutput::Circle(hole.center, line.size * 0.5),
+                    _ => HoleOutput::Outline(line.hole_outline(&hole)),
+                };
+                (piece, child, output)
+            })
+        })
+        .collect()
+}
+
 pub(super) fn number(value: f64) -> String {
     let mut formatted = format!("{value:.6}");
     while formatted.contains('.') && formatted.ends_with('0') {
@@ -82,8 +117,7 @@ pub(super) fn number(value: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{BooleanOp, ChildShape, PatternPiece, Point};
-    use crate::shapes::Shape;
+    use crate::model::{BooleanOp, ChildShape, PatternPiece};
 
     fn project() -> Project {
         Project {
@@ -234,5 +268,56 @@ EOF
         // 100 mm of a 15 mm pattern: 6 periods of a dash and a dot, then a last dash.
         assert_eq!(dxf.matches("LINE\n8\nCENTERLINE\n").count(), 13);
         assert!(dxf.contains("0\nLINE\n8\nCENTERLINE\n10\n15\n20\n-5\n11\n15\n21\n5\n"));
+    }
+
+    fn project_with_stitches(hole: HoleKind) -> Project {
+        let mut project = project();
+        project.pieces[0].children.push(ChildShape {
+            id: 2,
+            op: BooleanOp::Subtract,
+            shape: Shape::StitchLine(
+                StitchLine::new(
+                    vec![Point::new(0.0, 10.0), Point::new(20.0, 10.0)],
+                    hole,
+                    4.0,
+                    1.2,
+                )
+                .unwrap(),
+            ),
+        });
+        project
+    }
+
+    #[test]
+    fn round_stitch_holes_export_as_circles() {
+        let project = project_with_stitches(HoleKind::Round);
+        let svg = to_svg(&project).unwrap();
+        assert_eq!(
+            svg.matches("<circle data-piece=\"1\" data-child=\"2\"")
+                .count(),
+            6
+        );
+        // The first hole is 10 mm right of the piece's left edge and 5 mm below its top.
+        assert!(svg.contains("cx=\"10\" cy=\"5\" r=\"0.6\""));
+        let dxf = to_dxf(&project).unwrap();
+        assert_eq!(dxf.matches("0\nCIRCLE\n8\nSTITCH_HOLES\n").count(), 6);
+        assert!(dxf.contains("0\nCIRCLE\n8\nSTITCH_HOLES\n10\n0\n20\n10\n40\n0.6\n"));
+    }
+
+    #[test]
+    fn slanted_stitch_holes_export_as_closed_outlines() {
+        let project = project_with_stitches(HoleKind::Diamond);
+        let svg = to_svg(&project).unwrap();
+        assert_eq!(
+            svg.matches("<polygon data-piece=\"1\" data-child=\"2\"")
+                .count(),
+            6
+        );
+        let dxf = to_dxf(&project).unwrap();
+        assert_eq!(
+            dxf.matches("0\nLWPOLYLINE\n8\nSTITCH_HOLES\n90\n4\n70\n1\n")
+                .count(),
+            6
+        );
     }
 }

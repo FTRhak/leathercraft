@@ -98,7 +98,7 @@ fn rebuild_preview(
 
     for piece in &project.pieces {
         // A piece whose shapes don't combine into one outline is flagged in the editor instead.
-        let Ok(region) = piece.region() else {
+        let Ok(region) = piece.punched_region() else {
             continue;
         };
         match build_piece_mesh(&region, piece.material.thickness_mm, center_x, center_z) {

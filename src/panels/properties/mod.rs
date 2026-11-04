@@ -5,7 +5,9 @@ use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{PatternPiece, Project, Units};
 use leathercraft::shapes::{
-    Ellipse, LineStyle, MIN_DASH_MM, REGULAR_POLYGON_SIDES, Rectangle, RegularPolygon, Shape,
+    Ellipse, HoleKind, LineStyle, MAX_HOLE_MM, MAX_PITCH_MM, MIN_DASH_MM, MIN_HOLE_MM,
+    MIN_PITCH_MM, PITCH_PRESETS, REGULAR_POLYGON_SIDES, Rectangle, RegularPolygon, Shape,
+    StitchBand,
 };
 
 /// The canvas options of the 2D editor.
@@ -110,10 +112,10 @@ fn selected_piece_details(
         Some(child) => {
             let index = piece.child_index(child.id).unwrap_or_default() + 1;
             // A line's operation is ignored, so it is named for what it is.
-            let kind = if child.shape.is_open() {
-                Label::Centerline
-            } else {
-                Label::Operation(child.op)
+            let kind = match child.shape {
+                Shape::Line(_) => Label::Centerline,
+                Shape::StitchLine(_) => Label::StitchHoles,
+                _ => Label::Operation(child.op),
             };
             (format!("{index}. {}", language.label(kind)), &child.shape)
         }
@@ -123,7 +125,11 @@ fn selected_piece_details(
     let mut edited = shape.clone();
     ui.add_enabled_ui(!piece.locked, |ui| {
         shape_fields(ui, &mut edited, selection.part, units, language);
-        if !matches!(shape, Shape::Polygon(_) | Shape::Line(_))
+        if let Shape::StitchLine(line) = shape {
+            stitch_details(ui, line, piece.material.thickness_mm, units, language);
+        }
+        if !matches!(shape, Shape::Polygon(_))
+            && !shape.is_open()
             && ui.button(language.label(Label::ToPolygon)).clicked()
         {
             edited = shape.to_polygon();
@@ -201,6 +207,130 @@ pub(crate) fn line_style_fields(
     if let LineStyle::Dashed { dash, gap } | LineStyle::DashDot { dash, gap } = style {
         length_field(ui, Label::DashLength, dash, MIN_DASH_MM, units, language);
         length_field(ui, Label::GapLength, gap, MIN_DASH_MM, units, language);
+    }
+}
+
+/// A length in display units within `min..=max` mm.
+fn bounded_length_field(
+    ui: &mut egui::Ui,
+    label: Label,
+    millimeters: &mut f64,
+    (min, max): (f64, f64),
+    units: Units,
+    language: Language,
+) {
+    let scale = units.from_millimeters(1.0);
+    let mut value = *millimeters * scale;
+    ui.horizontal(|ui| {
+        ui.label(language.label(label));
+        let field = egui::DragValue::new(&mut value)
+            .speed(0.01 * scale)
+            .max_decimals(3)
+            .range(min * scale..=max * scale)
+            .suffix(format!(" {}", language.unit_symbol(units)));
+        if ui.add(field).changed() {
+            *millimeters = value / scale;
+        }
+    });
+}
+
+/// The hole type, the pitch with the usual iron pitches as presets, and the hole size, in
+/// display units. Choosing another type starts from that type's default size.
+pub(crate) fn stitch_fields(
+    ui: &mut egui::Ui,
+    hole: &mut HoleKind,
+    pitch: &mut f64,
+    size: &mut f64,
+    units: Units,
+    language: Language,
+) {
+    ui.horizontal(|ui| {
+        ui.label(language.label(Label::HoleType));
+        egui::ComboBox::from_id_salt("hole_kind")
+            .selected_text(language.label(Label::HoleKind(*hole)))
+            .show_ui(ui, |ui| {
+                for kind in HoleKind::ALL {
+                    let chosen = kind == *hole;
+                    if ui
+                        .selectable_label(chosen, language.label(Label::HoleKind(kind)))
+                        .clicked()
+                        && !chosen
+                    {
+                        *hole = kind;
+                        *size = kind.default_size();
+                    }
+                }
+            });
+    });
+    bounded_length_field(
+        ui,
+        Label::Pitch,
+        pitch,
+        (MIN_PITCH_MM, MAX_PITCH_MM),
+        units,
+        language,
+    );
+    ui.horizontal(|ui| {
+        ui.label(format!(
+            "{}, {}",
+            language.label(Label::PitchPresets),
+            language.unit_symbol(Units::Millimeters)
+        ));
+        for preset in PITCH_PRESETS {
+            let text = preset.to_string();
+            if ui.selectable_label(*pitch == preset, text).clicked() {
+                *pitch = preset;
+            }
+        }
+    });
+    bounded_length_field(
+        ui,
+        Label::HoleSize,
+        size,
+        (MIN_HOLE_MM, MAX_HOLE_MM),
+        units,
+        language,
+    );
+}
+
+/// What a stitch line comes to: its vertices, length, hole count and actual pitch, the thread
+/// that suits its pitch, and a warning when the piece's leather doesn't.
+fn stitch_details(
+    ui: &mut egui::Ui,
+    line: &leathercraft::shapes::StitchLine,
+    thickness_mm: f64,
+    units: Units,
+    language: Language,
+) {
+    let length = |millimeters: f64| format_length(language, units, millimeters);
+    ui.separator();
+    ui.label(language.message(&Message::StitchVertices {
+        count: line.points.len(),
+    }));
+    egui::Grid::new("stitch_details").show(ui, |ui| {
+        ui.label(language.label(Label::StitchLength));
+        ui.label(length(line.length()));
+        ui.end_row();
+        ui.label(language.label(Label::HoleCount));
+        ui.label(line.hole_count().to_string());
+        ui.end_row();
+        if let Some((min, max)) = line.actual_pitch() {
+            ui.label(language.label(Label::ActualPitch));
+            if (max - min).abs() < 1.0e-3 {
+                ui.label(length(min));
+            } else {
+                ui.label(format!("{} – {}", length(min), length(max)));
+            }
+            ui.end_row();
+        }
+    });
+    let band = StitchBand::from_pitch(line.pitch);
+    ui.weak(language.message(&Message::ThreadHint { band }));
+    if !band.suits_leather(thickness_mm) {
+        ui.colored_label(
+            ui.visuals().warn_fg_color,
+            language.message(&Message::LeatherOutsideBand { band }),
+        );
     }
 }
 
@@ -311,6 +441,16 @@ fn shape_fields(
             }
             ui.separator();
             line_style_fields(ui, &mut line.style, units, language);
+        }
+        Shape::StitchLine(line) => {
+            stitch_fields(
+                ui,
+                &mut line.hole,
+                &mut line.pitch,
+                &mut line.size,
+                units,
+                language,
+            );
         }
     }
     // The radius is kept as typed; the ring reduces it where the corner's edges are too short.

@@ -25,11 +25,12 @@ pub enum Action {
     ToolEllipse,
     ToolRegularPolygon,
     ToolCenterline,
+    ToolStitchHoles,
     ToggleView,
 }
 
 impl Action {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::New,
         Self::Open,
         Self::Save,
@@ -45,6 +46,7 @@ impl Action {
         Self::ToolEllipse,
         Self::ToolRegularPolygon,
         Self::ToolCenterline,
+        Self::ToolStitchHoles,
         Self::ToggleView,
     ];
 
@@ -65,6 +67,7 @@ impl Action {
             Self::ToolEllipse => Label::Ellipse,
             Self::ToolRegularPolygon => Label::RegularPolygon,
             Self::ToolCenterline => Label::Centerline,
+            Self::ToolStitchHoles => Label::StitchHoles,
             Self::ToggleView => Label::ToggleView,
         }
     }
@@ -79,6 +82,7 @@ impl Action {
             Self::ToolEllipse => Some(Tool::Ellipse),
             Self::ToolRegularPolygon => Some(Tool::RegularPolygon),
             Self::ToolCenterline => Some(Tool::Centerline),
+            Self::ToolStitchHoles => Some(Tool::StitchHoles),
             _ => None,
         }
     }
@@ -104,6 +108,7 @@ impl Action {
             Self::ToolEllipse => vec![plain(Key::L)],
             Self::ToolRegularPolygon => vec![plain(Key::G)],
             Self::ToolCenterline => vec![plain(Key::C)],
+            Self::ToolStitchHoles => vec![plain(Key::H)],
             Self::ToggleView => vec![plain(Key::Tab)],
         }
     }

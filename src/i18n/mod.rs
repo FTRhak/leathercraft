@@ -7,6 +7,7 @@ use crate::material::{
     ThicknessCategory, Treatment, WaterResistance,
 };
 use crate::model::{BooleanOp, Units};
+use crate::shapes::{HoleKind, StitchBand};
 use std::error::Error;
 use std::fmt;
 
@@ -107,6 +108,16 @@ pub enum Label {
     LineDashDot,
     DashLength,
     GapLength,
+    StitchHoles,
+    StitchHolesHint,
+    HoleType,
+    HoleKind(HoleKind),
+    Pitch,
+    PitchPresets,
+    HoleSize,
+    StitchLength,
+    HoleCount,
+    ActualPitch,
     StartX,
     StartY,
     EndX,
@@ -239,6 +250,13 @@ pub enum Message {
     InvalidShapeSize { name: String },
     BaseMustBeClosed { name: String },
     TooManyDashes { name: String, max: usize },
+    InvalidHoleParameters { name: String },
+    HolesOverlap { name: String },
+    TooManyHoles { name: String, max: usize },
+    StitchHolesRow { count: usize },
+    StitchVertices { count: usize },
+    ThreadHint { band: StitchBand },
+    LeatherOutsideBand { band: StitchBand },
     ResultEmpty { name: String },
     ResultSplit { name: String },
     PointCount { count: usize },

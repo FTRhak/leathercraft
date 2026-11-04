@@ -63,7 +63,7 @@ pub(crate) fn round_corners(corners: &[Point], radii: &[f64]) -> Vec<Point> {
     ring
 }
 
-fn push_point(ring: &mut Vec<Point>, point: Point) {
+pub(crate) fn push_point(ring: &mut Vec<Point>, point: Point) {
     if ring
         .last()
         .is_none_or(|last| distance(*last, point) >= MERGE_DISTANCE_MM)
@@ -79,7 +79,12 @@ fn distance(a: Point, b: Point) -> f64 {
 /// The arc that rounds `corner` between the edges to `previous` and to `next`, from the point
 /// where it leaves the first edge to the point where it meets the second. `None` for a corner
 /// that can't be rounded: an edge without length, or a flat or folded-back corner.
-fn fillet(previous: Point, corner: Point, next: Point, radius: f64) -> Option<Vec<Point>> {
+pub(crate) fn fillet(
+    previous: Point,
+    corner: Point,
+    next: Point,
+    radius: f64,
+) -> Option<Vec<Point>> {
     let to_previous = distance(corner, previous);
     let to_next = distance(corner, next);
     if to_previous < MERGE_DISTANCE_MM || to_next < MERGE_DISTANCE_MM {
