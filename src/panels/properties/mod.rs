@@ -270,7 +270,8 @@ pub(crate) fn stitch_fields(
         units,
         language,
     );
-    ui.horizontal(|ui| {
+    // Wrapped, so that every preset stays reachable in a narrow panel.
+    ui.horizontal_wrapped(|ui| {
         ui.label(format!(
             "{}, {}",
             language.label(Label::PitchPresets),
@@ -316,10 +317,12 @@ fn stitch_details(
         ui.end_row();
         if let Some((min, max)) = line.actual_pitch() {
             ui.label(language.label(Label::ActualPitch));
-            if (max - min).abs() < 1.0e-3 {
-                ui.label(length(min));
+            // Runs that differ by less than the display precision show one value.
+            let (min, max) = (length(min), length(max));
+            if min == max {
+                ui.label(min);
             } else {
-                ui.label(format!("{} – {}", length(min), length(max)));
+                ui.label(format!("{min} – {max}"));
             }
             ui.end_row();
         }
