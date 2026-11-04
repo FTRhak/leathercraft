@@ -4,7 +4,9 @@ use bevy_egui::egui;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{PatternPiece, Project, Units};
-use leathercraft::shapes::{Ellipse, REGULAR_POLYGON_SIDES, Rectangle, RegularPolygon, Shape};
+use leathercraft::shapes::{
+    Ellipse, LineStyle, MIN_DASH_MM, REGULAR_POLYGON_SIDES, Rectangle, RegularPolygon, Shape,
+};
 
 /// The canvas options of the 2D editor.
 pub struct EditorView<'a> {
@@ -107,8 +109,13 @@ fn selected_piece_details(
     let (title, shape) = match child {
         Some(child) => {
             let index = piece.child_index(child.id).unwrap_or_default() + 1;
-            let op = language.label(Label::Operation(child.op));
-            (format!("{index}. {op}"), &child.shape)
+            // A line's operation is ignored, so it is named for what it is.
+            let kind = if child.shape.is_open() {
+                Label::Centerline
+            } else {
+                Label::Operation(child.op)
+            };
+            (format!("{index}. {}", language.label(kind)), &child.shape)
         }
         None => (language.label(Label::Base).to_owned(), &piece.base),
     };
@@ -116,7 +123,7 @@ fn selected_piece_details(
     let mut edited = shape.clone();
     ui.add_enabled_ui(!piece.locked, |ui| {
         shape_fields(ui, &mut edited, selection.part, units, language);
-        if !matches!(shape, Shape::Polygon(_))
+        if !matches!(shape, Shape::Polygon(_) | Shape::Line(_))
             && ui.button(language.label(Label::ToPolygon)).clicked()
         {
             edited = shape.to_polygon();
@@ -135,6 +142,68 @@ fn selected_piece_details(
     event
 }
 
+/// A length in display units, at least `min` mm.
+fn length_field(
+    ui: &mut egui::Ui,
+    label: Label,
+    millimeters: &mut f64,
+    min: f64,
+    units: Units,
+    language: Language,
+) {
+    let scale = units.from_millimeters(1.0);
+    let mut value = *millimeters * scale;
+    ui.horizontal(|ui| {
+        ui.label(language.label(label));
+        let field = egui::DragValue::new(&mut value)
+            .speed(0.1 * scale)
+            .max_decimals(3)
+            .range(min * scale..=f64::MAX)
+            .suffix(format!(" {}", language.unit_symbol(units)));
+        if ui.add(field).changed() {
+            *millimeters = value / scale;
+        }
+    });
+}
+
+/// The type of a line and, for a dashed one, its dash and gap in display units. Choosing
+/// another type starts from that type's default lengths.
+pub(crate) fn line_style_fields(
+    ui: &mut egui::Ui,
+    style: &mut LineStyle,
+    units: Units,
+    language: Language,
+) {
+    let kinds = [
+        (LineStyle::Solid, Label::LineSolid),
+        (LineStyle::dashed_default(), Label::LineDashed),
+        (LineStyle::dash_dot_default(), Label::LineDashDot),
+    ];
+    let same_kind =
+        |a: &LineStyle, b: &LineStyle| std::mem::discriminant(a) == std::mem::discriminant(b);
+    let current = kinds
+        .iter()
+        .find(|(kind, _)| same_kind(kind, style))
+        .map_or(Label::LineSolid, |(_, label)| *label);
+    ui.horizontal(|ui| {
+        ui.label(language.label(Label::LineType));
+        egui::ComboBox::from_id_salt("line_style")
+            .selected_text(language.label(current))
+            .show_ui(ui, |ui| {
+                for (kind, label) in kinds {
+                    let chosen = same_kind(&kind, style);
+                    if ui.selectable_label(chosen, language.label(label)).clicked() && !chosen {
+                        *style = kind;
+                    }
+                }
+            });
+    });
+    if let LineStyle::Dashed { dash, gap } | LineStyle::DashDot { dash, gap } = style {
+        length_field(ui, Label::DashLength, dash, MIN_DASH_MM, units, language);
+        length_field(ui, Label::GapLength, gap, MIN_DASH_MM, units, language);
+    }
+}
+
 /// Fields for the parameters of a primitive, in display units; a polygon shows its point count
 /// and the length of the selected edge. A selected vertex shows the radius of its corner.
 fn shape_fields(
@@ -144,26 +213,13 @@ fn shape_fields(
     units: Units,
     language: Language,
 ) {
-    let scale = units.from_millimeters(1.0);
-    let symbol = language.unit_symbol(units);
     let length = |ui: &mut egui::Ui, label: Label, millimeters: &mut f64, min: f64| {
-        let mut value = *millimeters * scale;
-        ui.horizontal(|ui| {
-            ui.label(language.label(label));
-            let field = egui::DragValue::new(&mut value)
-                .speed(0.1 * scale)
-                .max_decimals(3)
-                .range(min * scale..=f64::MAX)
-                .suffix(format!(" {symbol}"));
-            if ui.add(field).changed() {
-                *millimeters = value / scale;
-            }
-        });
+        length_field(ui, label, millimeters, min, units, language);
     };
-    let angle = |ui: &mut egui::Ui, radians: &mut f64| {
+    let angle_field = |ui: &mut egui::Ui, label: Label, radians: &mut f64| {
         let mut degrees = radians.to_degrees();
         ui.horizontal(|ui| {
-            ui.label(language.label(Label::Rotation));
+            ui.label(language.label(label));
             let field = egui::DragValue::new(&mut degrees)
                 .speed(1.0)
                 .max_decimals(2)
@@ -173,6 +229,7 @@ fn shape_fields(
             }
         });
     };
+    let angle = |ui: &mut egui::Ui, radians: &mut f64| angle_field(ui, Label::Rotation, radians);
     // Sizes stay above zero, which the project would reject.
     const MIN_SIZE_MM: f64 = 0.01;
     match shape {
@@ -233,6 +290,27 @@ fn shape_fields(
                 ui.add(egui::DragValue::new(sides).range(REGULAR_POLYGON_SIDES));
             });
             angle(ui, rotation);
+        }
+        Shape::Line(line) => {
+            length(ui, Label::StartX, &mut line.start.x, f64::MIN);
+            length(ui, Label::StartY, &mut line.start.y, f64::MIN);
+            length(ui, Label::EndX, &mut line.end.x, f64::MIN);
+            length(ui, Label::EndY, &mut line.end.y, f64::MIN);
+            // Length and angle turn and stretch the line around its start.
+            let current = line.length();
+            let mut value = current;
+            length(ui, Label::EdgeLength, &mut value, MIN_SIZE_MM);
+            if value != current {
+                *line = line.with_length(value);
+            }
+            let current = line.angle();
+            let mut value = current;
+            angle_field(ui, Label::Angle, &mut value);
+            if value != current {
+                *line = line.with_angle(value);
+            }
+            ui.separator();
+            line_style_fields(ui, &mut line.style, units, language);
         }
     }
     // The radius is kept as typed; the ring reduces it where the corner's edges are too short.

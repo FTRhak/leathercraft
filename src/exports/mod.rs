@@ -1,6 +1,7 @@
 use crate::boolean::Region;
 use crate::i18n::Message;
 use crate::model::Project;
+use crate::shapes::{Line, Shape};
 use std::error::Error;
 use std::fmt;
 
@@ -48,6 +49,19 @@ pub(super) fn validate_export(project: &Project) -> Result<Vec<Region>, ExportEr
         .iter()
         .map(|piece| piece.region().map_err(ExportError::InvalidProject))
         .collect()
+}
+
+/// Every centerline of the project, in piece and child order, with its piece and child ids.
+pub(super) fn centerlines(project: &Project) -> impl Iterator<Item = (u64, u64, &Line)> {
+    project.pieces.iter().flat_map(|piece| {
+        piece
+            .children
+            .iter()
+            .filter_map(move |child| match &child.shape {
+                Shape::Line(line) => Some((piece.id, child.id, line)),
+                _ => None,
+            })
+    })
 }
 
 pub(super) fn number(value: f64) -> String {
@@ -183,5 +197,42 @@ EOF
     fn empty_projects_are_not_exported() {
         assert_eq!(to_svg(&Project::default()), Err(ExportError::EmptyProject));
         assert_eq!(to_dxf(&Project::default()), Err(ExportError::EmptyProject));
+    }
+
+    fn project_with_line() -> Project {
+        let mut project = project();
+        project.pieces[0].children.push(ChildShape {
+            id: 1,
+            op: BooleanOp::Subtract,
+            shape: Shape::line_from_ends(
+                Point::new(15.0, -5.0),
+                Point::new(15.0, 95.0),
+                false,
+                crate::shapes::LineStyle::DashDot {
+                    dash: 10.0,
+                    gap: 2.0,
+                },
+            )
+            .unwrap(),
+        });
+        project
+    }
+
+    #[test]
+    fn svg_draws_centerlines_beyond_their_piece() {
+        let svg = to_svg(&project_with_line()).unwrap();
+        // The line reaches 10 mm above and below the piece.
+        assert!(svg.contains("width=\"50mm\" height=\"100mm\""));
+        assert!(svg.contains(
+            "<line data-piece=\"1\" data-child=\"1\" x1=\"25\" y1=\"0\" x2=\"25\" y2=\"100\" stroke-dasharray=\"10 2 1 2\" />"
+        ));
+    }
+
+    #[test]
+    fn dxf_puts_each_dash_on_the_centerline_layer() {
+        let dxf = to_dxf(&project_with_line()).unwrap();
+        // 100 mm of a 15 mm pattern: 6 periods of a dash and a dot, then a last dash.
+        assert_eq!(dxf.matches("LINE\n8\nCENTERLINE\n").count(), 13);
+        assert!(dxf.contains("0\nLINE\n8\nCENTERLINE\n10\n15\n20\n-5\n11\n15\n21\n5\n"));
     }
 }

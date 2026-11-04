@@ -10,7 +10,7 @@ use earcutr::earcut;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Language, Message};
 use leathercraft::model::{BooleanOp, PatternPiece, Point, Project, Units};
-use leathercraft::shapes::{Ellipse, Polygon, Rectangle, RegularPolygon, Shape};
+use leathercraft::shapes::{Ellipse, Line, Polygon, Rectangle, RegularPolygon, Shape};
 
 const MIN_ZOOM: f32 = 0.05;
 const MAX_ZOOM: f32 = 100.0;
@@ -18,6 +18,11 @@ const VERTEX_HIT_RADIUS_PX: f32 = 8.0;
 const EDGE_HIT_RADIUS_PX: f32 = 6.0;
 const CLOSE_HIT_RADIUS_PX: f32 = 10.0;
 const MAX_POINTS_WITH_EDGE_LABELS: usize = 64;
+/// Centerlines are thinner than outlines, which are 1.5 px, or 2.5 px when selected.
+const CENTERLINE_WIDTH_PX: f32 = 0.8;
+const SELECTED_CENTERLINE_WIDTH_PX: f32 = 1.5;
+/// Below this period on screen, a dash pattern is drawn as a faded solid line.
+const MIN_DASH_PERIOD_PX: f32 = 3.0;
 
 #[derive(Clone, Copy)]
 pub(super) struct Viewport {
@@ -33,6 +38,11 @@ impl Viewport {
     pub(super) fn to_world(self, position: egui::Pos2) -> Point {
         let offset = (position - self.origin) / self.zoom;
         Point::new(f64::from(offset.x), f64::from(offset.y))
+    }
+
+    /// How far from a line, in mm, a click still hits it.
+    pub(super) fn hit_tolerance(self) -> f64 {
+        f64::from(EDGE_HIT_RADIUS_PX / self.zoom)
     }
 }
 
@@ -82,7 +92,7 @@ pub(super) fn canvas(
         Tool::Select => handle_select(ui, &response, view, project, events, state),
         Tool::Edge => handle_edge(ui, &response, view, project, events, state),
         Tool::Draw => handle_draw(ui, &response, view, project, events, state),
-        Tool::Rectangle | Tool::Ellipse | Tool::RegularPolygon => {
+        Tool::Rectangle | Tool::Ellipse | Tool::RegularPolygon | Tool::Centerline => {
             handle_shape(ui, &response, view, project, events, state);
         }
     }
@@ -90,6 +100,7 @@ pub(super) fn canvas(
     painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
     draw_grid(&painter, rect, view);
     draw_pieces(&painter, view, project, state);
+    draw_centerlines(&painter, view, project, state);
     draw_edges(&painter, response.hover_pos(), view, project, state);
     draw_draft(&painter, response.hover_pos(), view, project.units, state);
     draw_shape_draft(&painter, view, project.units, state);
@@ -138,17 +149,18 @@ fn handle_select(
         && let Some(position) = response.interact_pointer_pos()
     {
         let point = view.to_world(position);
+        let tolerance = view.hit_tolerance();
         if ui.input(|input| input.modifiers.shift) {
-            match child_of_selected_at(project, point, state) {
+            match child_of_selected_at(project, point, tolerance, state) {
                 Some((piece, child)) => state.toggle_child(piece, child),
                 None => {
-                    if let Some(piece) = piece_at(project, point) {
+                    if let Some(piece) = piece_at(project, point, tolerance) {
                         state.toggle_piece(piece);
                     }
                 }
             }
         } else {
-            select_at(project, point, state);
+            select_at(project, point, tolerance, state);
         }
     }
 }
@@ -185,7 +197,12 @@ fn handle_edge(
         } else if let Some((piece, shape, edge)) = edge_at(project, state, position, view) {
             state.select_part(piece, shape, ShapePart::Edge(edge));
         } else {
-            select_at(project, view.to_world(position), state);
+            select_at(
+                project,
+                view.to_world(position),
+                view.hit_tolerance(),
+                state,
+            );
         }
     }
     if !ui.ctx().wants_keyboard_input() && ui.input(|input| input.key_pressed(egui::Key::Escape)) {
@@ -193,23 +210,25 @@ fn handle_edge(
     }
 }
 
-/// The child of the selected piece under the point, with its piece id.
+/// The child of the selected piece under the point, with its piece id. `tolerance` is how
+/// far from a line, in mm, still hits it.
 fn child_of_selected_at(
     project: &Project,
     point: Point,
+    tolerance: f64,
     state: &EditorState,
 ) -> Option<(u64, u64)> {
     state
         .selected
         .and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
-        .and_then(|piece| child_at(piece, point).map(|child| (piece.id, child)))
+        .and_then(|piece| child_at(piece, point, tolerance).map(|child| (piece.id, child)))
 }
 
 /// A child of the selected piece takes the click; otherwise it selects a piece.
-fn select_at(project: &Project, point: Point, state: &mut EditorState) {
-    match child_of_selected_at(project, point, state) {
+fn select_at(project: &Project, point: Point, tolerance: f64, state: &mut EditorState) {
+    match child_of_selected_at(project, point, tolerance, state) {
         Some((piece, child)) => state.select(Some(piece), Some(child)),
-        None => state.select(piece_at(project, point), None),
+        None => state.select(piece_at(project, point, tolerance), None),
     }
 }
 
@@ -256,16 +275,21 @@ fn finish_draft(
 }
 
 /// A finished shape becomes a child of the selected piece when an operation is chosen,
-/// otherwise a new piece.
+/// otherwise a new piece. A line is always a child, since it can't be a piece of its own.
 fn commit_shape(
     project: &Project,
     events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
     shape: Shape,
 ) {
-    let Some(op) = state.op_mode else {
-        add_piece(project, events, state.language, shape);
-        return;
+    let op = match state.op_mode {
+        Some(op) => op,
+        // The operation of a line is ignored.
+        None if shape.is_open() => BooleanOp::default(),
+        None => {
+            add_piece(project, events, state.language, shape);
+            return;
+        }
     };
     match state.selected {
         Some(id) => send(events, ProjectEvent::AddChild { id, op, shape }),
@@ -308,6 +332,7 @@ fn handle_shape(
             draft.end,
             draft.constrained,
             state.polygon_sides,
+            state.line_style,
         )
     {
         commit_shape(project, events, state, shape);
@@ -330,26 +355,44 @@ fn add_piece(
     send(events, ProjectEvent::AddPiece { name, base });
 }
 
-/// Whether the point is on the piece. A piece whose shapes don't combine is hit by its base.
-fn piece_hit(piece: &PatternPiece, point: Point) -> bool {
-    match piece.region() {
-        Ok(region) => region.contains(point),
-        Err(_) => piece.base.contains(point),
+/// Whether the shape is under the point: inside an outline, or within `tolerance` mm of a line.
+fn shape_hit(shape: &Shape, point: Point, tolerance: f64) -> bool {
+    match shape.distance_to(point) {
+        Some(distance) => distance <= tolerance,
+        None => shape.contains(point),
     }
 }
 
-pub(super) fn piece_at(project: &Project, point: Point) -> Option<u64> {
+/// Whether the point is on the piece or one of its lines, which may reach past it. A piece
+/// whose shapes don't combine is hit by its base.
+fn piece_hit(piece: &PatternPiece, point: Point, tolerance: f64) -> bool {
+    let on_line = piece
+        .children
+        .iter()
+        .any(|child| child.shape.is_open() && shape_hit(&child.shape, point, tolerance));
+    on_line
+        || match piece.region() {
+            Ok(region) => region.contains(point),
+            Err(_) => piece.base.contains(point),
+        }
+}
+
+pub(super) fn piece_at(project: &Project, point: Point, tolerance: f64) -> Option<u64> {
     project
         .pieces
         .iter()
         .rev()
-        .find(|piece| piece_hit(piece, point))
+        .find(|piece| piece_hit(piece, point, tolerance))
         .map(|piece| piece.id)
 }
 
 /// The smallest child under the point, so that a child inside a larger one stays reachable.
-pub(super) fn child_at(piece: &PatternPiece, point: Point) -> Option<u64> {
+/// A line counts as having no area, so it wins over the outlines it crosses.
+pub(super) fn child_at(piece: &PatternPiece, point: Point, tolerance: f64) -> Option<u64> {
     let area = |shape: &Shape| {
+        if shape.is_open() {
+            return 0.0;
+        }
         shape
             .bounds()
             .map_or(0.0, |bounds| bounds.width() * bounds.height())
@@ -357,7 +400,7 @@ pub(super) fn child_at(piece: &PatternPiece, point: Point) -> Option<u64> {
     piece
         .children
         .iter()
-        .filter(|child| child.shape.contains(point))
+        .filter(|child| shape_hit(&child.shape, point, tolerance))
         .min_by(|a, b| area(&a.shape).total_cmp(&area(&b.shape)))
         .map(|child| child.id)
 }
@@ -502,7 +545,7 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
             Err(_) => {
                 let error_stroke = egui::Stroke::new(stroke.width, error_color);
                 dashed_ring(painter, to_screen(view, &piece.base.ring()), error_stroke);
-                for child in &piece.children {
+                for child in piece.children.iter().filter(|child| !child.shape.is_open()) {
                     dashed_ring(painter, to_screen(view, &child.shape.ring()), error_stroke);
                 }
             }
@@ -536,7 +579,8 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
         let selected_child = state.selected_child_id();
         let construction = egui::Stroke::new(1.0, stroke.color.gamma_multiply(0.7));
         dashed_ring(painter, to_screen(view, &piece.base.ring()), construction);
-        for child in &piece.children {
+        // Lines are drawn by `draw_centerlines`.
+        for child in piece.children.iter().filter(|child| !child.shape.is_open()) {
             let screen = to_screen(view, &child.shape.ring());
             let color = op_color(child.op);
             if state.selected_children().contains(&child.id) {
@@ -553,6 +597,13 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
         }
         match selected_child.and_then(|id| piece.child(id)) {
             Some(child) => {
+                if let Shape::Line(line) = &child.shape {
+                    if !piece.locked {
+                        draw_handles(painter, view, &child.shape, CENTERLINE_SELECTED_COLOR);
+                    }
+                    draw_line_label(painter, view, line, project.units, state);
+                    continue;
+                }
                 if !piece.locked {
                     draw_handles(painter, view, &child.shape, op_color(child.op));
                 }
@@ -580,6 +631,77 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
             }
         }
     }
+}
+
+const CENTERLINE_COLOR: egui::Color32 = egui::Color32::from_rgb(120, 195, 215);
+const CENTERLINE_SELECTED_COLOR: egui::Color32 = egui::Color32::from_rgb(240, 160, 70);
+
+/// The lines of every piece, on top of all outlines and never clipped by them.
+fn draw_centerlines(
+    painter: &egui::Painter,
+    view: Viewport,
+    project: &Project,
+    state: &EditorState,
+) {
+    for piece in &project.pieces {
+        let piece = state.displayed(piece);
+        let primary = state.selected == Some(piece.id);
+        for child in &piece.children {
+            let Shape::Line(line) = &child.shape else {
+                continue;
+            };
+            let stroke = if primary && state.selected_children().contains(&child.id) {
+                egui::Stroke::new(SELECTED_CENTERLINE_WIDTH_PX, CENTERLINE_SELECTED_COLOR)
+            } else if state.is_selected(piece.id) {
+                egui::Stroke::new(CENTERLINE_WIDTH_PX, CENTERLINE_COLOR)
+            } else {
+                egui::Stroke::new(CENTERLINE_WIDTH_PX, CENTERLINE_COLOR.gamma_multiply(0.8))
+            };
+            draw_line(painter, view, line, stroke);
+        }
+    }
+}
+
+/// A line in its dash pattern, which is in mm and so scales with the zoom.
+fn draw_line(painter: &egui::Painter, view: Viewport, line: &Line, stroke: egui::Stroke) {
+    let ends = [view.to_screen(line.start), view.to_screen(line.end)];
+    let period = line
+        .style
+        .pattern()
+        .map(|pattern| pattern.iter().sum::<f64>() as f32 * view.zoom);
+    match period {
+        Some(period) if period >= MIN_DASH_PERIOD_PX => {
+            for (a, b) in line.dashes() {
+                painter.line_segment([view.to_screen(a), view.to_screen(b)], stroke);
+            }
+        }
+        // Too fine to show its dashes at this zoom.
+        Some(_) => {
+            painter.line_segment(
+                ends,
+                egui::Stroke::new(stroke.width, stroke.color.gamma_multiply(0.6)),
+            );
+        }
+        None => {
+            painter.line_segment(ends, stroke);
+        }
+    }
+}
+
+fn draw_line_label(
+    painter: &egui::Painter,
+    view: Viewport,
+    line: &Line,
+    units: Units,
+    state: &EditorState,
+) {
+    painter.text(
+        view.to_screen(line.midpoint()),
+        egui::Align2::CENTER_BOTTOM,
+        format_length(state.language, units, line.length()),
+        egui::FontId::proportional(11.0),
+        egui::Color32::from_gray(220),
+    );
 }
 
 /// The selected edge, and with the Edge tool the edge under the cursor.
@@ -766,16 +888,28 @@ fn draw_shape_draft(painter: &egui::Painter, view: Viewport, units: Units, state
         draft.end,
         draft.constrained,
         state.polygon_sides,
+        state.line_style,
     ) else {
         return;
     };
     let color = draft_color(state);
-    painter.add(egui::Shape::closed_line(
-        to_screen(view, &shape.ring()),
-        egui::Stroke::new(2.0, color),
-    ));
+    match &shape {
+        Shape::Line(line) => draw_line(
+            painter,
+            view,
+            line,
+            egui::Stroke::new(1.5, CENTERLINE_COLOR),
+        ),
+        _ => {
+            painter.add(egui::Shape::closed_line(
+                to_screen(view, &shape.ring()),
+                egui::Stroke::new(2.0, color),
+            ));
+        }
+    }
     let length = |millimeters: f64| format_length(state.language, units, millimeters);
     let size = match shape {
+        Shape::Line(line) => length(line.length()),
         Shape::Ellipse(Ellipse {
             radius_x, radius_y, ..
         }) if radius_x == radius_y => format!("Ø {}", length(radius_x * 2.0)),

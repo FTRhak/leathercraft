@@ -18,7 +18,7 @@ fn target_on_selected(
     if let Some((shape, handle)) = handle_at(piece, selected_child, origin, view) {
         return Some(DragTarget::Handle(shape, handle));
     }
-    child_at(piece, start).map(DragTarget::Child)
+    child_at(piece, start, view.hit_tolerance()).map(DragTarget::Child)
 }
 
 /// Grabbing a whole piece or a child that is selected moves the whole selection of pieces or
@@ -39,7 +39,7 @@ pub(super) fn begin_drag(
     });
     let piece_id = match (target, selected) {
         (Some(_), Some(piece)) => Some(piece.id),
-        _ => piece_at(project, start),
+        _ => piece_at(project, start, view.hit_tolerance()),
     };
     let Some(piece_id) = piece_id else {
         return;

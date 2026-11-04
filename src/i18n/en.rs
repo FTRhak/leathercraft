@@ -32,6 +32,21 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Polygon => "Polygon",
         Label::RegularPolygon => "Regular polygon",
         Label::Edge => "Edge",
+        Label::Centerline => "Centerline",
+        Label::CenterlineHint => {
+            "Drag from one end to the other to add a centerline to the selected piece. Hold Shift to turn in 15° steps. Esc cancels."
+        }
+        Label::LineType => "Line type",
+        Label::LineSolid => "Solid",
+        Label::LineDashed => "Dashed",
+        Label::LineDashDot => "Dash-dot",
+        Label::DashLength => "Dash",
+        Label::GapLength => "Gap",
+        Label::StartX => "Start X",
+        Label::StartY => "Start Y",
+        Label::EndX => "End X",
+        Label::EndY => "End Y",
+        Label::Angle => "Angle, °",
         Label::RectangleHint => "Drag from corner to corner. Esc cancels.",
         Label::EllipseHint => "Drag from the center outward. Hold Shift for a circle. Esc cancels.",
         Label::RegularPolygonHint => {
@@ -394,6 +409,12 @@ pub(super) fn message(message: &Message) -> String {
         }
         Message::InvalidShapeSize { name } => {
             format!("Shapes of piece '{name}' must have a positive size.")
+        }
+        Message::BaseMustBeClosed { name } => {
+            format!("The base of piece '{name}' must be a closed shape, not a line.")
+        }
+        Message::TooManyDashes { name, max } => {
+            format!("A line of piece '{name}' would have more than {max} dashes; make them longer.")
         }
         Message::ResultEmpty { name } => format!("Nothing is left of piece '{name}'."),
         Message::ResultSplit { name } => {

@@ -48,6 +48,7 @@ fn shape_label(shape: &Shape) -> Label {
         Shape::Rectangle(_) => Label::Rectangle,
         Shape::Ellipse(_) => Label::Ellipse,
         Shape::RegularPolygon(_) => Label::RegularPolygon,
+        Shape::Line(_) => Label::Centerline,
     }
 }
 
@@ -111,6 +112,10 @@ fn child_row(
                 });
             }
         });
+        // A line's operation is ignored, so it has no picker.
+        if child.shape.is_open() {
+            return;
+        }
         let mut op = child.op;
         egui::ComboBox::from_id_salt(("child_op", id, child_id))
             .selected_text(language.label(Label::Operation(op)))

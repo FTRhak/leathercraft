@@ -1,8 +1,9 @@
 use crate::icons::icon_button;
+use crate::panels::properties::line_style_fields;
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
-use leathercraft::model::{BooleanOp, Point};
-use leathercraft::shapes::{REGULAR_POLYGON_SIDES, Shape};
+use leathercraft::model::{BooleanOp, Point, Units};
+use leathercraft::shapes::{LineStyle, REGULAR_POLYGON_SIDES, Shape};
 use std::f32::consts::{PI, TAU};
 
 const ICON_BUTTON_SIZE: f32 = 32.0;
@@ -19,16 +20,18 @@ pub enum Tool {
     Rectangle,
     Ellipse,
     RegularPolygon,
+    Centerline,
 }
 
 impl Tool {
-    const ALL: [Self; 6] = [
+    const ALL: [Self; 7] = [
         Self::Select,
         Self::Edge,
         Self::Draw,
         Self::Rectangle,
         Self::Ellipse,
         Self::RegularPolygon,
+        Self::Centerline,
     ];
 
     fn label(self) -> Label {
@@ -39,6 +42,7 @@ impl Tool {
             Self::Rectangle => Label::Rectangle,
             Self::Ellipse => Label::Ellipse,
             Self::RegularPolygon => Label::RegularPolygon,
+            Self::Centerline => Label::Centerline,
         }
     }
 
@@ -50,13 +54,22 @@ impl Tool {
             Self::Rectangle => Label::RectangleHint,
             Self::Ellipse => Label::EllipseHint,
             Self::RegularPolygon => Label::RegularPolygonHint,
+            Self::Centerline => Label::CenterlineHint,
         }
     }
 
     /// The shape dragged from `start` to `end`, for the tools that draw by dragging.
-    /// `constrained` keeps an ellipse round and turns a regular polygon in steps.
-    pub fn shape(self, start: Point, end: Point, constrained: bool, sides: usize) -> Option<Shape> {
+    /// `constrained` keeps an ellipse round and turns a regular polygon or a line in steps.
+    pub fn shape(
+        self,
+        start: Point,
+        end: Point,
+        constrained: bool,
+        sides: usize,
+        line_style: LineStyle,
+    ) -> Option<Shape> {
         match self {
+            Self::Centerline => Shape::line_from_ends(start, end, constrained, line_style),
             Self::Rectangle => Shape::rectangle_from_corners(start, end),
             Self::Ellipse => Shape::ellipse_from_center(start, end, constrained),
             Self::RegularPolygon => {
@@ -124,6 +137,13 @@ impl Tool {
                     .collect();
                 painter.add(egui::Shape::closed_line(points, stroke));
             }
+            Self::Centerline => {
+                // A dash-dot diagonal: dash, dot, dash.
+                let along = |t: f32| at(t, 1.0 - t);
+                painter.line_segment([along(0.0), along(0.4)], stroke);
+                painter.circle_filled(along(0.5), stroke.width, stroke.color);
+                painter.line_segment([along(0.6), along(1.0)], stroke);
+            }
         }
     }
 }
@@ -188,13 +208,22 @@ fn paint_new_piece_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui:
     );
 }
 
-pub fn show_panel(
-    ui: &mut egui::Ui,
-    tool: &mut Tool,
-    polygon_sides: &mut usize,
-    op_mode: &mut Option<BooleanOp>,
-    language: Language,
-) {
+/// What the Tools panel edits: the tool and the settings of the tools that have any.
+pub struct ToolSettings<'a> {
+    pub tool: &'a mut Tool,
+    pub polygon_sides: &'a mut usize,
+    pub op_mode: &'a mut Option<BooleanOp>,
+    /// The style of new centerlines.
+    pub line_style: &'a mut LineStyle,
+}
+
+pub fn show_panel(ui: &mut egui::Ui, settings: ToolSettings, units: Units, language: Language) {
+    let ToolSettings {
+        tool,
+        polygon_sides,
+        op_mode,
+        line_style,
+    } = settings;
     ui.horizontal_wrapped(|ui| {
         for option in Tool::ALL {
             let name = language.label(option.label());
@@ -238,5 +267,8 @@ pub fn show_panel(
             ui.label(language.label(Label::Sides));
             ui.add(egui::DragValue::new(polygon_sides).range(REGULAR_POLYGON_SIDES));
         });
+    }
+    if *tool == Tool::Centerline {
+        line_style_fields(ui, line_style, units, language);
     }
 }

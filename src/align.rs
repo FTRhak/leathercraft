@@ -630,4 +630,37 @@ mod tests {
         assert!(project.pieces[0].region().is_err());
         assert_near(piece_box(&project.pieces[0]).unwrap().min_x, -5.0);
     }
+
+    #[test]
+    fn lines_align_like_other_children() {
+        let mut project = holes();
+        project.pieces[0].children.push(ChildShape {
+            id: 3,
+            op: BooleanOp::Subtract,
+            shape: Shape::line_from_ends(
+                Point::new(70.0, 80.0),
+                Point::new(130.0, 80.0),
+                false,
+                crate::shapes::LineStyle::Solid,
+            )
+            .unwrap(),
+        });
+        let centered = moved_children(
+            &project,
+            &[3],
+            Arrange::Align(Axis::Horizontal, Edge::Center),
+            AlignTo::Parent,
+        );
+        let bounds = child_boxes(&centered)[2];
+        assert_near(bounds.min_x, 20.0);
+        assert_near(bounds.max_x, 80.0);
+
+        let left = moved_children(
+            &project,
+            &[2, 3],
+            Arrange::Align(Axis::Horizontal, Edge::Min),
+            AlignTo::KeyObject(2),
+        );
+        assert_near(child_boxes(&left)[2].min_x, 50.0);
+    }
 }

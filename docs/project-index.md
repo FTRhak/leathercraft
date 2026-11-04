@@ -29,46 +29,47 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/editor_state_struct.rs` | 397 | 3,300 | bin | `EditorState` and its methods (primary piece plus multi-selection, primary child plus multi-selection of children in that piece, selected edge or vertex), `document_name` |
 | `src/editor/drag_state_struct.rs` | 53 | 420 | bin | `ShapeRef`, `DragTarget`, `DragState` (with the `group` of pieces or `child_group` of children moved along) |
 | `src/editor/shape_draft_struct.rs` | 9 | 60 | bin | `ShapeDraft` |
-| `src/editor/canvas.rs` | 798 | 6,700 | bin | `canvas`, `Viewport`, tool behavior (Shift+click toggles a child of the selected piece, else a piece; the Edge tool picks a vertex or a polygon edge), hit testing (pieces, children, handles, vertices, polygon edges), painting |
+| `src/editor/canvas.rs` | 932 | 7,900 | bin | `canvas`, `Viewport` (`hit_tolerance`), tool behavior (Shift+click toggles a child of the selected piece, else a piece; the Edge tool picks a vertex or a polygon edge; a line is always added as a child), hit testing (pieces and their lines, children with a line tolerance, handles, vertices, polygon edges), painting (centerlines in their dash pattern above all outlines) |
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
-| `src/editor/drag.rs` | 181 | 1,450 | bin | `begin_drag`, `begin_handle_drag`, `update_drag`, `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
+| `src/editor/drag.rs` | 216 | 1,450 | bin | `begin_drag`, `begin_handle_drag`, `update_drag`, `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
 | `src/editor/grid.rs` | 33 | 300 | bin | `draw_grid`: canvas grid and axes, grid steps |
 | `src/editor/ui.rs` | 401 | 3,700 | bin | `editor_ui`, `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
 | `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History tab title has an icon; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/icons/mod.rs` | 87 | 760 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
 | `src/panels/dock/mod.rs` | 178 | 1,500 | bin | `PanelTab`, `PanelDock`: panel arrangement, default layout, saving and restoring it |
-| `src/panels/tools/mod.rs` | 242 | 2,100 | bin | `Tool`, painted tool and operation icons, Tools panel with the regular polygon's sides field |
-| `src/panels/layout/mod.rs` | 267 | 2,750 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls; Shift+click toggles a piece or child |
+| `src/panels/tools/mod.rs` | 274 | 2,400 | bin | `Tool` (with `Centerline`), `ToolSettings`, painted tool and operation icons, Tools panel with the regular polygon's sides field and the style of new centerlines |
+| `src/panels/layout/mod.rs` | 273 | 2,800 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls (none for a centerline); Shift+click toggles a piece or child |
 | `src/panels/align/mod.rs` | 293 | 2,300 | bin | Align panel: `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), painted align, distribute and spacing icons, `show_panel` |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
 | `src/panels/settings/mod.rs` | 95 | 700 | bin | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` with Default material and Hotkeys tabs |
 | `src/panels/settings/material.rs` | 187 | 1,500 | bin | Default material tab: `material_tab`, its own material form with Reset to defaults |
 | `src/panels/settings/hotkeys.rs` | 190 | 1,600 | bin | Hotkeys tab: `Capture`, `hotkeys_tab`, `shortcut_button`, key capture |
-| `src/panels/properties/mod.rs` | 272 | 2,150 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, selected edge's length, selected vertex's corner radius, To Polygon button |
+| `src/panels/properties/mod.rs` | 350 | 2,900 | bin | Properties panel: view or preview controls, display units, selected piece's name, size and shape fields, a line's ends, length, angle and style (`line_style_fields`, shared with the Tools panel), selected edge's length, selected vertex's corner radius, To Polygon button |
 | `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion |
-| `src/model.rs` | 476 | 3,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation |
-| `src/boolean.rs` | 221 | 1,900 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes |
+| `src/model.rs` | 562 | 4,200 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation (a base must be closed; a line's ends and dash count) |
+| `src/boolean.rs` | 235 | 2,000 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes, skipping open lines |
 | `src/material.rs` | 462 | 2,800 | lib | `Material` and the scales of its properties |
 | `src/events.rs` | 980 | 6,650 | lib | `ProjectEvent` (including the group `MovePieces`, `RemovePieces`, `ArrangePieces`, `MoveChildren`, `ArrangeChildren`, `RemoveChildren`), `ProjectChange`, `Project::apply` |
-| `src/align.rs` | 633 | 4,950 | lib | `Axis`, `Edge`, `Arrange` (Illustrator's align, distribute and spacing operations), `AlignTo` (including `Parent`, the base shape of the children's piece), `Spacing`, `piece_box`, `offsets` (pieces), `child_offsets` (children of one piece), shared `arrange_items` |
-| `src/i18n/uk.rs` | 552 | 6,200 | lib | Ukrainian catalog, `plural` helper |
-| `src/i18n/mod.rs` | 318 | 2,150 | lib | `Language`, `Label`, `Message` |
-| `src/exports/mod.rs` | 187 | 1,200 | lib | `ExportError`, shared helpers, tests |
-| `src/exports/svg.rs` | 45 | 430 | lib | `to_svg` |
-| `src/exports/dxf.rs` | 25 | 200 | lib | `to_dxf` |
-| `src/shapes/mod.rs` | 346 | 2,700 | lib | `Shape`: dispatch to the shape structs, constructors from a drag, `corners`, `corner_radius`, `with_corner_radius` |
+| `src/align.rs` | 666 | 4,950 | lib | `Axis`, `Edge`, `Arrange` (Illustrator's align, distribute and spacing operations), `AlignTo` (including `Parent`, the base shape of the children's piece), `Spacing`, `piece_box`, `offsets` (pieces), `child_offsets` (children of one piece), shared `arrange_items` |
+| `src/i18n/uk.rs` | 587 | 6,700 | lib | Ukrainian catalog, `plural` helper |
+| `src/i18n/mod.rs` | 349 | 2,350 | lib | `Language`, `Label`, `Message` |
+| `src/exports/mod.rs` | 238 | 1,600 | lib | `ExportError`, shared helpers (`validate_export`, `centerlines`, `number`), tests |
+| `src/exports/svg.rs` | 69 | 700 | lib | `to_svg`: outlines, then a group of centerlines with their dash pattern |
+| `src/exports/dxf.rs` | 37 | 330 | lib | `to_dxf`: outlines on `PATTERN`, each centerline dash as a `LINE` on `CENTERLINE` |
+| `src/shapes/mod.rs` | 378 | 3,000 | lib | `Shape`: dispatch to the shape structs, constructors from a drag, `is_open`, `distance_to`, `corners`, `corner_radius`, `with_corner_radius` |
+| `src/shapes/line.rs` | 305 | 2,300 | lib | `Line` (open, a centerline), `LineStyle` (solid, dashed, dash-dot), `MIN_DASH_MM`, `MAX_DASHES_PER_LINE`, `DOT_MM`: `from_ends`, `with_length`, `with_angle`, `distance_to`, `dashes`, `dash_count`; tests |
 | `src/shapes/corners.rs` | 243 | 1,900 | lib | Rounded corners: `round_corners` (fillet arcs), `radius_at`, `set_radius`, `valid_radii` |
 | `src/shapes/rectangle.rs` | 128 | 900 | lib | `Rectangle` |
 | `src/shapes/ellipse.rs` | 123 | 900 | lib | `Ellipse`, `CIRCLE_SEGMENTS` |
 | `src/shapes/regular_polygon.rs` | 154 | 1,150 | lib | `RegularPolygon`, `REGULAR_POLYGON_SIDES` |
 | `src/shapes/polygon.rs` | 116 | 850 | lib | `Polygon`, its edges and their lengths |
-| `src/i18n/en.rs` | 497 | 4,750 | lib | English catalog |
+| `src/i18n/en.rs` | 532 | 5,100 | lib | English catalog |
 | `src/history.rs` | 725 | 4,950 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
-| `src/persistence.rs` | 169 | 1,300 | lib | `save_project`, `load_project`, `write_export` |
+| `src/persistence.rs` | 230 | 1,750 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings/mod.rs` | 123 | 1,000 | bin | `settings.json` in the OS config directory: language, panel layout, and `Preferences` (default material, hotkeys) with `load_preferences`, `save_preferences` |
-| `src/settings/hotkeys.rs` | 335 | 2,700 | bin | `Action` (bindable commands, default shortcuts), `Hotkeys` (`from_json`, `to_json`, `first`, conflicts, `triggered`), `format_shortcut`, `parse_shortcut`; tests |
+| `src/settings/hotkeys.rs` | 340 | 2,700 | bin | `Action` (bindable commands, default shortcuts), `Hotkeys` (`from_json`, `to_json`, `first`, conflicts, `triggered`), `format_shortcut`, `parse_shortcut`; tests |
 | `src/document.rs` | 70 | 550 | bin | `ActiveProject` (`new`, project and history), `ProjectMessage`, `HistoryMessage`, `apply_project_events` |
 | `src/main.rs` | 51 | 350 | bin | App wiring and system schedule; loads `Preferences` and starts the project with their default material; the editor UI starts one pass after the icon font is installed |
 | `src/lib.rs` | 9 | 40 | lib | Module declarations |
@@ -90,13 +91,14 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 143-262 | `PatternPiece`: `bounds`, `child`, `child_index`, `next_child_id`, `translate`, `validate_shape`, `validate_ring`, `validate_shapes` |
 | | 265-353 | `Project`: `bounds`, `validate` (301), `next_piece_id`, `add_piece`, `remove_piece` |
 | | 355-476 | Tests |
-| `shapes/mod.rs` | 1-40 | Re-exports, `Shape` enum (`Polygon`, `Rectangle`, `Ellipse`, `RegularPolygon` wrapping the structs of the same name), `to_world`, `to_local`, `positive` |
+| `shapes/mod.rs` | 1-40 | Re-exports, `Shape` enum (`Polygon`, `Rectangle`, `Ellipse`, `RegularPolygon`, `Line` wrapping the structs of the same name), `to_world`, `to_local`, `positive` |
 | | 43-200 | `rectangle_from_corners`, `ellipse_from_center`, `regular_polygon_from_center`, `ring`, `to_polygon` (keeps corners and radii), `corners`, `corner_radius`, `with_corner_radius`, `bounds`, `contains`, `center`, `translate`, `handles` (corners, not ring points), `with_handle_at`, `has_valid_size` |
 | | 202-346 | `test_support` (`validate`, `assert_near`), tests |
 | `shapes/corners.rs` | 14-128 | `radius_at`, `set_radius` (keeps the list to the vertex count, empties it when all are 0), `valid_radii`, `round_corners`, `fillet` (radius reduced so an arc reaches at most halfway along each edge); tests from 130 |
 | `shapes/rectangle.rs` | 5-68 | `Rectangle` (with `radii`): `from_corners`, `ring`, `corners`, `with_handle_at`, `has_valid_size`; tests from 70 |
 | `shapes/ellipse.rs` | 6-79 | `CIRCLE_SEGMENTS`, `Ellipse`: `from_center`, `ring`, `handles`, `with_handle_at`, `has_valid_size`; tests from 81 |
 | `shapes/regular_polygon.rs` | 7-85 | `REGULAR_POLYGON_SIDES` (3..=64), `ROTATION_SNAP`, `RegularPolygon` (with `radii`): `from_center`, `ring`, `corners`, `with_handle_at`, `has_valid_size`; tests from 87 |
+| `shapes/line.rs` | 1-208 | `LineStyle` (`dashed_default`, `dash_dot_default`, `pattern`), `Line`: `from_ends` (Shift snaps to 15°), `length`, `angle`, `midpoint`, `with_length`, `with_angle`, `translate`, `handles`, `with_handle_at`, `distance_to`, `dash_count`, `dashes`, `has_valid_size`; tests from 210 |
 | `shapes/polygon.rs` | 4-67 | `Polygon` (`points`, `radii`): `new`, `ring` (rounded), `has_valid_size`, `translate`, `with_handle_at`, `edge`, `edge_length`, `with_edge_length` (moves the edge's end along it); tests from 69 |
 | `boolean.rs` | 11-53 | `ROUND_PRECISION_MM`, `Region`: `rings`, `vertices`, `hole_indices`, `bounds`, `contains` |
 | | 67-96 | `PatternPiece::region` |
@@ -218,7 +220,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add a validation rule | `model.rs` 8-13, 200-262, 301-333 | `validate`, plus a `Message` variant and both catalogs |
 | Add UI text | `i18n/mod.rs` 70-166 | A `Label` or `Message` variant and an arm in `en.rs` and `uk.rs`; the compiler flags missing arms |
 | Add a language | `i18n/mod.rs` 14-66 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
-| Add a canvas tool | `panels/tools/mod.rs`, `editor/canvas.rs` 38-93, 152-262 | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`; a new primitive also goes in `Shape` (`ring`, `handles`, `with_handle_at`, `has_valid_size`), `shape_label` and `shape_fields` |
+| Add a canvas tool | `panels/tools/mod.rs`, `editor/canvas.rs` 38-93, 152-262, `settings/hotkeys.rs` | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`, an `Action::Tool…` hotkey; a new primitive also goes in `Shape` (`ring`, `handles`, `with_handle_at`, `has_valid_size`), `shape_label` and `shape_fields`; an open one also in `is_open`, `distance_to`, `draw_centerlines` and the exports (see `docs/centerline.md`) |
 | Add a boolean operation | `model.rs` `BooleanOp`, `boolean.rs` `region` | A `BooleanOp` variant and its `ALL`, its `OverlayRule`, catalog arms, `op_color` and `paint_operation_icon` |
 | Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material`, `material_fields` and the Settings form in `panels/settings/material.rs` |
 | Change the file format | `model.rs` 119-160, 265-278, `shapes/mod.rs` 14-23 and the shape structs, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
@@ -239,20 +241,20 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 102 tests inline in the library crate, plus 4 in the binary (`settings::hotkeys`, run with `cargo test --bin leathercraft`, which compiles Bevy):
+There are 116 tests inline in the library crate, plus 4 in the binary (`settings::hotkeys`, run with `cargo test --bin leathercraft`, which compiles Bevy):
 
 | Module | Tests |
 |---|---:|
-| `model` | 6 |
-| `shapes` | 26 |
-| `boolean` | 7 |
+| `model` | 8 |
+| `shapes` | 33 |
+| `boolean` | 8 |
 | `material` | 3 |
-| `align` | 13 |
+| `align` | 14 |
 | `events` | 17 |
 | `history` | 13 |
 | `i18n` | 5 |
-| `exports` | 7 |
-| `persistence` | 5 |
+| `exports` | 9 |
+| `persistence` | 6 |
 
 Apart from shortcut parsing, `document`, `editor`, `preview`, `settings` and `panels` have no tests, so changes there need `cargo check` and a manual run.
 
@@ -264,6 +266,8 @@ Apart from shortcut parsing, `document`, `editor`, `preview`, `settings` and `pa
 | `docs/icons.md` | Current. Spec for the icon font, `paint_glyph` and `icon_button`: adding glyphs, sizes, toggles, disabled state. |
 | `docs/history.md` | Current. Spec for undo, redo and the History panel: user controls, snapshots and merging, the message flow in the binary, adding a new edit. |
 | `docs/settings.md` | Current. Spec for `settings.json` and the Settings window: sections and their fallbacks, `Action` and `Hotkeys`, shortcut text format, the draft and key capture, adding a hotkey or preference. |
+| `docs/centerline.md` | Current. Spec for centerlines: `Shape::Line` as an open child, `LineStyle` and its dash pattern in mm, validation limits, hit testing and drawing, SVG and DXF output, extending to other open shapes. |
+| `docs/round-vertex.md` | Current. Spec for rounded vertices: per-vertex `radii`, `Shape::corners` vs `ring`, the fillet construction and its clamping, selecting a vertex with the Edge tool, the Corner radius field, extending to new shapes. |
 | `docs/i18n.md` | Current. Spec for the localization module: `Label` vs `Message`, rendering, language selection, adding text and languages, translation conventions. |
 | `docs/plan.md` | Historical MVP plan. It still says the repo contains only a license. Its todo 6 asks for build and run docs, and there is no README; `CLAUDE.md` only lists the commands. |
 

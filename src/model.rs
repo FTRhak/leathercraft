@@ -1,6 +1,6 @@
 use crate::i18n::Message;
 use crate::material::Material;
-use crate::shapes::Shape;
+use crate::shapes::{MAX_DASHES_PER_LINE, Shape};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -130,6 +130,7 @@ impl BooleanOp {
 }
 
 /// A shape combined with the piece. `id` is unique within its piece and survives reordering.
+/// An open shape, such as a centerline, only marks the piece: its `op` is ignored.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ChildShape {
     pub id: u64,
@@ -203,7 +204,34 @@ impl PatternPiece {
                 name: self.name.clone(),
             });
         }
-        self.validate_ring(&shape.ring())
+        match shape {
+            Shape::Line(line) => {
+                self.validate_coordinates(&[line.start, line.end])?;
+                if line.dash_count() > MAX_DASHES_PER_LINE {
+                    return Err(Message::TooManyDashes {
+                        name: self.name.clone(),
+                        max: MAX_DASHES_PER_LINE,
+                    });
+                }
+                Ok(())
+            }
+            _ => self.validate_ring(&shape.ring()),
+        }
+    }
+
+    fn validate_coordinates(&self, points: &[Point]) -> Result<(), Message> {
+        let out_of_range = |point: &Point| {
+            !point.x.is_finite()
+                || !point.y.is_finite()
+                || point.x.abs() > MAX_COORDINATE_MM
+                || point.y.abs() > MAX_COORDINATE_MM
+        };
+        if points.iter().any(out_of_range) {
+            return Err(Message::CoordinateOutOfRange {
+                name: self.name.clone(),
+            });
+        }
+        Ok(())
     }
 
     fn validate_ring(&self, ring: &[Point]) -> Result<(), Message> {
@@ -213,16 +241,8 @@ impl PatternPiece {
                 max: MAX_POINTS_PER_PIECE,
             });
         }
+        self.validate_coordinates(ring)?;
         for (index, point) in ring.iter().enumerate() {
-            if !point.x.is_finite()
-                || !point.y.is_finite()
-                || point.x.abs() > MAX_COORDINATE_MM
-                || point.y.abs() > MAX_COORDINATE_MM
-            {
-                return Err(Message::CoordinateOutOfRange {
-                    name: self.name.clone(),
-                });
-            }
             let next = ring[(index + 1) % ring.len()];
             if (point.x - next.x).hypot(point.y - next.y) < 1.0e-8 {
                 return Err(Message::CoincidentPoints {
@@ -245,6 +265,11 @@ impl PatternPiece {
             return Err(Message::TooManyChildren {
                 name: self.name.clone(),
                 max: MAX_CHILDREN_PER_PIECE,
+            });
+        }
+        if self.base.is_open() {
+            return Err(Message::BaseMustBeClosed {
+                name: self.name.clone(),
             });
         }
         self.validate_shape(&self.base)?;
@@ -474,5 +499,64 @@ mod tests {
     fn converts_display_measurements_without_changing_internal_geometry() {
         assert_eq!(Units::Inches.from_millimeters(25.4), 1.0);
         assert_eq!(Units::Millimeters.from_millimeters(25.4), 25.4);
+    }
+
+    fn line(x: f64, style: crate::shapes::LineStyle) -> Shape {
+        Shape::line_from_ends(Point::new(0.0, 60.0), Point::new(x, 60.0), false, style).unwrap()
+    }
+
+    #[test]
+    fn a_line_is_a_valid_child_but_not_a_base() {
+        use crate::shapes::LineStyle;
+        let mut piece = rectangle(1);
+        piece.children.push(ChildShape {
+            id: 1,
+            op: BooleanOp::Subtract,
+            shape: line(200.0, LineStyle::dash_dot_default()),
+        });
+        assert_eq!(project(piece).validate(), Ok(()));
+
+        let base = PatternPiece::new(1, "Axis", line(10.0, LineStyle::Solid));
+        assert_eq!(
+            project(base).validate(),
+            Err(Message::BaseMustBeClosed {
+                name: "Axis".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn line_styles_are_checked() {
+        use crate::shapes::LineStyle;
+        let with_line = |shape| {
+            let mut piece = rectangle(1);
+            piece.children.push(ChildShape {
+                id: 1,
+                op: BooleanOp::Subtract,
+                shape,
+            });
+            project(piece).validate()
+        };
+        let no_gap = LineStyle::Dashed {
+            dash: 5.0,
+            gap: 0.0,
+        };
+        assert_eq!(
+            with_line(line(100.0, no_gap)),
+            Err(Message::InvalidShapeSize {
+                name: "Pocket".to_owned()
+            })
+        );
+        let fine = LineStyle::Dashed {
+            dash: 0.1,
+            gap: 0.1,
+        };
+        assert_eq!(
+            with_line(line(10_000.0, fine)),
+            Err(Message::TooManyDashes {
+                name: "Pocket".to_owned(),
+                max: crate::shapes::MAX_DASHES_PER_LINE
+            })
+        );
     }
 }

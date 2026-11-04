@@ -32,6 +32,21 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Polygon => "Полігон",
         Label::RegularPolygon => "Багатокутник",
         Label::Edge => "Грань",
+        Label::Centerline => "Осьова лінія",
+        Label::CenterlineHint => {
+            "Перетягуйте від одного кінця до іншого, щоб додати осьову лінію до вибраної деталі. Shift — поворот кроком 15°. Esc скасовує."
+        }
+        Label::LineType => "Тип лінії",
+        Label::LineSolid => "Суцільна",
+        Label::LineDashed => "Штрихова",
+        Label::LineDashDot => "Штрихпунктирна",
+        Label::DashLength => "Штрих",
+        Label::GapLength => "Проміжок",
+        Label::StartX => "Початок X",
+        Label::StartY => "Початок Y",
+        Label::EndX => "Кінець X",
+        Label::EndY => "Кінець Y",
+        Label::Angle => "Кут, °",
         Label::RectangleHint => "Перетягуйте від кута до кута. Esc скасовує.",
         Label::EllipseHint => "Перетягуйте від центру назовні. Shift — коло. Esc скасовує.",
         Label::RegularPolygonHint => {
@@ -404,6 +419,12 @@ pub(super) fn message(message: &Message) -> String {
         }
         Message::InvalidShapeSize { name } => {
             format!("Фігури деталі «{name}» мають бути додатного розміру.")
+        }
+        Message::BaseMustBeClosed { name } => {
+            format!("Основа деталі «{name}» має бути замкненою фігурою, а не лінією.")
+        }
+        Message::TooManyDashes { name, max } => {
+            format!("Лінія деталі «{name}» мала б понад {max} штрихів; збільште їх довжину.")
         }
         Message::ResultEmpty { name } => format!("Від деталі «{name}» нічого не лишилося."),
         Message::ResultSplit { name } => {

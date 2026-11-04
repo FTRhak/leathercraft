@@ -61,13 +61,13 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
             PanelTab::Tools => {
                 ui.add_enabled_ui(editing, |ui| {
                     let state = &mut *self.state;
-                    tools::show_panel(
-                        ui,
-                        &mut state.tool,
-                        &mut state.polygon_sides,
-                        &mut state.op_mode,
-                        language,
-                    );
+                    let settings = tools::ToolSettings {
+                        tool: &mut state.tool,
+                        polygon_sides: &mut state.polygon_sides,
+                        op_mode: &mut state.op_mode,
+                        line_style: &mut state.line_style,
+                    };
+                    tools::show_panel(ui, settings, self.project.units, language);
                 });
             }
             PanelTab::Align => {

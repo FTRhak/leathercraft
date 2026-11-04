@@ -65,11 +65,12 @@ fn ring(contour: &[[f64; 2]]) -> Vec<Point> {
 }
 
 impl PatternPiece {
-    /// Combines the base with each child in list order. Fails if nothing is left or the
-    /// result falls apart into several outlines, since a piece is cut as one.
+    /// Combines the base with each child in list order; open children, such as centerlines,
+    /// are skipped. Fails if nothing is left or the result falls apart into several outlines,
+    /// since a piece is cut as one.
     pub fn region(&self) -> Result<Region, Message> {
         let mut shapes = vec![vec![contour(&self.base.ring())]];
-        for child in &self.children {
+        for child in self.children.iter().filter(|child| !child.shape.is_open()) {
             let rule = match child.op {
                 BooleanOp::Subtract => OverlayRule::Difference,
                 BooleanOp::Union => OverlayRule::Union,
@@ -217,5 +218,18 @@ mod tests {
             piece(vec![(BooleanOp::Union, square(200.0, 200.0, 10.0))]).region(),
             Err(Message::ResultSplit { name })
         );
+    }
+
+    #[test]
+    fn lines_do_not_change_the_region() {
+        let line = Shape::line_from_ends(
+            Point::new(-20.0, 60.0),
+            Point::new(100.0, 60.0),
+            false,
+            crate::shapes::LineStyle::dash_dot_default(),
+        )
+        .unwrap();
+        let region = piece(vec![(BooleanOp::Intersect, line)]).region().unwrap();
+        assert_eq!(region, piece(Vec::new()).region().unwrap());
     }
 }

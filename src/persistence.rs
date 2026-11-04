@@ -190,4 +190,41 @@ mod tests {
         }
         fs::remove_file(path).unwrap();
     }
+
+    #[test]
+    fn lines_round_trip_and_default_to_solid() {
+        use crate::shapes::{Line, LineStyle};
+        let path = temp_path("line");
+        let mut piece = flap();
+        piece.children.push(ChildShape {
+            id: 1,
+            op: BooleanOp::Subtract,
+            shape: Shape::Line(Line {
+                start: Point::new(25.0, -10.0),
+                end: Point::new(25.0, 80.0),
+                style: LineStyle::Dashed {
+                    dash: 4.0,
+                    gap: 1.5,
+                },
+            }),
+        });
+        let project = Project {
+            pieces: vec![piece],
+            ..Project::default()
+        };
+        save_project(&path, &project).unwrap();
+        assert_eq!(load_project(&path).unwrap(), project);
+
+        let text = fs::read_to_string(&path).unwrap();
+        let start = text.find("\"style\"").unwrap();
+        let end = start + text[start..].find('}').unwrap() + 1;
+        let without_style = format!("{}\"unused\": 0{}", &text[..start], &text[end..]);
+        fs::write(&path, without_style).unwrap();
+        let loaded = load_project(&path).unwrap();
+        let Shape::Line(line) = &loaded.pieces[0].children[0].shape else {
+            panic!("not a line");
+        };
+        assert_eq!(line.style, LineStyle::Solid);
+        fs::remove_file(path).unwrap();
+    }
 }

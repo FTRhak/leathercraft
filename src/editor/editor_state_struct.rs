@@ -10,6 +10,7 @@ use leathercraft::events::ProjectChange;
 use leathercraft::i18n::{Language, Message};
 use leathercraft::material::Material;
 use leathercraft::model::{BooleanOp, PatternPiece, Point, Project};
+use leathercraft::shapes::LineStyle;
 use std::borrow::Cow;
 
 #[derive(Resource)]
@@ -19,6 +20,8 @@ pub struct EditorState {
     pub(super) shape_draft: Option<ShapeDraft>,
     /// The number of sides the Regular polygon tool draws.
     pub(super) polygon_sides: usize,
+    /// The style the Centerline tool draws with.
+    pub(super) line_style: LineStyle,
     /// With an operation, the drawing tools add a child with it to the selected piece instead
     /// of adding a piece.
     pub(super) op_mode: Option<BooleanOp>,
@@ -64,6 +67,7 @@ impl Default for EditorState {
             draft: Vec::new(),
             shape_draft: None,
             polygon_sides: 6,
+            line_style: LineStyle::dash_dot_default(),
             op_mode: None,
             align: AlignOptions::default(),
             selected: None,

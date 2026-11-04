@@ -1,4 +1,4 @@
-use super::{ExportError, number, validate_export};
+use super::{ExportError, centerlines, number, validate_export};
 use crate::boolean::Region;
 use crate::model::Project;
 
@@ -17,6 +17,18 @@ pub fn to_dxf(project: &Project) -> Result<String, ExportError> {
                 "10\n{}\n20\n{}\n",
                 number(point.x),
                 number(point.y)
+            ));
+        }
+    }
+    // Each dash is its own LINE, so the pattern survives without a linetype table.
+    for (_, _, line) in centerlines(project) {
+        for (a, b) in line.dashes() {
+            dxf.push_str(&format!(
+                "0\nLINE\n8\nCENTERLINE\n10\n{}\n20\n{}\n11\n{}\n21\n{}\n",
+                number(a.x),
+                number(a.y),
+                number(b.x),
+                number(b.y)
             ));
         }
     }

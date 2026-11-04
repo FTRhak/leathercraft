@@ -1,10 +1,12 @@
 mod corners;
 mod ellipse;
+mod line;
 mod polygon;
 mod rectangle;
 mod regular_polygon;
 
 pub use ellipse::{CIRCLE_SEGMENTS, Ellipse};
+pub use line::{DOT_MM, Line, LineStyle, MAX_DASHES_PER_LINE, MIN_DASH_MM};
 pub use polygon::Polygon;
 pub use rectangle::Rectangle;
 pub use regular_polygon::{REGULAR_POLYGON_SIDES, RegularPolygon};
@@ -12,8 +14,9 @@ pub use regular_polygon::{REGULAR_POLYGON_SIDES, RegularPolygon};
 use crate::model::{Bounds, Point, ring_bounds, ring_contains};
 use serde::{Deserialize, Serialize};
 
-/// A closed outline. Primitives keep their parameters, so an ellipse stays editable as one;
-/// `ring` turns any shape into the polygon that geometry works with.
+/// A closed outline, or an open line that only marks a piece. Primitives keep their parameters,
+/// so an ellipse stays editable as one; `ring` turns any closed shape into the polygon that
+/// geometry works with.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Shape {
@@ -21,6 +24,8 @@ pub enum Shape {
     Rectangle(Rectangle),
     Ellipse(Ellipse),
     RegularPolygon(RegularPolygon),
+    /// Open, so it is never a base and takes no part in a piece's outline.
+    Line(Line),
 }
 
 /// Turns a point in a primitive's own axes into world coordinates.
@@ -61,9 +66,29 @@ impl Shape {
         RegularPolygon::from_center(center, vertex, sides, snap).map(Self::RegularPolygon)
     }
 
-    /// The closed polygon of the shape, without a repeated closing point.
+    /// See `Line::from_ends`.
+    pub fn line_from_ends(start: Point, end: Point, snap: bool, style: LineStyle) -> Option<Self> {
+        Line::from_ends(start, end, snap, style).map(Self::Line)
+    }
+
+    /// Whether the shape is an open line rather than an outline.
+    pub fn is_open(&self) -> bool {
+        matches!(self, Self::Line(_))
+    }
+
+    /// The distance from the point to an open shape, or `None` for an outline.
+    pub fn distance_to(&self, point: Point) -> Option<f64> {
+        match self {
+            Self::Line(line) => Some(line.distance_to(point)),
+            _ => None,
+        }
+    }
+
+    /// The closed polygon of the shape, without a repeated closing point. For an open line it
+    /// is just its two ends.
     pub fn ring(&self) -> Vec<Point> {
         match self {
+            Self::Line(line) => vec![line.start, line.end],
             Self::Polygon(polygon) => polygon.ring(),
             Self::Rectangle(rectangle) => rectangle.ring(),
             Self::Ellipse(ellipse) => ellipse.ring(),
@@ -75,7 +100,7 @@ impl Shape {
     /// keeps its corners and their radii, and an ellipse becomes the points of its ring.
     pub fn to_polygon(&self) -> Self {
         match self {
-            Self::Polygon(_) => self.clone(),
+            Self::Polygon(_) | Self::Line(_) => self.clone(),
             Self::Rectangle(Rectangle { radii, .. })
             | Self::RegularPolygon(RegularPolygon { radii, .. }) => Self::Polygon(Polygon {
                 points: self.corners().unwrap_or_default(),
@@ -85,13 +110,14 @@ impl Shape {
         }
     }
 
-    /// The vertices before their corners are rounded, or `None` for an ellipse, which has none.
+    /// The vertices before their corners are rounded, or `None` for an ellipse or a line, which
+    /// have none.
     pub fn corners(&self) -> Option<Vec<Point>> {
         match self {
             Self::Polygon(polygon) => Some(polygon.points.clone()),
             Self::Rectangle(rectangle) => Some(rectangle.corners()),
             Self::RegularPolygon(polygon) => Some(polygon.corners()),
-            Self::Ellipse(_) => None,
+            Self::Ellipse(_) | Self::Line(_) => None,
         }
     }
 
@@ -100,7 +126,7 @@ impl Shape {
             Self::Polygon(Polygon { radii, .. })
             | Self::Rectangle(Rectangle { radii, .. })
             | Self::RegularPolygon(RegularPolygon { radii, .. }) => radii,
-            Self::Ellipse(_) => &[],
+            Self::Ellipse(_) | Self::Line(_) => &[],
         }
     }
 
@@ -125,7 +151,7 @@ impl Shape {
             | Self::RegularPolygon(RegularPolygon { radii, .. }) => {
                 corners::set_radius(radii, index, count, radius);
             }
-            Self::Ellipse(_) => return None,
+            Self::Ellipse(_) | Self::Line(_) => return None,
         }
         Some(shape)
     }
@@ -143,6 +169,7 @@ impl Shape {
             Self::Rectangle(Rectangle { center, .. })
             | Self::Ellipse(Ellipse { center, .. })
             | Self::RegularPolygon(RegularPolygon { center, .. }) => *center,
+            Self::Line(line) => line.midpoint(),
             Self::Polygon(_) => self.bounds().map_or_else(Point::default, |bounds| {
                 Point::new(
                     (bounds.min_x + bounds.max_x) * 0.5,
@@ -155,6 +182,7 @@ impl Shape {
     pub fn translate(&mut self, dx: f64, dy: f64) {
         match self {
             Self::Polygon(polygon) => polygon.translate(dx, dy),
+            Self::Line(line) => line.translate(dx, dy),
             Self::Rectangle(Rectangle { center, .. })
             | Self::Ellipse(Ellipse { center, .. })
             | Self::RegularPolygon(RegularPolygon { center, .. }) => {
@@ -165,13 +193,14 @@ impl Shape {
     }
 
     /// Points that can be dragged to reshape the shape: the vertices of a polygon, the corners
-    /// of a rectangle or a regular polygon, and the ends of an ellipse's axes.
+    /// of a rectangle or a regular polygon, the ends of an ellipse's axes and the ends of a line.
     pub fn handles(&self) -> Vec<Point> {
         match self {
             Self::Polygon(polygon) => polygon.points.clone(),
             Self::Rectangle(rectangle) => rectangle.corners(),
             Self::RegularPolygon(polygon) => polygon.corners(),
             Self::Ellipse(ellipse) => ellipse.handles(),
+            Self::Line(line) => line.handles(),
         }
     }
 
@@ -186,16 +215,19 @@ impl Shape {
             Self::RegularPolygon(polygon) => {
                 Self::RegularPolygon(polygon.with_handle_at(handle, to))
             }
+            Self::Line(line) => Self::Line(line.with_handle_at(handle, to)),
         }
     }
 
-    /// Whether the parameters describe a shape with an area. Polygons are checked by their ring.
+    /// Whether the parameters describe a shape with an area, or a line with a length and a valid
+    /// style. Polygons are checked by their ring.
     pub(crate) fn has_valid_size(&self) -> bool {
         match self {
             Self::Polygon(polygon) => polygon.has_valid_size(),
             Self::Rectangle(rectangle) => rectangle.has_valid_size(),
             Self::Ellipse(ellipse) => ellipse.has_valid_size(),
             Self::RegularPolygon(polygon) => polygon.has_valid_size(),
+            Self::Line(line) => line.has_valid_size(),
         }
     }
 }
