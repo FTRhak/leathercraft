@@ -196,10 +196,51 @@ pub struct ToolSettings<'a> {
     pub stitch: &'a mut StitchSettings,
     /// Whether a piece is selected; the tools that need one are disabled otherwise.
     pub piece_selected: bool,
+    /// Set when a zoom button is clicked.
+    pub zoom_request: &'a mut Option<ZoomRequest>,
+}
+
+/// What the canvas zooms to on its next frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ZoomRequest {
+    /// Every piece.
+    All,
+    /// The selected children, or else the selected pieces.
+    Selection,
+}
+
+/// Paints corner brackets around a small filled square, the icon of Zoom to selection.
+fn paint_fit_selection_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+    paint_fit_icon(painter, rect, stroke);
+    let square =
+        egui::Rect::from_center_size(rect.center(), egui::Vec2::splat(rect.width() * 0.18));
+    painter.rect_filled(square, 1.0, stroke.color);
+}
+
+/// Paints four corner brackets, the icon of Zoom to fit.
+fn paint_fit_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+    let frame = rect.shrink(rect.width() * 0.25);
+    let arm = frame.width() * 0.35;
+    let stroke = egui::Stroke::new(stroke.width.max(1.5), stroke.color);
+    for (corner, dx, dy) in [
+        (frame.left_top(), arm, arm),
+        (frame.right_top(), -arm, arm),
+        (frame.left_bottom(), arm, -arm),
+        (frame.right_bottom(), -arm, -arm),
+    ] {
+        painter.line(
+            vec![
+                corner + egui::vec2(dx, 0.0),
+                corner,
+                corner + egui::vec2(0.0, dy),
+            ],
+            stroke,
+        );
+    }
 }
 
 /// The tool bar across the top of the window: tools, then the new-piece and operation modes,
-/// then the settings of the current tool, all on one line that scrolls when the window is narrow.
+/// then Zoom to fit and Zoom to selection and the settings of the current tool, all on one line that scrolls when the window is narrow.
 pub fn show_toolbar(ui: &mut egui::Ui, settings: ToolSettings, units: Units, language: Language) {
     let ToolSettings {
         tool,
@@ -208,6 +249,7 @@ pub fn show_toolbar(ui: &mut egui::Ui, settings: ToolSettings, units: Units, lan
         line_style,
         stitch,
         piece_selected,
+        zoom_request,
     } = settings;
     if tool.needs_piece() && !piece_selected {
         *tool = Tool::Select;
@@ -238,6 +280,29 @@ pub fn show_toolbar(ui: &mut egui::Ui, settings: ToolSettings, units: Units, lan
             ui.add_enabled_ui(piece_selected, |ui| {
                 for option in Tool::ALL.into_iter().filter(|option| option.needs_piece()) {
                     tool_button(ui, option);
+                }
+            });
+            ui.separator();
+            let fit = icon_button(
+                ui,
+                ICON_BUTTON_SIZE,
+                false,
+                language.label(Label::ZoomToFit),
+                paint_fit_icon,
+            );
+            if fit.clicked() {
+                *zoom_request = Some(ZoomRequest::All);
+            }
+            ui.add_enabled_ui(piece_selected, |ui| {
+                let fit_selection = icon_button(
+                    ui,
+                    ICON_BUTTON_SIZE,
+                    false,
+                    language.label(Label::ZoomToSelection),
+                    paint_fit_selection_icon,
+                );
+                if fit_selection.clicked() {
+                    *zoom_request = Some(ZoomRequest::Selection);
                 }
             });
             match *tool {

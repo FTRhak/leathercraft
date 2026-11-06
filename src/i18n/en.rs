@@ -107,6 +107,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::SnapAltHint => "Hold Alt to turn snapping off for a moment",
         Label::ToggleSnap => "Snapping on / off",
         Label::ZoomToFit => "Zoom to fit",
+        Label::ZoomToSelection => "Zoom to selection",
         Label::DisplayUnits => "Display units",
         Label::Pieces => "Pieces",
         Label::DeletePiece => "Delete piece",

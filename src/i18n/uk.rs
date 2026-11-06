@@ -109,6 +109,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::SnapAltHint => "Утримуйте Alt, щоб тимчасово вимкнути прив’язку",
         Label::ToggleSnap => "Увімкнути / вимкнути прив’язку",
         Label::ZoomToFit => "Показати все",
+        Label::ZoomToSelection => "Показати виділене",
         Label::DisplayUnits => "Одиниці виміру",
         Label::Pieces => "Деталі",
         Label::DeletePiece => "Видалити деталь",

@@ -3,7 +3,7 @@ use super::drag_state_struct::ShapeRef;
 use super::{DragState, ShapeDraft};
 use crate::panels::align::AlignOptions;
 use crate::panels::settings::SettingsDraft;
-use crate::panels::tools::{StitchSettings, Tool};
+use crate::panels::tools::{StitchSettings, Tool, ZoomRequest};
 use bevy::prelude::*;
 use bevy_egui::egui;
 use leathercraft::events::ProjectChange;
@@ -50,7 +50,8 @@ pub struct EditorState {
     pub(super) drag: Option<DragState>,
     pub(super) pan: egui::Vec2,
     pub(super) zoom: f32,
-    pub(super) fit_requested: bool,
+    /// A zoom asked for by the tool bar, or by opening a project; done on the next canvas frame.
+    pub(super) zoom_request: Option<ZoomRequest>,
     /// The snapping settings of the Snap panel.
     pub(super) snap: SnapSettings,
     /// The settings last written to `settings.json`, so that only a change is saved.
@@ -93,7 +94,7 @@ impl Default for EditorState {
             drag: None,
             pan: egui::Vec2::ZERO,
             zoom: 2.0,
-            fit_requested: false,
+            zoom_request: None,
             snap: SnapSettings::default(),
             snap_saved: SnapSettings::default(),
             snap_suspended: false,
@@ -169,7 +170,7 @@ impl EditorState {
         self.selected_part = None;
         self.drag = None;
         self.rename_buffer = None;
-        self.fit_requested = true;
+        self.zoom_request = Some(ZoomRequest::All);
     }
 
     pub fn on_project_change(&mut self, change: ProjectChange, project: &Project) {

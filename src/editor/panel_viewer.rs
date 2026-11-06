@@ -113,7 +113,6 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                 let view = if editing {
                     properties::ViewControls::Editor(properties::EditorView {
                         hint: state.tool.hint(),
-                        fit_requested: &mut state.fit_requested,
                     })
                 } else {
                     properties::ViewControls::Preview(self.settings)

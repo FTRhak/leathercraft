@@ -88,6 +88,7 @@ pub fn editor_ui(
                 line_style: &mut state.line_style,
                 stitch: &mut state.stitch,
                 piece_selected: state.selected.is_some(),
+                zoom_request: &mut state.zoom_request,
             };
             tools::show_toolbar(ui, settings, project.units, state.language);
         });

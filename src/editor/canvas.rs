@@ -3,13 +3,13 @@ use super::drag_state_struct::ShapeRef;
 use super::grid::draw_grid;
 use super::{EditorState, ShapeDraft, ShapePart, format_length, send};
 use crate::document::ProjectMessage;
-use crate::panels::tools::Tool;
+use crate::panels::tools::{Tool, ZoomRequest};
 use bevy::prelude::*;
 use bevy_egui::egui;
 use earcutr::earcut;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Language, Message};
-use leathercraft::model::{BooleanOp, PatternPiece, Point, Project, Units};
+use leathercraft::model::{BooleanOp, Bounds, PatternPiece, Point, Project, Units};
 use leathercraft::shapes::{
     Ellipse, HoleKind, Line, Polygon, Rectangle, RegularPolygon, Shape, StitchLine,
 };
@@ -68,9 +68,15 @@ pub(super) fn canvas(
         ui.allocate_painter(ui.available_size(), egui::Sense::click_and_drag());
     let rect = response.rect;
 
-    if state.fit_requested {
-        state.fit_requested = false;
-        fit_view(rect, project, state);
+    if let Some(request) = state.zoom_request.take() {
+        let bounds = match request {
+            ZoomRequest::All => project.bounds(),
+            ZoomRequest::Selection => selection_bounds(project, state),
+        };
+        // Nothing selected leaves the view as it is; an empty project recenters it.
+        if bounds.is_some() || request == ZoomRequest::All {
+            fit_view(rect, bounds, state);
+        }
     }
     if response.dragged_by(egui::PointerButton::Secondary)
         || response.dragged_by(egui::PointerButton::Middle)
@@ -204,8 +210,30 @@ fn draw_snap_feedback(painter: &egui::Painter, view: Viewport, state: &EditorSta
     }
 }
 
-fn fit_view(rect: egui::Rect, project: &Project, state: &mut EditorState) {
-    let Some(bounds) = project.bounds() else {
+/// The box around the selected children, or else around every selected piece.
+fn selection_bounds(project: &Project, state: &EditorState) -> Option<Bounds> {
+    let children = state.selected_children();
+    if let Some(piece) = state
+        .selected
+        .and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
+        && !children.is_empty()
+    {
+        return children
+            .iter()
+            .filter_map(|id| piece.child(*id))
+            .filter_map(|child| child.shape.bounds())
+            .reduce(Bounds::union);
+    }
+    project
+        .pieces
+        .iter()
+        .filter(|piece| state.is_selected(piece.id))
+        .filter_map(PatternPiece::bounds)
+        .reduce(Bounds::union)
+}
+
+fn fit_view(rect: egui::Rect, bounds: Option<Bounds>, state: &mut EditorState) {
+    let Some(bounds) = bounds else {
         state.pan = egui::Vec2::ZERO;
         return;
     };

@@ -22,15 +22,14 @@ use leathercraft::i18n::{Label, Language};
 use leathercraft::model::{PatternPiece, Project, Units};
 
 /// The canvas options of the 2D editor.
-pub struct EditorView<'a> {
+pub struct EditorView {
     /// What the current tool does.
     pub hint: Label,
-    pub fit_requested: &'a mut bool,
 }
 
 /// The controls at the top of the panel, which depend on the view mode.
 pub enum ViewControls<'a> {
-    Editor(EditorView<'a>),
+    Editor(EditorView),
     Preview(&'a mut PreviewSettings),
 }
 
@@ -47,9 +46,6 @@ pub struct Selection<'a> {
 fn view_controls(ui: &mut egui::Ui, view: EditorView, language: Language) {
     ui.small(language.label(view.hint));
     ui.small(language.label(Label::NavigationHint));
-    if ui.button(language.label(Label::ZoomToFit)).clicked() {
-        *view.fit_requested = true;
-    }
 }
 
 fn units_control(ui: &mut egui::Ui, project: &Project, language: Language) -> Option<ProjectEvent> {

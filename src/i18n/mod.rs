@@ -158,6 +158,7 @@ pub enum Label {
     /// The hotkey action that turns snapping on or off.
     ToggleSnap,
     ZoomToFit,
+    ZoomToSelection,
     DisplayUnits,
     Pieces,
     DeletePiece,
