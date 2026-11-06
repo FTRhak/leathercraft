@@ -42,18 +42,18 @@ Constants are in `icons::glyph`:
 | `LOCK` | `U+E115` | Locked piece (Layout panel) |
 | `UNLOCK` | `U+E116` | Unlocked piece (Layout panel) |
 | `HISTORY` | `U+E121` | History panel tab title, via `icon_text` |
-| `SELECT` | `U+E130` | Select tool (Tools panel) |
-| `DRAW` | `U+E132` | Draw tool (Tools panel) |
-| `RECTANGLE` | `U+E133` | Rectangle tool (Tools panel) |
-| `ELLIPSE` | `U+E134` | Ellipse tool (Tools panel) |
-| `EDGE` | `U+E135` | Edge tool (Tools panel) |
-| `STITCH_HOLES` | `U+E136` | Stitch holes tool (Tools panel) |
-| `CENTERLINE` | `U+E137` | Centerline tool (Tools panel) |
-| `REGULAR_POLYGON` | `U+E138` | Regular polygon tool (Tools panel) |
-| `NEW_PIECE` | `U+E13C` | New piece mode (Tools panel) |
-| `SUBTRACT` | `U+E13D` | Subtract operation (Tools panel) |
-| `UNION` | `U+E13E` | Union operation (Tools panel) |
-| `INTERSECT` | `U+E13F` | Intersect operation (Tools panel) |
+| `SELECT` | `U+E130` | Select tool (tool bar) |
+| `DRAW` | `U+E132` | Draw tool (tool bar) |
+| `RECTANGLE` | `U+E133` | Rectangle tool (tool bar) |
+| `ELLIPSE` | `U+E134` | Ellipse tool (tool bar) |
+| `EDGE` | `U+E135` | Edge tool (tool bar) |
+| `STITCH_HOLES` | `U+E136` | Stitch holes tool (tool bar) |
+| `CENTERLINE` | `U+E137` | Centerline tool (tool bar) |
+| `REGULAR_POLYGON` | `U+E138` | Regular polygon tool (tool bar) |
+| `NEW_PIECE` | `U+E13C` | New piece mode (tool bar) |
+| `SUBTRACT` | `U+E13D` | Subtract operation (tool bar) |
+| `UNION` | `U+E13E` | Union operation (tool bar) |
+| `INTERSECT` | `U+E13F` | Intersect operation (tool bar) |
 | `ALIGN_LEFT` | `U+E140` | Align left edges (Align panel) |
 | `ALIGN_CENTER_X` | `U+E141` | Align horizontal centers (Align panel) |
 | `ALIGN_RIGHT` | `U+E142` | Align right edges (Align panel) |
@@ -149,7 +149,7 @@ let response = icon_button(ui, ICON_BUTTON_SIZE, piece.locked, name, |painter, r
 
 ### A group of exclusive choices
 
-One button per option, `selected` when it is the current one, as in the Tools panel:
+One button per option, `selected` when it is the current one, as in the tool bar:
 
 ```rust
 for option in Tool::ALL {
@@ -173,7 +173,7 @@ Each panel defines its own constants rather than sharing them:
 
 | Panel | `ICON_BUTTON_SIZE` | `ICON_MARGIN` | Context |
 |---|---:|---:|---|
-| Tools | 32 | 8 | Main tool palette |
+| Tool bar | 32 | 8 | Main tool bar across the window |
 | Layout | 20 | 4 | Inline in tree rows, matching text height |
 
 `paint` receives the whole button rect. Painted icons shrink it themselves, typically `rect.shrink(ICON_MARGIN)` (Layout adds 1 more for its small triangles). Glyphs don't need a margin: the 75% font size leaves one.

@@ -124,7 +124,7 @@ impl Default for StitchSettings {
     }
 }
 
-/// What the Tools panel edits: the tool and the settings of the tools that have any.
+/// What the tool bar edits: the tool and the settings of the tools that have any.
 pub struct ToolSettings<'a> {
     pub tool: &'a mut Tool,
     pub polygon_sides: &'a mut usize,
@@ -135,7 +135,9 @@ pub struct ToolSettings<'a> {
     pub stitch: &'a mut StitchSettings,
 }
 
-pub fn show_panel(ui: &mut egui::Ui, settings: ToolSettings, units: Units, language: Language) {
+/// The tool bar across the top of the window: tools, then the new-piece and operation modes,
+/// then the settings of the current tool, all on one line that scrolls when the window is narrow.
+pub fn show_toolbar(ui: &mut egui::Ui, settings: ToolSettings, units: Units, language: Language) {
     let ToolSettings {
         tool,
         polygon_sides,
@@ -143,61 +145,67 @@ pub fn show_panel(ui: &mut egui::Ui, settings: ToolSettings, units: Units, langu
         line_style,
         stitch,
     } = settings;
-    ui.horizontal_wrapped(|ui| {
-        for option in Tool::ALL {
-            let name = language.label(option.label());
-            let response = icon_button(
-                ui,
-                ICON_BUTTON_SIZE,
-                *tool == option,
-                name,
-                |painter, rect, stroke| option.paint_icon(painter, rect, stroke),
-            );
-            if response.clicked() {
-                *tool = option;
-            }
-        }
-        ui.separator();
-        let response = icon_button(
-            ui,
-            ICON_BUTTON_SIZE,
-            op_mode.is_none(),
-            language.label(Label::NewPieceMode),
-            |painter, rect, stroke| paint_glyph(painter, rect, stroke, glyph::NEW_PIECE),
-        );
-        if response.clicked() {
-            *op_mode = None;
-        }
-        for op in BooleanOp::ALL {
-            let response = icon_button(
-                ui,
-                ICON_BUTTON_SIZE,
-                *op_mode == Some(op),
-                language.label(Label::OperationHint(op)),
-                |painter, rect, stroke| paint_glyph(painter, rect, stroke, operation_glyph(op)),
-            );
-            if response.clicked() {
-                *op_mode = Some(op);
-            }
-        }
-    });
-    if *tool == Tool::RegularPolygon {
+    egui::ScrollArea::horizontal().show(ui, |ui| {
         ui.horizontal(|ui| {
-            ui.label(language.label(Label::Sides));
-            ui.add(egui::DragValue::new(polygon_sides).range(REGULAR_POLYGON_SIDES));
+            for option in Tool::ALL {
+                let name = language.label(option.label());
+                let response = icon_button(
+                    ui,
+                    ICON_BUTTON_SIZE,
+                    *tool == option,
+                    name,
+                    |painter, rect, stroke| option.paint_icon(painter, rect, stroke),
+                );
+                if response.clicked() {
+                    *tool = option;
+                }
+            }
+            ui.separator();
+            let response = icon_button(
+                ui,
+                ICON_BUTTON_SIZE,
+                op_mode.is_none(),
+                language.label(Label::NewPieceMode),
+                |painter, rect, stroke| paint_glyph(painter, rect, stroke, glyph::NEW_PIECE),
+            );
+            if response.clicked() {
+                *op_mode = None;
+            }
+            for op in BooleanOp::ALL {
+                let response = icon_button(
+                    ui,
+                    ICON_BUTTON_SIZE,
+                    *op_mode == Some(op),
+                    language.label(Label::OperationHint(op)),
+                    |painter, rect, stroke| paint_glyph(painter, rect, stroke, operation_glyph(op)),
+                );
+                if response.clicked() {
+                    *op_mode = Some(op);
+                }
+            }
+            match *tool {
+                Tool::RegularPolygon => {
+                    ui.separator();
+                    ui.label(language.label(Label::Sides));
+                    ui.add(egui::DragValue::new(polygon_sides).range(REGULAR_POLYGON_SIDES));
+                }
+                Tool::Centerline => {
+                    ui.separator();
+                    line_style_fields(ui, line_style, units, language);
+                }
+                Tool::StitchHoles => {
+                    ui.separator();
+                    stitch_fields(
+                        ui,
+                        &mut stitch.hole,
+                        &mut stitch.pitch,
+                        &mut stitch.size,
+                        units,
+                        language,
+                    );
+                }
+                _ => {}
+            }
         });
-    }
-    if *tool == Tool::Centerline {
-        line_style_fields(ui, line_style, units, language);
-    }
-    if *tool == Tool::StitchHoles {
-        stitch_fields(
-            ui,
-            &mut stitch.hole,
-            &mut stitch.pitch,
-            &mut stitch.size,
-            units,
-            language,
-        );
-    }
+    });
 }

@@ -25,7 +25,6 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::UnsavedChanges => "Незбережені зміни",
         Label::DiscardChanges => "Відкинути незбережені зміни в цьому проєкті?",
         Label::ProjectFileType => "Проєкт Leathercraft",
-        Label::Tools => "Інструменти",
         Label::Select => "Вибір",
         Label::Draw => "Малювання",
         Label::Rectangle => "Прямокутник",

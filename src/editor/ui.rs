@@ -6,6 +6,7 @@ use crate::document::{ActiveProject, HistoryMessage, ProjectMessage};
 use crate::panels::dock::{PanelDock, PanelTab};
 use crate::panels::material::{self, DialogResult};
 use crate::panels::settings::{SettingsDraft, SettingsResult, settings_dialog};
+use crate::panels::tools;
 use crate::preview::PreviewSettings;
 use crate::settings::{self, Action, Hotkeys, Preferences};
 use bevy::prelude::*;
@@ -74,6 +75,20 @@ pub fn editor_ui(
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 language_control(ui, state, dock);
             });
+        });
+    });
+
+    // Disabled rather than hidden in preview mode, so that the layout doesn't jump.
+    egui::TopBottomPanel::top("tool_bar").show(ctx, |ui| {
+        ui.add_enabled_ui(*view_mode == ViewMode::Editor2d, |ui| {
+            let settings = tools::ToolSettings {
+                tool: &mut state.tool,
+                polygon_sides: &mut state.polygon_sides,
+                op_mode: &mut state.op_mode,
+                line_style: &mut state.line_style,
+                stitch: &mut state.stitch,
+            };
+            tools::show_toolbar(ui, settings, project.units, state.language);
         });
     });
 

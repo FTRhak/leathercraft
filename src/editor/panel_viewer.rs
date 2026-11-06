@@ -2,7 +2,7 @@ use super::{EditorState, ViewMode, canvas, send};
 use crate::document::{HistoryMessage, ProjectMessage};
 use crate::icons::{glyph, icon_text};
 use crate::panels::dock::PanelTab;
-use crate::panels::{align, history, layout, material, properties, snap, tools};
+use crate::panels::{align, history, layout, material, properties, snap};
 use crate::preview::PreviewSettings;
 use bevy::prelude::*;
 use bevy_egui::egui;
@@ -42,9 +42,12 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
             PanelTab::Layout => {
                 icon_text(&self.style, egui::TextStyle::Button, glyph::LAYOUT, text)
             }
-            PanelTab::Properties => {
-                icon_text(&self.style, egui::TextStyle::Button, glyph::PROPERTIES, text)
-            }
+            PanelTab::Properties => icon_text(
+                &self.style,
+                egui::TextStyle::Button,
+                glyph::PROPERTIES,
+                text,
+            ),
             _ => text.into(),
         }
     }
@@ -64,19 +67,6 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                 }
             }
             // Disabled rather than removed in preview mode, so that the layout doesn't jump.
-            PanelTab::Tools => {
-                ui.add_enabled_ui(editing, |ui| {
-                    let state = &mut *self.state;
-                    let settings = tools::ToolSettings {
-                        tool: &mut state.tool,
-                        polygon_sides: &mut state.polygon_sides,
-                        op_mode: &mut state.op_mode,
-                        line_style: &mut state.line_style,
-                        stitch: &mut state.stitch,
-                    };
-                    tools::show_panel(ui, settings, self.project.units, language);
-                });
-            }
             PanelTab::Align => {
                 ui.add_enabled_ui(editing, |ui| {
                     let state = &mut *self.state;
@@ -195,9 +185,7 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
 
     fn scroll_bars(&self, tab: &PanelTab) -> [bool; 2] {
         match tab {
-            PanelTab::Tools | PanelTab::Properties | PanelTab::Align | PanelTab::Snap => {
-                [false, true]
-            }
+            PanelTab::Properties | PanelTab::Align | PanelTab::Snap => [false, true],
             // The canvas pans itself, and these two have their own scroll areas.
             PanelTab::Canvas | PanelTab::Layout | PanelTab::Material | PanelTab::History => {
                 [false, false]

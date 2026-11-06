@@ -21,7 +21,7 @@ A centerline is an open straight line kept as a child of a piece. It marks the p
 |---|---|
 | Add a centerline | Select a piece, pick **Centerline** (C), and drag from one end to the other |
 | Keep it at an angle step | Hold Shift while dragging: 15° steps |
-| Choose its style beforehand | Under the Tools buttons while the tool is active: **Line type**, **Dash**, **Gap** |
+| Choose its style beforehand | In the tool bar, after the tool buttons, while the tool is active: **Line type**, **Dash**, **Gap** |
 | Change it afterwards | Select it, then in Properties: start and end X/Y, **Length**, **Angle**, line type, dash and gap |
 | Move or reshape it | Drag the line, or one of its two end handles, with Select |
 | Align it | Select it with other children (Shift+click) and use the Align panel, also with **Align to parent** |

@@ -10,7 +10,6 @@ const REOPENED_PANEL_SIZE: egui::Vec2 = egui::vec2(280.0, 380.0);
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PanelTab {
     Canvas,
-    Tools,
     Properties,
     Layout,
     Material,
@@ -21,8 +20,7 @@ pub enum PanelTab {
 
 impl PanelTab {
     /// The panels the Window menu lists; the canvas always stays open.
-    pub const CLOSEABLE: [Self; 7] = [
-        Self::Tools,
+    pub const CLOSEABLE: [Self; 6] = [
         Self::Properties,
         Self::Align,
         Self::Snap,
@@ -34,7 +32,6 @@ impl PanelTab {
     pub fn label(self) -> Label {
         match self {
             Self::Canvas => Label::Canvas,
-            Self::Tools => Label::Tools,
             Self::Properties => Label::Properties,
             Self::Layout => Label::Layout,
             Self::Material => Label::Material,
@@ -167,10 +164,9 @@ fn default_state() -> DockState<PanelTab> {
         vec![PanelTab::Layout, PanelTab::History],
     );
     surface.split_below(right, 0.35, vec![PanelTab::Material]);
-    let [_, left] = surface.split_left(canvas, 0.2, vec![PanelTab::Tools]);
-    surface.split_below(
-        left,
-        0.3,
+    surface.split_left(
+        canvas,
+        0.2,
         vec![PanelTab::Properties, PanelTab::Align, PanelTab::Snap],
     );
     state

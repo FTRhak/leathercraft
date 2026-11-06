@@ -86,7 +86,6 @@ pub enum Label {
     UnsavedChanges,
     DiscardChanges,
     ProjectFileType,
-    Tools,
     Select,
     Draw,
     Rectangle,

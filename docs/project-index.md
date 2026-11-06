@@ -33,12 +33,12 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
 | `src/editor/drag.rs` | 309 | 2,100 | bin | `begin_drag`, `begin_handle_drag`, `snap_setup` (what a drag snaps to), `update_drag` (snapped offset or handle), `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
 | `src/editor/grid.rs` | 72 | 600 | bin | `draw_grid`: canvas grid and axes, grid steps; `draw_snap_dots`: the snap grid |
-| `src/editor/ui.rs` | 401 | 3,700 | bin | `editor_ui`, `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
+| `src/editor/ui.rs` | 401 | 3,700 | bin | `editor_ui` (menu bar, tool bar, status bar, dock area), `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
 | `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History, Layout and Properties tab titles have icons; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/icons/mod.rs` | 113 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
-| `src/panels/dock/mod.rs` | 185 | 1,550 | bin | `PanelTab` (including `Snap`), `PanelDock`: panel arrangement, default layout, saving and restoring it |
-| `src/panels/tools/mod.rs` | 203 | 1,600 | bin | `Tool` (with `Centerline` and `StitchHoles`), `StitchSettings`, `ToolSettings`, tool, new-piece and operation icons from font glyphs, Tools panel with the regular polygon's sides field, the style of new centerlines and the holes of new stitch lines |
+| `src/panels/dock/mod.rs` | 185 | 1,550 | bin | `PanelTab` (including `Snap`; the tools are a fixed tool bar, not a tab), `PanelDock`: panel arrangement, default layout, saving and restoring it |
+| `src/panels/tools/mod.rs` | 210 | 1,650 | bin | `Tool` (with `Centerline` and `StitchHoles`), `StitchSettings`, `ToolSettings`, tool, new-piece and operation icons from font glyphs; `show_toolbar`: the full-width tool bar under the menu bar (drawn by `editor_ui`, not a dock tab), one scrolling line of tool and mode buttons followed by the current tool's settings (regular polygon sides, centerline style, stitch holes) |
 | `src/panels/layout/mod.rs` | 273 | 2,800 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls (none for a centerline); Shift+click toggles a piece or child |
 | `src/panels/align/mod.rs` | 248 | 2,000 | bin | Align panel: `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), align, distribute and spacing icons from font glyphs (`arrange_glyph`), `show_panel` |
 | `src/panels/snap/mod.rs` | 43 | 400 | bin | Snap panel: `show_panel` edits `SnapSettings` (on/off, grid and step, vertices, smart guides, distance in px) |
@@ -47,7 +47,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/settings/mod.rs` | 95 | 700 | bin | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` with Default material and Hotkeys tabs |
 | `src/panels/settings/material.rs` | 187 | 1,500 | bin | Default material tab: `material_tab`, its own material form with Reset to defaults |
 | `src/panels/settings/hotkeys.rs` | 190 | 1,600 | bin | Hotkeys tab: `Capture`, `hotkeys_tab`, `shortcut_button`, key capture |
-| `src/panels/properties/mod.rs` | 85 | 700 | bin | Properties panel: `EditorView`, `ViewControls`, `Selection`, view or preview controls (hint, zoom to fit), display units, `show_panel`; re-exports `line_style_fields` and `stitch_fields` for the Tools panel |
+| `src/panels/properties/mod.rs` | 85 | 700 | bin | Properties panel: `EditorView`, `ViewControls`, `Selection`, view or preview controls (hint, zoom to fit), display units, `show_panel`; re-exports `line_style_fields` and `stitch_fields` for the tool bar |
 | `src/panels/properties/piece.rs` | 95 | 800 | bin | Selected piece's name, size or result error, title and fields of its base or child, To Polygon button |
 | `src/panels/properties/shape.rs` | 56 | 500 | bin | `shape_fields`: dispatch to the file of each shape type; the selected vertex's corner radius |
 | `src/panels/properties/fields.rs` | 80 | 600 | bin | Shared inputs: `MIN_SIZE_MM`, `length_field`, `bounded_length_field`, `angle_field`, `center_fields` |
@@ -55,8 +55,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/properties/rectangle.rs` | 25 | 200 | bin | Rectangle's center, width, height and rotation |
 | `src/panels/properties/ellipse.rs` | 24 | 200 | bin | Ellipse's center, radii and rotation |
 | `src/panels/properties/regular_polygon.rs` | 28 | 250 | bin | Regular polygon's center, radius, sides and rotation |
-| `src/panels/properties/line.rs` | 69 | 700 | bin | Centerline's ends, length, angle and style (`line_style_fields`, shared with the Tools panel) |
-| `src/panels/properties/stitch.rs` | 129 | 1,000 | bin | Stitch line's hole type, pitch and size (`stitch_fields`, shared with the Tools panel), and its length, hole count, actual pitch and thread hint (`stitch_details`) |
+| `src/panels/properties/line.rs` | 69 | 700 | bin | Centerline's ends, length, angle and style (`line_style_fields`, shared with the tool bar) |
+| `src/panels/properties/stitch.rs` | 129 | 1,000 | bin | Stitch line's hole type, pitch and size (`stitch_fields`, shared with the tool bar), and its length, hole count, actual pitch and thread hint (`stitch_details`) |
 | `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion from each piece's `punched_region` |
 | `src/model.rs` | 594 | 4,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation (a base must be closed; a line's ends and dash count; a stitch line's points, hole parameters, hole count and overlap in `validate_stitch_line`) |
 | `src/boolean.rs` | 290 | 2,500 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes, skipping open lines; `punched_region`: the region with stitch holes cut, for the preview |

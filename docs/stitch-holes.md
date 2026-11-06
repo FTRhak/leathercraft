@@ -16,7 +16,7 @@ A stitch line is a `ChildShape` whose shape is `Shape::StitchLine`, so ids, sele
 | `src/panels/tools/mod.rs` | `Tool::StitchHoles`, its icon, `StitchSettings` (the kind, pitch and size of new lines) in `ToolSettings` |
 | `src/editor/canvas.rs` | `handle_stitch`, `stitch_target`, `stitch_line`, `finish_stitch`: the click-by-click draft; `commit_shape` (a stitch line is always a child); `draw_stitch_holes`, `draw_stitch_line`, `draw_stitch_draft` |
 | `src/editor/editor_state_struct.rs` | `stitch` (the tool's settings) and `draft_tool`, the tool that owns `draft` |
-| `src/panels/properties/mod.rs` | `stitch_fields` (shared with the Tools panel), `bounded_length_field`, `stitch_details` |
+| `src/panels/properties/mod.rs` | `stitch_fields` (shared with the tool bar), `bounded_length_field`, `stitch_details` |
 | `src/panels/layout/mod.rs` | Named *Stitch holes (N)*, with no operation picker |
 | `src/preview/mod.rs` | `rebuild_preview` builds the mesh from `punched_region` |
 | `src/settings/hotkeys.rs` | `Action::ToolStitchHoles`, H by default |

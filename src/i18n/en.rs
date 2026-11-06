@@ -25,7 +25,6 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::UnsavedChanges => "Unsaved changes",
         Label::DiscardChanges => "Discard the unsaved changes to this project?",
         Label::ProjectFileType => "Leathercraft project",
-        Label::Tools => "Tools",
         Label::Select => "Select",
         Label::Draw => "Draw",
         Label::Rectangle => "Rectangle",

@@ -15,7 +15,7 @@ pub mod glyph {
     pub const DRAW: char = '\u{E132}';
     pub const RECTANGLE: char = '\u{E133}';
     pub const ELLIPSE: char = '\u{E134}';
-    pub const EDGE: char = '\u{E135}';
+    pub const EDGE: char = '\u{E131}';
     pub const STITCH_HOLES: char = '\u{E136}';
     pub const CENTERLINE: char = '\u{E137}';
     pub const REGULAR_POLYGON: char = '\u{E138}';
