@@ -87,6 +87,7 @@ pub fn editor_ui(
                 op_mode: &mut state.op_mode,
                 line_style: &mut state.line_style,
                 stitch: &mut state.stitch,
+                piece_selected: state.selected.is_some(),
             };
             tools::show_toolbar(ui, settings, project.units, state.language);
         });
@@ -298,7 +299,9 @@ fn handle_hotkeys(
         return;
     };
     if let Some(tool) = action.tool() {
-        state.tool = tool;
+        if !tool.needs_piece() || state.selected.is_some() {
+            state.tool = tool;
+        }
         return;
     }
     match action {

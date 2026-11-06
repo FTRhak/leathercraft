@@ -1,4 +1,4 @@
-use crate::icons::{glyph, icon_button, paint_glyph};
+use crate::icons::{glyph, icon_button, icon_text, paint_glyph};
 use crate::panels::properties::{line_style_fields, stitch_fields};
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
@@ -79,6 +79,12 @@ impl Tool {
         }
     }
 
+    /// Whether the tool only adds children to the selected piece, so it is offered
+    /// only while a piece is selected.
+    pub fn needs_piece(self) -> bool {
+        matches!(self, Self::Centerline | Self::StitchHoles)
+    }
+
     fn glyph(self) -> char {
         match self {
             Self::Select => glyph::SELECT,
@@ -95,6 +101,61 @@ impl Tool {
     fn paint_icon(self, painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
         paint_glyph(painter, rect, stroke, self.glyph());
     }
+}
+
+/// What new shapes do: start a piece (`None`) or combine with the selected one.
+const OP_MODES: [Option<BooleanOp>; 4] = [
+    None,
+    Some(BooleanOp::Union),
+    Some(BooleanOp::Subtract),
+    Some(BooleanOp::Intersect),
+];
+
+fn op_mode_glyph(mode: Option<BooleanOp>) -> char {
+    mode.map_or(glyph::NEW_PIECE, operation_glyph)
+}
+
+fn op_mode_label(mode: Option<BooleanOp>) -> Label {
+    mode.map_or(Label::NewPieceMode, Label::OperationHint)
+}
+
+/// One button showing the current mode, with a small arrow; a click lists every mode.
+fn op_mode_dropdown(ui: &mut egui::Ui, op_mode: &mut Option<BooleanOp>, language: Language) {
+    let current = *op_mode;
+    let response = icon_button(
+        ui,
+        ICON_BUTTON_SIZE,
+        false,
+        language.label(op_mode_label(current)),
+        |painter, rect, stroke| {
+            paint_glyph(painter, rect, stroke, op_mode_glyph(current));
+            let corner = rect.right_bottom() - egui::vec2(3.0, 3.0);
+            let arrow = vec![
+                corner - egui::vec2(6.0, 3.0),
+                corner - egui::vec2(0.0, 3.0),
+                corner - egui::vec2(3.0, 0.0),
+            ];
+            painter.add(egui::Shape::convex_polygon(
+                arrow,
+                stroke.color,
+                egui::Stroke::NONE,
+            ));
+        },
+    );
+    egui::Popup::menu(&response).show(|ui| {
+        let style = ui.style().clone();
+        for mode in OP_MODES {
+            let text = icon_text(
+                &style,
+                egui::TextStyle::Button,
+                op_mode_glyph(mode),
+                language.label(op_mode_label(mode)),
+            );
+            if ui.selectable_label(*op_mode == mode, text).clicked() {
+                *op_mode = mode;
+            }
+        }
+    });
 }
 
 fn operation_glyph(op: BooleanOp) -> char {
@@ -133,6 +194,8 @@ pub struct ToolSettings<'a> {
     pub line_style: &'a mut LineStyle,
     /// The holes of new stitch lines.
     pub stitch: &'a mut StitchSettings,
+    /// Whether a piece is selected; the tools that need one are hidden otherwise.
+    pub piece_selected: bool,
 }
 
 /// The tool bar across the top of the window: tools, then the new-piece and operation modes,
@@ -144,10 +207,17 @@ pub fn show_toolbar(ui: &mut egui::Ui, settings: ToolSettings, units: Units, lan
         op_mode,
         line_style,
         stitch,
+        piece_selected,
     } = settings;
+    if tool.needs_piece() && !piece_selected {
+        *tool = Tool::Select;
+    }
     egui::ScrollArea::horizontal().show(ui, |ui| {
         ui.horizontal(|ui| {
             for option in Tool::ALL {
+                if option.needs_piece() && !piece_selected {
+                    continue;
+                }
                 let name = language.label(option.label());
                 let response = icon_button(
                     ui,
@@ -161,28 +231,7 @@ pub fn show_toolbar(ui: &mut egui::Ui, settings: ToolSettings, units: Units, lan
                 }
             }
             ui.separator();
-            let response = icon_button(
-                ui,
-                ICON_BUTTON_SIZE,
-                op_mode.is_none(),
-                language.label(Label::NewPieceMode),
-                |painter, rect, stroke| paint_glyph(painter, rect, stroke, glyph::NEW_PIECE),
-            );
-            if response.clicked() {
-                *op_mode = None;
-            }
-            for op in BooleanOp::ALL {
-                let response = icon_button(
-                    ui,
-                    ICON_BUTTON_SIZE,
-                    *op_mode == Some(op),
-                    language.label(Label::OperationHint(op)),
-                    |painter, rect, stroke| paint_glyph(painter, rect, stroke, operation_glyph(op)),
-                );
-                if response.clicked() {
-                    *op_mode = Some(op);
-                }
-            }
+            op_mode_dropdown(ui, op_mode, language);
             match *tool {
                 Tool::RegularPolygon => {
                     ui.separator();

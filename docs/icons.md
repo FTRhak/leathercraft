@@ -50,10 +50,10 @@ Constants are in `icons::glyph`:
 | `STITCH_HOLES` | `U+E136` | Stitch holes tool (tool bar) |
 | `CENTERLINE` | `U+E137` | Centerline tool (tool bar) |
 | `REGULAR_POLYGON` | `U+E138` | Regular polygon tool (tool bar) |
-| `NEW_PIECE` | `U+E13C` | New piece mode (tool bar) |
-| `SUBTRACT` | `U+E13D` | Subtract operation (tool bar) |
-| `UNION` | `U+E13E` | Union operation (tool bar) |
-| `INTERSECT` | `U+E13F` | Intersect operation (tool bar) |
+| `NEW_PIECE` | `U+E13C` | New piece mode (tool bar mode dropdown) |
+| `SUBTRACT` | `U+E13D` | Subtract operation (tool bar mode dropdown) |
+| `UNION` | `U+E13E` | Union operation (tool bar mode dropdown) |
+| `INTERSECT` | `U+E13F` | Intersect operation (tool bar mode dropdown) |
 | `ALIGN_LEFT` | `U+E140` | Align left edges (Align panel) |
 | `ALIGN_CENTER_X` | `U+E141` | Align horizontal centers (Align panel) |
 | `ALIGN_RIGHT` | `U+E142` | Align right edges (Align panel) |
