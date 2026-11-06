@@ -1,4 +1,4 @@
-use crate::icons::icon_button;
+use crate::icons::{glyph, icon_button, paint_glyph};
 use crate::panels::properties::{line_style_fields, stitch_fields};
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
@@ -8,7 +8,6 @@ use std::f32::consts::{PI, TAU};
 
 const ICON_BUTTON_SIZE: f32 = 32.0;
 const ICON_MARGIN: f32 = 8.0;
-const ICON_VERTEX_RADIUS: f32 = 2.0;
 const ICON_ARC_SEGMENTS: usize = 48;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -83,83 +82,21 @@ impl Tool {
         }
     }
 
-    fn paint_icon(self, painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
-        let rect = rect.shrink(ICON_MARGIN);
-        let at = |x: f32, y: f32| rect.lerp_inside(egui::vec2(x, y));
+    fn glyph(self) -> char {
         match self {
-            Self::Select => {
-                let arrow = vec![
-                    at(0.1, 0.0),
-                    at(0.1, 0.8),
-                    at(0.35, 0.6),
-                    at(0.55, 1.0),
-                    at(0.7, 0.92),
-                    at(0.5, 0.52),
-                    at(0.85, 0.52),
-                ];
-                painter.add(egui::Shape::closed_line(arrow, stroke));
-            }
-            Self::Edge => {
-                let outline = vec![at(0.0, 0.85), at(0.15, 0.1), at(0.85, 0.0), at(1.0, 0.75)];
-                let faded = egui::Stroke::new(1.0, stroke.color.gamma_multiply(0.35));
-                painter.add(egui::Shape::closed_line(outline.clone(), faded));
-                let edge = [outline[3], outline[0]];
-                painter.line_segment(edge, egui::Stroke::new(stroke.width * 2.0, stroke.color));
-                for vertex in edge {
-                    painter.circle_filled(vertex, ICON_VERTEX_RADIUS, stroke.color);
-                }
-            }
-            Self::Draw => {
-                let vertices = vec![at(0.0, 1.0), at(0.3, 0.2), at(0.7, 0.7), at(1.0, 0.0)];
-                for vertex in &vertices {
-                    painter.circle_filled(*vertex, ICON_VERTEX_RADIUS, stroke.color);
-                }
-                painter.add(egui::Shape::line(vertices, stroke));
-            }
-            Self::Rectangle => {
-                painter.rect_stroke(rect, 0.0, stroke, egui::StrokeKind::Middle);
-            }
-            Self::Ellipse => {
-                let center = rect.center();
-                let points = (0..ICON_ARC_SEGMENTS)
-                    .map(|index| {
-                        let angle = TAU * index as f32 / ICON_ARC_SEGMENTS as f32;
-                        center
-                            + egui::vec2(
-                                angle.cos() * rect.width() / 2.0,
-                                angle.sin() * rect.height() / 3.0,
-                            )
-                    })
-                    .collect();
-                painter.add(egui::Shape::closed_line(points, stroke));
-            }
-            Self::RegularPolygon => {
-                let center = rect.center();
-                let radius = rect.width() / 2.0;
-                let points = (0..6)
-                    .map(|index| center + egui::Vec2::angled(TAU * index as f32 / 6.0) * radius)
-                    .collect();
-                painter.add(egui::Shape::closed_line(points, stroke));
-            }
-            Self::Centerline => {
-                // A dash-dot diagonal: dash, dot, dash.
-                let along = |t: f32| at(t, 1.0 - t);
-                painter.line_segment([along(0.0), along(0.4)], stroke);
-                painter.circle_filled(along(0.5), stroke.width, stroke.color);
-                painter.line_segment([along(0.6), along(1.0)], stroke);
-            }
-            Self::StitchHoles => {
-                // Slanted holes along a faded diagonal path.
-                let along = |t: f32| at(t, 1.0 - t);
-                let faded = egui::Stroke::new(1.0, stroke.color.gamma_multiply(0.35));
-                painter.line_segment([along(0.0), along(1.0)], faded);
-                let slot = egui::Vec2::angled(-PI / 4.0 - PI / 4.0) * 3.0;
-                for index in 0..4 {
-                    let center = along(0.1 + 0.8 * index as f32 / 3.0);
-                    painter.line_segment([center - slot, center + slot], stroke);
-                }
-            }
+            Self::Select => glyph::SELECT,
+            Self::Edge => glyph::EDGE,
+            Self::Draw => glyph::DRAW,
+            Self::Rectangle => glyph::RECTANGLE,
+            Self::Ellipse => glyph::ELLIPSE,
+            Self::RegularPolygon => glyph::REGULAR_POLYGON,
+            Self::Centerline => glyph::CENTERLINE,
+            Self::StitchHoles => glyph::STITCH_HOLES,
         }
+    }
+
+    fn paint_icon(self, painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+        paint_glyph(painter, rect, stroke, self.glyph());
     }
 }
 

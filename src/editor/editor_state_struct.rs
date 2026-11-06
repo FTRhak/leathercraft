@@ -11,6 +11,7 @@ use leathercraft::i18n::{Language, Message};
 use leathercraft::material::Material;
 use leathercraft::model::{BooleanOp, PatternPiece, Point, Project};
 use leathercraft::shapes::LineStyle;
+use leathercraft::snap::{self, SnapFeedback, SnapSettings, SnapTargets};
 use std::borrow::Cow;
 
 #[derive(Resource)]
@@ -50,8 +51,16 @@ pub struct EditorState {
     pub(super) pan: egui::Vec2,
     pub(super) zoom: f32,
     pub(super) fit_requested: bool,
-    pub(super) snap_enabled: bool,
-    pub(super) snap_mm: f64,
+    /// The snapping settings of the Snap panel.
+    pub(super) snap: SnapSettings,
+    /// The settings last written to `settings.json`, so that only a change is saved.
+    pub(super) snap_saved: SnapSettings,
+    /// Snapping is suspended while Alt is held.
+    pub(super) snap_suspended: bool,
+    /// What the last snap of this frame lined up with, drawn on the canvas.
+    pub(super) snap_feedback: SnapFeedback,
+    /// Where a drawing tool would place a point under the cursor, snapped.
+    pub(super) hover_target: Option<Point>,
     pub(super) rename_buffer: Option<String>,
     /// The material being chosen while the new-project dialog is open.
     pub(super) new_project_dialog: Option<Material>,
@@ -85,8 +94,11 @@ impl Default for EditorState {
             pan: egui::Vec2::ZERO,
             zoom: 2.0,
             fit_requested: false,
-            snap_enabled: true,
-            snap_mm: 1.0,
+            snap: SnapSettings::default(),
+            snap_saved: SnapSettings::default(),
+            snap_suspended: false,
+            snap_feedback: SnapFeedback::default(),
+            hover_target: None,
             rename_buffer: None,
             new_project_dialog: None,
             settings_dialog: None,
@@ -99,9 +111,11 @@ impl Default for EditorState {
 }
 
 impl EditorState {
-    pub fn new(language: Language) -> Self {
+    pub fn new(language: Language, snap: SnapSettings) -> Self {
         Self {
             language,
+            snap,
+            snap_saved: snap,
             ..Self::default()
         }
     }
@@ -116,16 +130,34 @@ impl EditorState {
         self.status_is_error = true;
     }
 
-    pub(super) fn snap(&self, value: f64) -> f64 {
-        if self.snap_enabled {
-            (value / self.snap_mm).round() * self.snap_mm
-        } else {
-            value
+    /// The snapping settings in effect: off while Alt is held.
+    pub(super) fn active_snap(&self) -> SnapSettings {
+        SnapSettings {
+            enabled: self.snap.enabled && !self.snap_suspended,
+            ..self.snap
         }
     }
 
-    pub(super) fn snap_point(&self, point: Point) -> Point {
-        Point::new(self.snap(point.x), self.snap(point.y))
+    /// The point snapped to the targets, remembering what it lined up with for drawing.
+    /// `tolerance` is in mm.
+    pub(super) fn snap_point(
+        &mut self,
+        point: Point,
+        targets: &SnapTargets,
+        tolerance: f64,
+    ) -> Point {
+        let (point, feedback) = snap::snap_point(point, targets, &self.active_snap(), tolerance);
+        self.snap_feedback = feedback;
+        point
+    }
+
+    /// Writes the snapping settings once they changed and no button is held, so that dragging
+    /// a value doesn't write the file on every frame.
+    pub fn save_snap_when_settled(&mut self, pointer_down: bool) {
+        if !pointer_down && self.snap != self.snap_saved {
+            crate::settings::save_snap(&self.snap);
+            self.snap_saved = self.snap;
+        }
     }
 
     fn reset_document(&mut self) {

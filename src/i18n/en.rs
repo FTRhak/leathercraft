@@ -94,7 +94,19 @@ pub(super) fn label(label: Label) -> &'static str {
             "Drag a piece or a vertex of the selected piece. Shift+click adds or removes a piece, Ctrl+A selects all. Del removes the selected pieces."
         }
         Label::NavigationHint => "Right or middle drag pans; scroll zooms.",
-        Label::SnapMillimeters => "Snap (mm)",
+        Label::Snap => "Snap",
+        Label::SnapEnabled => "Snapping",
+        Label::SnapGrid => "To grid",
+        Label::SnapGridStep => "Grid step",
+        Label::SnapVertices => "To vertices",
+        Label::SnapVerticesHint => "A child shape snaps only to vertices of its own piece",
+        Label::SnapGuides => "Smart guides",
+        Label::SnapGuidesHint => {
+            "Lines up the left, right, top and bottom edges and the center with other objects"
+        }
+        Label::SnapDistance => "Snap distance (px)",
+        Label::SnapAltHint => "Hold Alt to turn snapping off for a moment",
+        Label::ToggleSnap => "Snapping on / off",
         Label::ZoomToFit => "Zoom to fit",
         Label::DisplayUnits => "Display units",
         Label::Pieces => "Pieces",

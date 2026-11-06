@@ -13,6 +13,7 @@ use leathercraft::model::{BooleanOp, PatternPiece, Point, Project, Units};
 use leathercraft::shapes::{
     Ellipse, HoleKind, Line, Polygon, Rectangle, RegularPolygon, Shape, StitchLine,
 };
+use leathercraft::snap::{GuideAxis, SnapScope, SnapTargets};
 
 const MIN_ZOOM: f32 = 0.05;
 const MAX_ZOOM: f32 = 100.0;
@@ -28,6 +29,7 @@ const MIN_DASH_PERIOD_PX: f32 = 3.0;
 /// Below this pitch on screen, stitch holes are drawn as a faded dotted path.
 const MIN_HOLE_PITCH_PX: f32 = 3.0;
 const HOLE_COLOR: egui::Color32 = egui::Color32::from_gray(205);
+const SNAP_COLOR: egui::Color32 = egui::Color32::from_rgb(230, 90, 220);
 
 #[derive(Clone, Copy)]
 pub(super) struct Viewport {
@@ -48,6 +50,11 @@ impl Viewport {
     /// How far from a line, in mm, a click still hits it.
     pub(super) fn hit_tolerance(self) -> f64 {
         f64::from(EDGE_HIT_RADIUS_PX / self.zoom)
+    }
+
+    /// How far, in mm, snapping reaches for a distance on screen.
+    pub(super) fn snap_tolerance(self, distance_px: f32) -> f64 {
+        f64::from(distance_px / self.zoom)
     }
 }
 
@@ -89,6 +96,9 @@ pub(super) fn canvas(
         .hover_pos()
         .or_else(|| response.interact_pointer_pos())
         .map(|position| view.to_world(position));
+    state.snap_suspended = ui.input(|input| input.modifiers.alt);
+    state.snap_feedback = Default::default();
+    state.hover_target = None;
 
     // The Draw and Stitch holes tools each click a draft; another tool drops it.
     if state.tool != state.draft_tool {
@@ -104,9 +114,26 @@ pub(super) fn canvas(
             handle_shape(ui, &response, view, project, events, state);
         }
     }
+    // Shows where a drawing tool would place its next point before the click.
+    let drawing = match state.tool {
+        Tool::Draw | Tool::StitchHoles => true,
+        Tool::Rectangle | Tool::Ellipse | Tool::RegularPolygon | Tool::Centerline => {
+            state.shape_draft.is_none()
+        }
+        Tool::Select | Tool::Edge => false,
+    };
+    if drawing && let Some(position) = response.hover_pos() {
+        state.hover_target = Some(snap_draw(project, view, state, view.to_world(position)));
+    }
 
     painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
-    draw_grid(&painter, rect, view);
+    let snap_grid = state.snap.enabled && state.snap.grid;
+    draw_grid(
+        &painter,
+        rect,
+        view,
+        snap_grid.then_some(state.snap.grid_step_mm),
+    );
     draw_pieces(&painter, view, project, state);
     draw_centerlines(&painter, view, project, state);
     draw_stitch_holes(&painter, ui, response.hover_pos(), view, project, state);
@@ -124,6 +151,64 @@ pub(super) fn canvas(
         draw_draft(&painter, response.hover_pos(), view, project.units, state);
     }
     draw_shape_draft(&painter, view, project.units, state);
+    draw_snap_feedback(&painter, view, state);
+}
+
+/// What a drawing tool snaps to. A shape that becomes a child of the selected piece snaps only
+/// within that piece; a new piece snaps to every piece. The points of the draft count too.
+fn draw_targets(project: &Project, state: &EditorState) -> SnapTargets {
+    let child =
+        state.op_mode.is_some() || matches!(state.tool, Tool::Centerline | Tool::StitchHoles);
+    let scope = match state.selected {
+        Some(id) if child => SnapScope::Piece {
+            id,
+            exclude: Vec::new(),
+        },
+        _ => SnapScope::Project {
+            exclude: Vec::new(),
+        },
+    };
+    SnapTargets::collect(project, &scope).with_points(state.draft.iter().copied())
+}
+
+/// A point placed by a drawing tool, snapped.
+fn snap_draw(project: &Project, view: Viewport, state: &mut EditorState, point: Point) -> Point {
+    let targets = draw_targets(project, state);
+    let tolerance = view.snap_tolerance(state.snap.distance_px);
+    state.snap_point(point, &targets, tolerance)
+}
+
+/// A marker on the vertex snapped to, and the guides that lined up.
+fn draw_snap_feedback(painter: &egui::Painter, view: Viewport, state: &EditorState) {
+    let feedback = &state.snap_feedback;
+    let stroke = egui::Stroke::new(1.0, SNAP_COLOR);
+    for guide in &feedback.guides {
+        let (a, b) = match guide.axis {
+            GuideAxis::X => (
+                Point::new(guide.at, guide.from),
+                Point::new(guide.at, guide.to),
+            ),
+            GuideAxis::Y => (
+                Point::new(guide.from, guide.at),
+                Point::new(guide.to, guide.at),
+            ),
+        };
+        painter.extend(egui::Shape::dashed_line(
+            &[view.to_screen(a), view.to_screen(b)],
+            stroke,
+            4.0,
+            3.0,
+        ));
+    }
+    if let Some(vertex) = feedback.vertex {
+        let rect = egui::Rect::from_center_size(view.to_screen(vertex), egui::Vec2::splat(11.0));
+        painter.rect_stroke(
+            rect,
+            0.0,
+            egui::Stroke::new(1.5, SNAP_COLOR),
+            egui::StrokeKind::Middle,
+        );
+    }
 }
 
 fn fit_view(rect: egui::Rect, project: &Project, state: &mut EditorState) {
@@ -160,7 +245,8 @@ fn handle_select(
     if response.dragged_by(egui::PointerButton::Primary)
         && let Some(position) = response.interact_pointer_pos()
     {
-        update_drag(view.to_world(position), state);
+        let tolerance = view.snap_tolerance(state.snap.distance_px);
+        update_drag(view.to_world(position), tolerance, state);
     }
     if response.drag_stopped() {
         finish_drag(events, state);
@@ -204,7 +290,8 @@ fn handle_edge(
     if response.dragged_by(egui::PointerButton::Primary)
         && let Some(position) = response.interact_pointer_pos()
     {
-        update_drag(view.to_world(position), state);
+        let tolerance = view.snap_tolerance(state.snap.distance_px);
+        update_drag(view.to_world(position), tolerance, state);
     }
     if response.drag_stopped() {
         finish_drag(events, state);
@@ -269,7 +356,7 @@ fn handle_draw(
             finish_draft(project, events, state);
             return;
         }
-        let point = state.snap_point(view.to_world(position));
+        let point = snap_draw(project, view, state, view.to_world(position));
         if state.draft.last() != Some(&point) {
             state.draft.push(point);
         }
@@ -314,7 +401,8 @@ fn handle_stitch(
         && let Some(position) = response.interact_pointer_pos()
     {
         let shift = ui.input(|input| input.modifiers.shift);
-        let point = stitch_target(state, view.to_world(position), shift);
+        let point = snap_draw(project, view, state, view.to_world(position));
+        let point = stitch_target(state, point, shift);
         if state.draft.last() != Some(&point) {
             state.draft.push(point);
         }
@@ -333,10 +421,9 @@ fn handle_stitch(
     }
 }
 
-/// Where the next vertex of a stitch line goes: snapped to the grid, and with Shift turned
+/// Where the next vertex of a stitch line goes, from the snapped point: with Shift turned
 /// around the last vertex in 15° steps.
 fn stitch_target(state: &EditorState, point: Point, shift: bool) -> Point {
-    let point = state.snap_point(point);
     match state.draft.last() {
         Some(&last) if shift => StitchLine::snap(last, point),
         _ => point,
@@ -399,7 +486,7 @@ fn handle_shape(
     if response.drag_started_by(egui::PointerButton::Primary)
         && let Some(origin) = ui.input(|input| input.pointer.press_origin())
     {
-        let start = state.snap_point(view.to_world(origin));
+        let start = snap_draw(project, view, state, view.to_world(origin));
         state.shape_draft = Some(ShapeDraft {
             start,
             end: start,
@@ -409,7 +496,7 @@ fn handle_shape(
     if response.dragged_by(egui::PointerButton::Primary)
         && let Some(position) = response.interact_pointer_pos()
     {
-        let end = state.snap_point(view.to_world(position));
+        let end = snap_draw(project, view, state, view.to_world(position));
         if let Some(draft) = &mut state.shape_draft {
             draft.end = end;
             draft.constrained = constrained;
@@ -843,10 +930,10 @@ fn draw_stitch_draft(
         return;
     };
     let mut points = state.draft.clone();
-    let target = hover.map(|position| {
-        let shift = ui.input(|input| input.modifiers.shift);
-        stitch_target(state, view.to_world(position), shift)
-    });
+    let shift = ui.input(|input| input.modifiers.shift);
+    let target = hover
+        .and(state.hover_target)
+        .map(|point| stitch_target(state, point, shift));
     if let Some(target) = target
         && target != last
     {
@@ -1075,8 +1162,7 @@ fn draw_draft(
     for position in &screen {
         painter.circle_filled(*position, 4.0, color);
     }
-    if let Some(hover) = hover {
-        let target = state.snap_point(view.to_world(hover));
+    if let Some(target) = hover.and(state.hover_target) {
         let target_screen = view.to_screen(target);
         painter.line_segment(
             [view.to_screen(last), target_screen],

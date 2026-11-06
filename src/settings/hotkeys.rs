@@ -27,10 +27,11 @@ pub enum Action {
     ToolCenterline,
     ToolStitchHoles,
     ToggleView,
+    ToggleSnap,
 }
 
 impl Action {
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 18] = [
         Self::New,
         Self::Open,
         Self::Save,
@@ -48,6 +49,7 @@ impl Action {
         Self::ToolCenterline,
         Self::ToolStitchHoles,
         Self::ToggleView,
+        Self::ToggleSnap,
     ];
 
     pub fn label(self) -> Label {
@@ -69,6 +71,7 @@ impl Action {
             Self::ToolCenterline => Label::Centerline,
             Self::ToolStitchHoles => Label::StitchHoles,
             Self::ToggleView => Label::ToggleView,
+            Self::ToggleSnap => Label::ToggleSnap,
         }
     }
 
@@ -110,6 +113,7 @@ impl Action {
             Self::ToolCenterline => vec![plain(Key::C)],
             Self::ToolStitchHoles => vec![plain(Key::H)],
             Self::ToggleView => vec![plain(Key::Tab)],
+            Self::ToggleSnap => vec![plain(Key::F9)],
         }
     }
 }

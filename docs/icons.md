@@ -8,8 +8,8 @@ An icon is anything that paints into a rect with a stroke: `FnOnce(&egui::Painte
 
 | Kind | When to use | How |
 |---|---|---|
-| **Font glyph** | Fixed pictograms that are hard to draw with lines: trash can, padlock | `paint_glyph(painter, rect, stroke, glyph::TRASH)` |
-| **Painted** | Icons built from geometry or that depend on state: tool icons, boolean operation icons, reorder arrows | Draw with `painter` lines and shapes inside `rect`, in `stroke` |
+| **Font glyph** | Fixed pictograms: trash can, padlock, tool icons | `paint_glyph(painter, rect, stroke, glyph::TRASH)` |
+| **Painted** | Icons built from geometry or that depend on state: boolean operation icons, reorder arrows | Draw with `painter` lines and shapes inside `rect`, in `stroke` |
 
 Prefer a glyph for a new pictogram. Paint an icon when it shows the app's own geometry (shapes, operations), so it stays in step with how the canvas draws them.
 
@@ -42,6 +42,14 @@ Constants are in `icons::glyph`:
 | `LOCK` | `U+E115` | Locked piece (Layout panel) |
 | `UNLOCK` | `U+E116` | Unlocked piece (Layout panel) |
 | `HISTORY` | `U+E121` | History panel tab title, via `icon_text` |
+| `SELECT` | `U+E130` | Select tool (Tools panel) |
+| `DRAW` | `U+E132` | Draw tool (Tools panel) |
+| `RECTANGLE` | `U+E133` | Rectangle tool (Tools panel) |
+| `ELLIPSE` | `U+E134` | Ellipse tool (Tools panel) |
+| `EDGE` | `U+E135` | Edge tool (Tools panel) |
+| `STITCH_HOLES` | `U+E136` | Stitch holes tool (Tools panel) |
+| `CENTERLINE` | `U+E137` | Centerline tool (Tools panel) |
+| `REGULAR_POLYGON` | `U+E138` | Regular polygon tool (Tools panel) |
 
 ### Adding a glyph
 

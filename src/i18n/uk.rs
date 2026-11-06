@@ -96,7 +96,19 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::NavigationHint => {
             "Перетягування правою або середньою кнопкою зсуває вигляд; коліщатко змінює масштаб."
         }
-        Label::SnapMillimeters => "Прив’язка (мм)",
+        Label::Snap => "Прив’язка",
+        Label::SnapEnabled => "Прив’язувати",
+        Label::SnapGrid => "До сітки",
+        Label::SnapGridStep => "Крок сітки",
+        Label::SnapVertices => "До вершин",
+        Label::SnapVerticesHint => "Дочірня фігура прив’язується лише до вершин своєї деталі",
+        Label::SnapGuides => "Розумні напрямні",
+        Label::SnapGuidesHint => {
+            "Вирівнює лівий, правий, верхній і нижній краї та центр з іншими об’єктами"
+        }
+        Label::SnapDistance => "Відстань прив’язки (пікс.)",
+        Label::SnapAltHint => "Утримуйте Alt, щоб тимчасово вимкнути прив’язку",
+        Label::ToggleSnap => "Увімкнути / вимкнути прив’язку",
         Label::ZoomToFit => "Показати все",
         Label::DisplayUnits => "Одиниці виміру",
         Label::Pieces => "Деталі",

@@ -2,7 +2,7 @@ use super::{EditorState, ViewMode, canvas, send};
 use crate::document::{HistoryMessage, ProjectMessage};
 use crate::icons::{glyph, icon_text};
 use crate::panels::dock::PanelTab;
-use crate::panels::{align, history, layout, material, properties, tools};
+use crate::panels::{align, history, layout, material, properties, snap, tools};
 use crate::preview::PreviewSettings;
 use bevy::prelude::*;
 use bevy_egui::egui;
@@ -99,6 +99,13 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                     }
                 });
             }
+            PanelTab::Snap => {
+                ui.add_enabled_ui(editing, |ui| {
+                    snap::show_panel(ui, &mut self.state.snap, language);
+                });
+                let pointer_down = ui.input(|input| input.pointer.any_down());
+                self.state.save_snap_when_settled(pointer_down);
+            }
             PanelTab::Properties => {
                 let state = &mut *self.state;
                 let piece = state
@@ -110,8 +117,6 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                 let view = if editing {
                     properties::ViewControls::Editor(properties::EditorView {
                         hint: state.tool.hint(),
-                        snap_enabled: &mut state.snap_enabled,
-                        snap_mm: &mut state.snap_mm,
                         fit_requested: &mut state.fit_requested,
                     })
                 } else {
@@ -184,7 +189,9 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
 
     fn scroll_bars(&self, tab: &PanelTab) -> [bool; 2] {
         match tab {
-            PanelTab::Tools | PanelTab::Properties | PanelTab::Align => [false, true],
+            PanelTab::Tools | PanelTab::Properties | PanelTab::Align | PanelTab::Snap => {
+                [false, true]
+            }
             // The canvas pans itself, and these two have their own scroll areas.
             PanelTab::Canvas | PanelTab::Layout | PanelTab::Material | PanelTab::History => {
                 [false, false]

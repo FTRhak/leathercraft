@@ -5,6 +5,7 @@ pub use hotkeys::{Action, Hotkeys};
 use bevy::prelude::*;
 use leathercraft::i18n::Language;
 use leathercraft::material::Material;
+use leathercraft::snap::SnapSettings;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io;
@@ -23,6 +24,8 @@ struct Settings {
     default_material: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     hotkeys: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    snap: Option<serde_json::Value>,
 }
 
 /// The application preferences edited in the Settings window. Interface state, never part
@@ -83,6 +86,27 @@ pub fn load_language() -> Language {
 
 fn saved_language() -> Option<Language> {
     Language::from_tag(&read_settings()?.language?)
+}
+
+/// The saved snapping settings, brought into range; the default if missing or unusable.
+pub fn load_snap() -> SnapSettings {
+    read_settings()
+        .and_then(|settings| settings.snap)
+        .and_then(
+            |value| match serde_json::from_value::<SnapSettings>(value) {
+                Ok(snap) => Some(snap.clamped()),
+                Err(error) => {
+                    bevy::log::warn!("Ignoring saved snap settings: {error}");
+                    None
+                }
+            },
+        )
+        .unwrap_or_default()
+}
+
+pub fn save_snap(snap: &SnapSettings) {
+    let value = serde_json::to_value(snap).ok();
+    update_settings(|settings| settings.snap = value);
 }
 
 pub fn load_dock() -> Option<serde_json::Value> {

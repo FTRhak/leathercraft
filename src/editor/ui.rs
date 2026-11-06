@@ -304,6 +304,10 @@ fn handle_hotkeys(
                 ViewMode::Preview3d => ViewMode::Editor2d,
             };
         }
+        Action::ToggleSnap => {
+            state.snap.enabled = !state.snap.enabled;
+            state.save_snap_when_settled(false);
+        }
         _ => {}
     }
 }

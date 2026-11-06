@@ -8,3 +8,4 @@ pub mod material;
 pub mod model;
 pub mod persistence;
 pub mod shapes;
+pub mod snap;

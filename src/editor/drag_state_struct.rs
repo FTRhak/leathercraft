@@ -1,5 +1,6 @@
 use leathercraft::model::{PatternPiece, Point};
 use leathercraft::shapes::Shape;
+use leathercraft::snap::{Moving, SnapTargets};
 
 /// One of the shapes a piece is built from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,6 +51,11 @@ pub(super) struct DragState {
     pub(super) original: PatternPiece,
     /// The in-progress piece, drawn instead of the project's until the drag is committed.
     pub(super) current: PatternPiece,
+    /// What the drag snaps to, gathered when it starts, since the project doesn't change
+    /// during a drag.
+    pub(super) targets: SnapTargets,
+    /// The moved shapes of a piece or child drag; `None` for a handle.
+    pub(super) moving: Option<Moving>,
     /// Keeps the drag drawn for the frame in which its event is still being applied.
     pub(super) released: bool,
 }

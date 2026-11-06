@@ -55,6 +55,7 @@ How the app keeps interface state between runs, and how the user edits the defau
 | Ellipse tool | L |
 | Regular polygon tool | G |
 | Toggle editor / 3D preview | Tab |
+| Snapping on / off | F9 |
 
 ## Storage: `settings.json`
 
@@ -69,7 +70,8 @@ One file, `<config dir>/leathercraft/settings.json`, where the config directory 
     "undo": ["Ctrl+Z"],
     "redo": ["Ctrl+Shift+Z", "Ctrl+Y"],
     "delete": []
-  }
+  },
+  "snap": { "enabled": true, "grid": true, "grid_step_mm": 1.0, "vertices": true, "guides": true, "distance_px": 8.0 }
 }
 ```
 
@@ -79,6 +81,7 @@ One file, `<config dir>/leathercraft/settings.json`, where the config directory 
 | `dock` | raw `serde_json::Value` | `PanelDock` | `save_dock`, on a pointer release when the layout differs from the last saved one | `default_state()` layout |
 | `default_material` | raw `serde_json::Value` | `Preferences::default_material` | `save_preferences`, on Settings OK | `Material::default()` |
 | `hotkeys` | raw `serde_json::Value` | `Preferences::hotkeys` | `save_preferences`, on Settings OK | Per action: `Action::default_shortcuts` |
+| `snap` | raw `serde_json::Value` | `EditorState::snap` (`leathercraft::snap::SnapSettings`) | `save_snap`, from `EditorState::save_snap_when_settled` once a value changed and no pointer button is down, or at once by the F9 hotkey | `SnapSettings::default()`; missing fields take their defaults (`#[serde(default)]`), and numbers are clamped (`clamped`). See `docs/snap.md` |
 
 Every section is optional and omitted while unset (`skip_serializing_if`). `language` stays absent until the user picks one, so the OS locale keeps applying until then.
 
@@ -229,7 +232,7 @@ A shortcut that is already bound to *another* action is accepted and then flagge
 
 | Consumer | Uses |
 |---|---|
-| `main` | `load_language` for `EditorState::new`; `load_preferences` for the resource and the startup project's `default_material` |
+| `main` | `load_language` and `load_snap` for `EditorState::new`; `load_preferences` for the resource and the startup project's `default_material` |
 | `file_command` (New) | Opens the new-project dialog with `preferences.default_material` |
 | `action_button` | Menu items with `hotkeys.first(action)` as their shortcut text |
 | `handle_hotkeys` | `hotkeys.triggered(ctx)`, then a tool switch for tool actions or a `match` for the rest; skipped while drawing, in a dialog, or when `ctx.wants_keyboard_input()` |

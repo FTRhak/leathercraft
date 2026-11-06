@@ -25,8 +25,6 @@ use leathercraft::model::{PatternPiece, Project, Units};
 pub struct EditorView<'a> {
     /// What the current tool does.
     pub hint: Label,
-    pub snap_enabled: &'a mut bool,
-    pub snap_mm: &'a mut f64,
     pub fit_requested: &'a mut bool,
 }
 
@@ -49,15 +47,6 @@ pub struct Selection<'a> {
 fn view_controls(ui: &mut egui::Ui, view: EditorView, language: Language) {
     ui.small(language.label(view.hint));
     ui.small(language.label(Label::NavigationHint));
-    ui.horizontal(|ui| {
-        ui.checkbox(view.snap_enabled, language.label(Label::SnapMillimeters));
-        ui.add_enabled(
-            *view.snap_enabled,
-            egui::DragValue::new(view.snap_mm)
-                .range(0.1..=100.0)
-                .speed(0.1),
-        );
-    });
     if ui.button(language.label(Label::ZoomToFit)).clicked() {
         *view.fit_requested = true;
     }

@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use bevy_egui::egui;
 use leathercraft::events::ProjectEvent;
 use leathercraft::model::{PatternPiece, Point, Project};
+use leathercraft::snap::{self, Moving, SnapScope, SnapTargets};
 
 /// What the press grabs on the selected piece: handles first, then a child, then the piece.
 fn target_on_selected(
@@ -85,17 +86,95 @@ pub(super) fn begin_drag(
             .collect(),
         _ => Vec::new(),
     };
+    let target = target.unwrap_or(DragTarget::Piece);
+    let (targets, moving) = snap_setup(project, piece, target, &group, &child_group, start);
     state.drag = Some(DragState {
         piece_id,
-        target: target.unwrap_or(DragTarget::Piece),
+        target,
         group,
         child_group,
         start,
         offset: (0.0, 0.0),
         original: piece.clone(),
         current: piece.clone(),
+        targets,
+        moving,
         released: false,
     });
+}
+
+/// What a drag snaps to, and what it moves. A piece snaps to the other pieces; a child, or a
+/// handle of one, only to the rest of its own piece; a handle of the base to everything but
+/// itself and the box of its own piece.
+fn snap_setup(
+    project: &Project,
+    piece: &PatternPiece,
+    target: DragTarget,
+    group: &[u64],
+    child_group: &[u64],
+    start: Point,
+) -> (SnapTargets, Option<Moving>) {
+    match target {
+        DragTarget::Piece => {
+            let exclude: Vec<u64> = [piece.id]
+                .into_iter()
+                .chain(group.iter().copied())
+                .collect();
+            let shapes = project
+                .pieces
+                .iter()
+                .filter(|other| exclude.contains(&other.id))
+                .flat_map(|other| {
+                    std::iter::once(&other.base)
+                        .chain(other.children.iter().map(|child| &child.shape))
+                });
+            let moving = Moving::shapes(shapes, start);
+            let targets = SnapTargets::collect(project, &SnapScope::Project { exclude });
+            (targets, moving)
+        }
+        DragTarget::Child(child) => {
+            let exclude: Vec<u64> = [child]
+                .into_iter()
+                .chain(child_group.iter().copied())
+                .collect();
+            let shapes = piece
+                .children
+                .iter()
+                .filter(|other| exclude.contains(&other.id))
+                .map(|other| &other.shape);
+            let moving = Moving::shapes(shapes, start);
+            let scope = SnapScope::Piece {
+                id: piece.id,
+                exclude,
+            };
+            (SnapTargets::collect(project, &scope), moving)
+        }
+        DragTarget::Handle(shape, handle) => {
+            let Some(dragged) = shape.get(piece) else {
+                return (SnapTargets::default(), None);
+            };
+            let (scope, own_box) = match shape {
+                ShapeRef::Base => (
+                    SnapScope::Project {
+                        exclude: Vec::new(),
+                    },
+                    piece.bounds(),
+                ),
+                ShapeRef::Child(_) => (
+                    SnapScope::Piece {
+                        id: piece.id,
+                        exclude: Vec::new(),
+                    },
+                    dragged.bounds(),
+                ),
+            };
+            let mut targets = SnapTargets::collect(project, &scope).without_box(own_box);
+            if let Some(point) = dragged.handles().get(handle) {
+                targets = targets.without_point(*point);
+            }
+            (targets, None)
+        }
+    }
 }
 
 /// Starts dragging a handle of the selected piece without changing the selection, so that the
@@ -118,27 +197,37 @@ pub(super) fn begin_handle_drag(
     let Some((shape, handle)) = handle_at(piece, state.selected_child_id(), origin, view) else {
         return;
     };
+    let target = DragTarget::Handle(shape, handle);
+    let start = view.to_world(origin);
+    let (targets, moving) = snap_setup(project, piece, target, &[], &[], start);
     state.drag = Some(DragState {
         piece_id: piece.id,
-        target: DragTarget::Handle(shape, handle),
+        target,
         group: Vec::new(),
         child_group: Vec::new(),
-        start: view.to_world(origin),
+        start,
         offset: (0.0, 0.0),
         original: piece.clone(),
         current: piece.clone(),
+        targets,
+        moving,
         released: false,
     });
 }
 
-pub(super) fn update_drag(cursor: Point, state: &mut EditorState) {
+/// `tolerance` is how far, in mm, a vertex or guide reaches.
+pub(super) fn update_drag(cursor: Point, tolerance: f64, state: &mut EditorState) {
+    let settings = state.active_snap();
     let Some(drag) = &state.drag else {
         return;
     };
     let mut current = drag.original.clone();
+    let raw = (cursor.x - drag.start.x, cursor.y - drag.start.y);
     // Snap the offset, not the points, so that what moves keeps its own shape.
-    let dx = state.snap(cursor.x - drag.start.x);
-    let dy = state.snap(cursor.y - drag.start.y);
+    let ((dx, dy), mut feedback) = match &drag.moving {
+        Some(moving) => snap::snap_offset(raw, moving, &drag.targets, &settings, tolerance),
+        None => (raw, Default::default()),
+    };
     match drag.target {
         DragTarget::Piece => current.translate(dx, dy),
         DragTarget::Child(child) => {
@@ -149,11 +238,15 @@ pub(super) fn update_drag(cursor: Point, state: &mut EditorState) {
             }
         }
         DragTarget::Handle(shape, handle) => {
+            let (point, handle_feedback) =
+                snap::snap_point(cursor, &drag.targets, &settings, tolerance);
+            feedback = handle_feedback;
             if let Some(shape) = shape.get_mut(&mut current) {
-                *shape = shape.with_handle_at(handle, state.snap_point(cursor));
+                *shape = shape.with_handle_at(handle, point);
             }
         }
     }
+    state.snap_feedback = feedback;
     if let Some(drag) = &mut state.drag {
         drag.current = current;
         drag.offset = (dx, dy);

@@ -34,7 +34,7 @@ fn main() {
         .add_message::<HistoryMessage>()
         .insert_resource(ActiveProject::new(project))
         .insert_resource(preferences)
-        .insert_resource(EditorState::new(language))
+        .insert_resource(EditorState::new(language, settings::load_snap()))
         .insert_resource(PanelDock::load(language))
         .init_resource::<ViewMode>()
         .add_systems(

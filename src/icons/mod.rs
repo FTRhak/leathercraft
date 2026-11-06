@@ -9,6 +9,14 @@ pub mod glyph {
     pub const LOCK: char = '\u{E115}';
     pub const UNLOCK: char = '\u{E116}';
     pub const HISTORY: char = '\u{E121}';
+    pub const SELECT: char = '\u{E130}';
+    pub const DRAW: char = '\u{E132}';
+    pub const RECTANGLE: char = '\u{E133}';
+    pub const ELLIPSE: char = '\u{E134}';
+    pub const EDGE: char = '\u{E135}';
+    pub const STITCH_HOLES: char = '\u{E136}';
+    pub const CENTERLINE: char = '\u{E137}';
+    pub const REGULAR_POLYGON: char = '\u{E138}';
 }
 
 fn icon_font() -> egui::FontFamily {
