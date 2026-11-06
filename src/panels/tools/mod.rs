@@ -4,11 +4,8 @@ use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::model::{BooleanOp, Point, Units};
 use leathercraft::shapes::{DEFAULT_PITCH_MM, HoleKind, LineStyle, REGULAR_POLYGON_SIDES, Shape};
-use std::f32::consts::{PI, TAU};
 
 const ICON_BUTTON_SIZE: f32 = 32.0;
-const ICON_MARGIN: f32 = 8.0;
-const ICON_ARC_SEGMENTS: usize = 48;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Tool {
@@ -100,64 +97,12 @@ impl Tool {
     }
 }
 
-/// The arc of a circle that lies inside, or outside, a second circle of the same radius.
-/// It starts opposite the part it drops, so that the points it keeps are contiguous.
-fn arc(center: egui::Pos2, other: egui::Pos2, radius: f32, inside: bool) -> Vec<egui::Pos2> {
-    let toward = (other - center).angle();
-    let start = if inside { toward + PI } else { toward };
-    (0..=ICON_ARC_SEGMENTS)
-        .map(|index| {
-            let angle = start + TAU * index as f32 / ICON_ARC_SEGMENTS as f32;
-            center + egui::Vec2::angled(angle) * radius
-        })
-        .filter(|point| (point.distance(other) < radius) == inside)
-        .collect()
-}
-
-/// Two overlapping circles with the outline of the operation's result drawn in full and the
-/// rest faded: the left circle is the piece and the right one the new shape.
-fn paint_operation_icon(
-    painter: &egui::Painter,
-    rect: egui::Rect,
-    stroke: egui::Stroke,
-    op: BooleanOp,
-) {
-    let rect = rect.shrink(ICON_MARGIN - 2.0);
-    let radius = rect.width() * 0.32;
-    let piece = rect.center() - egui::vec2(rect.width() * 0.18, 0.0);
-    let shape = rect.center() + egui::vec2(rect.width() * 0.18, 0.0);
-    // Whether the result keeps the arcs of each circle that lie inside the other one.
-    let (piece_inside, shape_inside) = match op {
-        BooleanOp::Subtract => (false, true),
-        BooleanOp::Union => (false, false),
-        BooleanOp::Intersect => (true, true),
-    };
-    let faded = egui::Stroke::new(1.0, stroke.color.gamma_multiply(0.35));
-    for (center, other, inside) in [(piece, shape, piece_inside), (shape, piece, shape_inside)] {
-        painter.add(egui::Shape::line(
-            arc(center, other, radius, !inside),
-            faded,
-        ));
-        painter.add(egui::Shape::line(
-            arc(center, other, radius, inside),
-            stroke,
-        ));
+fn operation_glyph(op: BooleanOp) -> char {
+    match op {
+        BooleanOp::Subtract => glyph::SUBTRACT,
+        BooleanOp::Intersect => glyph::INTERSECT,
+        BooleanOp::Union => glyph::UNION,
     }
-}
-
-fn paint_new_piece_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
-    let rect = rect.shrink(ICON_MARGIN);
-    painter.rect_stroke(rect, 0.0, stroke, egui::StrokeKind::Middle);
-    let center = rect.center();
-    let arm = rect.width() * 0.25;
-    painter.line_segment(
-        [center - egui::vec2(arm, 0.0), center + egui::vec2(arm, 0.0)],
-        stroke,
-    );
-    painter.line_segment(
-        [center - egui::vec2(0.0, arm), center + egui::vec2(0.0, arm)],
-        stroke,
-    );
 }
 
 /// The hole kind, pitch and size the Stitch holes tool draws with.
@@ -218,7 +163,7 @@ pub fn show_panel(ui: &mut egui::Ui, settings: ToolSettings, units: Units, langu
             ICON_BUTTON_SIZE,
             op_mode.is_none(),
             language.label(Label::NewPieceMode),
-            paint_new_piece_icon,
+            |painter, rect, stroke| paint_glyph(painter, rect, stroke, glyph::NEW_PIECE),
         );
         if response.clicked() {
             *op_mode = None;
@@ -229,7 +174,7 @@ pub fn show_panel(ui: &mut egui::Ui, settings: ToolSettings, units: Units, langu
                 ICON_BUTTON_SIZE,
                 *op_mode == Some(op),
                 language.label(Label::OperationHint(op)),
-                |painter, rect, stroke| paint_operation_icon(painter, rect, stroke, op),
+                |painter, rect, stroke| paint_glyph(painter, rect, stroke, operation_glyph(op)),
             );
             if response.clicked() {
                 *op_mode = Some(op);

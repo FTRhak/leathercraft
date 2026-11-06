@@ -8,10 +8,10 @@ An icon is anything that paints into a rect with a stroke: `FnOnce(&egui::Painte
 
 | Kind | When to use | How |
 |---|---|---|
-| **Font glyph** | Fixed pictograms: trash can, padlock, tool icons | `paint_glyph(painter, rect, stroke, glyph::TRASH)` |
-| **Painted** | Icons built from geometry or that depend on state: boolean operation icons, reorder arrows | Draw with `painter` lines and shapes inside `rect`, in `stroke` |
+| **Font glyph** | Fixed pictograms: trash can, padlock, tool, new piece and boolean operation icons | `paint_glyph(painter, rect, stroke, glyph::TRASH)` |
+| **Painted** | Icons built from geometry or that depend on state: reorder arrows | Draw with `painter` lines and shapes inside `rect`, in `stroke` |
 
-Prefer a glyph for a new pictogram. Paint an icon when it shows the app's own geometry (shapes, operations), so it stays in step with how the canvas draws them.
+Prefer a glyph for a new pictogram. Paint an icon only when it depends on state or must follow the canvas geometry.
 
 Both kinds must use only the `stroke` they are given for color and width. That is how they follow hover, selected and disabled states and the light or dark theme.
 
@@ -50,6 +50,10 @@ Constants are in `icons::glyph`:
 | `STITCH_HOLES` | `U+E136` | Stitch holes tool (Tools panel) |
 | `CENTERLINE` | `U+E137` | Centerline tool (Tools panel) |
 | `REGULAR_POLYGON` | `U+E138` | Regular polygon tool (Tools panel) |
+| `NEW_PIECE` | `U+E13C` | New piece mode (Tools panel) |
+| `SUBTRACT` | `U+E13D` | Subtract operation (Tools panel) |
+| `INTERSECT` | `U+E13F` | Intersect operation (Tools panel) |
+| `UNION` | `U+E13E` | Union operation (Tools panel) |
 
 ### Adding a glyph
 

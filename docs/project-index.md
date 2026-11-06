@@ -35,10 +35,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/grid.rs` | 72 | 600 | bin | `draw_grid`: canvas grid and axes, grid steps; `draw_snap_dots`: the snap grid |
 | `src/editor/ui.rs` | 401 | 3,700 | bin | `editor_ui`, `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
 | `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History tab title has an icon; the Align tab targets the selected children when there are any, else the selected pieces |
-| `src/icons/mod.rs` | 95 | 830 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
+| `src/icons/mod.rs` | 99 | 870 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
 | `src/panels/dock/mod.rs` | 185 | 1,550 | bin | `PanelTab` (including `Snap`), `PanelDock`: panel arrangement, default layout, saving and restoring it |
-| `src/panels/tools/mod.rs` | 258 | 2,100 | bin | `Tool` (with `Centerline` and `StitchHoles`), `StitchSettings`, `ToolSettings`, tool icons from font glyphs, painted operation icons, Tools panel with the regular polygon's sides field, the style of new centerlines and the holes of new stitch lines |
+| `src/panels/tools/mod.rs` | 203 | 1,600 | bin | `Tool` (with `Centerline` and `StitchHoles`), `StitchSettings`, `ToolSettings`, tool, new-piece and operation icons from font glyphs, Tools panel with the regular polygon's sides field, the style of new centerlines and the holes of new stitch lines |
 | `src/panels/layout/mod.rs` | 273 | 2,800 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls (none for a centerline); Shift+click toggles a piece or child |
 | `src/panels/align/mod.rs` | 293 | 2,300 | bin | Align panel: `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), painted align, distribute and spacing icons, `show_panel` |
 | `src/panels/snap/mod.rs` | 43 | 400 | bin | Snap panel: `show_panel` edits `SnapSettings` (on/off, grid and step, vertices, smart guides, distance in px) |
@@ -184,10 +184,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
 | | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
 | | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
-| `tools/mod.rs` | 8-11 | Icon constants |
-| | 14-129 | `Tool` (Select, Edge, Draw, Rectangle, Ellipse, RegularPolygon): `ALL`, `label`, `hint`, `shape`, `paint_icon` |
-| | 119-175 | `arc`, `paint_operation_icon`, `paint_new_piece_icon` |
-| | 191 | `show_panel`: tools, the new-piece and operation modes, then the sides field while the Regular polygon tool is active (`EditorState::polygon_sides`) |
+| `tools/mod.rs` | 8 | Icon button size |
+| | 10-98 | `Tool` (Select, Edge, Draw, Rectangle, Ellipse, RegularPolygon, Centerline, StitchHoles): `ALL`, `label`, `hint`, `shape`, `glyph`, `paint_icon` |
+| | 100 | `operation_glyph`: font glyph of a boolean operation |
+| | 138 | `show_panel`: tools, the new-piece and operation modes, then the sides field while the Regular polygon tool is active (`EditorState::polygon_sides`) |
 | `layout/mod.rs` | 9-10 | Constants |
 | | 14 | `expand_toggle`: expands or collapses a piece's children |
 | | 31-52 | `paint_trash` (icon font), `paint_arrow`, `shape_label`; the lock button uses the font's lock and unlock glyphs |
@@ -239,8 +239,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add a validation rule | `model.rs` 8-13, 200-262, 301-333 | `validate`, plus a `Message` variant and both catalogs |
 | Add UI text | `i18n/mod.rs` 70-166 | A `Label` or `Message` variant and an arm in `en.rs` and `uk.rs`; the compiler flags missing arms |
 | Add a language | `i18n/mod.rs` 14-66 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
-| Add a canvas tool | `panels/tools/mod.rs`, `editor/canvas.rs` 38-93, 152-262, `settings/hotkeys.rs` | `Tool` and its `ALL`, `label`, `hint`, `paint_icon`, a dispatch arm in `canvas`, an `Action::Tool…` hotkey; a new primitive also goes in `Shape` (`ring`, `handles`, `with_handle_at`, `has_valid_size`), `shape_label` and `shape_fields` (with its own file in `panels/properties/`); an open one also in `is_open`, `distance_to`, its own drawing and the exports (see `docs/centerline.md` and `docs/stitch-holes.md`). A click-by-click tool shares `EditorState::draft`, owned through `draft_tool` |
-| Add a boolean operation | `model.rs` `BooleanOp`, `boolean.rs` `region` | A `BooleanOp` variant and its `ALL`, its `OverlayRule`, catalog arms, `op_color` and `paint_operation_icon` |
+| Add a canvas tool | `panels/tools/mod.rs`, `editor/canvas.rs` 38-93, 152-262, `settings/hotkeys.rs` | `Tool` and its `ALL`, `label`, `hint`, `glyph` (plus a glyph in the icon font), a dispatch arm in `canvas`, an `Action::Tool…` hotkey; a new primitive also goes in `Shape` (`ring`, `handles`, `with_handle_at`, `has_valid_size`), `shape_label` and `shape_fields` (with its own file in `panels/properties/`); an open one also in `is_open`, `distance_to`, its own drawing and the exports (see `docs/centerline.md` and `docs/stitch-holes.md`). A click-by-click tool shares `EditorState::draft`, owned through `draft_tool` |
+| Add a boolean operation | `model.rs` `BooleanOp`, `boolean.rs` `region` | A `BooleanOp` variant and its `ALL`, its `OverlayRule`, catalog arms, `op_color`, `operation_glyph` and a glyph in the icon font |
 | Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material`, `material_fields` and the Settings form in `panels/settings/material.rs` |
 | Change the file format | `model.rs` 119-160, 265-278, `shapes/mod.rs` 14-23 and the shape structs, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |

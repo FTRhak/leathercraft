@@ -17,6 +17,10 @@ pub mod glyph {
     pub const STITCH_HOLES: char = '\u{E136}';
     pub const CENTERLINE: char = '\u{E137}';
     pub const REGULAR_POLYGON: char = '\u{E138}';
+    pub const NEW_PIECE: char = '\u{E13C}';
+    pub const SUBTRACT: char = '\u{E13D}';
+    pub const INTERSECT: char = '\u{E13F}';
+    pub const UNION: char = '\u{E13E}';
 }
 
 fn icon_font() -> egui::FontFamily {
