@@ -21,6 +21,18 @@ pub mod glyph {
     pub const SUBTRACT: char = '\u{E13D}';
     pub const INTERSECT: char = '\u{E13F}';
     pub const UNION: char = '\u{E13E}';
+    pub const ALIGN_LEFT: char = '\u{E140}';
+    pub const ALIGN_CENTER_X: char = '\u{E141}';
+    pub const ALIGN_RIGHT: char = '\u{E142}';
+    pub const ALIGN_TOP: char = '\u{E143}';
+    pub const ALIGN_CENTER_Y: char = '\u{E144}';
+    pub const ALIGN_BOTTOM: char = '\u{E145}';
+    pub const DISTRIBUTE_TOP: char = '\u{E146}';
+    pub const DISTRIBUTE_CENTER_Y: char = '\u{E147}';
+    pub const DISTRIBUTE_BOTTOM: char = '\u{E148}';
+    pub const DISTRIBUTE_LEFT: char = '\u{E149}';
+    pub const DISTRIBUTE_CENTER_X: char = '\u{E14A}';
+    pub const DISTRIBUTE_RIGHT: char = '\u{E14B}';
 }
 
 fn icon_font() -> egui::FontFamily {

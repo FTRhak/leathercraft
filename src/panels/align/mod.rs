@@ -1,4 +1,4 @@
-use crate::icons::icon_button;
+use crate::icons::{glyph, icon_button, paint_glyph};
 use bevy_egui::egui;
 use leathercraft::align::{AlignTo, Arrange, Axis, Edge, Spacing};
 use leathercraft::events::ProjectEvent;
@@ -88,68 +88,59 @@ impl Default for AlignOptions {
     }
 }
 
-/// The edge or center of a bar spanning `min..max`.
-fn edge_at(edge: Edge, min: f32, max: f32) -> f32 {
-    match edge {
-        Edge::Min => min,
-        Edge::Center => (min + max) * 0.5,
-        Edge::Max => max,
-    }
+/// The font glyph of an Align or Distribute button; `Horizontal` works on left, center or
+/// right edges. Space buttons have no glyph and are painted.
+fn arrange_glyph(arrange: Arrange) -> Option<char> {
+    Some(match arrange {
+        Arrange::Align(Axis::Horizontal, Edge::Min) => glyph::ALIGN_LEFT,
+        Arrange::Align(Axis::Horizontal, Edge::Center) => glyph::ALIGN_CENTER_X,
+        Arrange::Align(Axis::Horizontal, Edge::Max) => glyph::ALIGN_RIGHT,
+        Arrange::Align(Axis::Vertical, Edge::Min) => glyph::ALIGN_TOP,
+        Arrange::Align(Axis::Vertical, Edge::Center) => glyph::ALIGN_CENTER_Y,
+        Arrange::Align(Axis::Vertical, Edge::Max) => glyph::ALIGN_BOTTOM,
+        Arrange::Distribute(Axis::Vertical, Edge::Min) => glyph::DISTRIBUTE_TOP,
+        Arrange::Distribute(Axis::Vertical, Edge::Center) => glyph::DISTRIBUTE_CENTER_Y,
+        Arrange::Distribute(Axis::Vertical, Edge::Max) => glyph::DISTRIBUTE_BOTTOM,
+        Arrange::Distribute(Axis::Horizontal, Edge::Min) => glyph::DISTRIBUTE_LEFT,
+        Arrange::Distribute(Axis::Horizontal, Edge::Center) => glyph::DISTRIBUTE_CENTER_X,
+        Arrange::Distribute(Axis::Horizontal, Edge::Max) => glyph::DISTRIBUTE_RIGHT,
+        Arrange::Space(_) => return None,
+    })
 }
 
-/// Bars drawn along the axis the pieces move on, as `(min, max)` along it and across it.
-/// The vertical icons are the horizontal ones with the coordinates swapped.
+/// Align and Distribute buttons use font glyphs. Space buttons draw three bars along the axis
+/// the pieces move on, as `(min, max)` along it and across it, with the gaps between them
+/// marked; the vertical icon is the horizontal one with the coordinates swapped.
 fn paint_arrange_icon(
     painter: &egui::Painter,
     rect: egui::Rect,
     stroke: egui::Stroke,
     arrange: Arrange,
 ) {
+    if let Some(glyph) = arrange_glyph(arrange) {
+        paint_glyph(painter, rect, stroke, glyph);
+        return;
+    }
     let rect = rect.shrink(ICON_MARGIN);
     let at = |along: f32, across: f32| match arrange.axis() {
         Axis::Horizontal => rect.lerp_inside(egui::vec2(along, across)),
         Axis::Vertical => rect.lerp_inside(egui::vec2(across, along)),
     };
-    let bar = |along: (f32, f32), across: (f32, f32)| {
-        let bar = egui::Rect::from_two_pos(at(along.0, across.0), at(along.1, across.1));
-        painter.rect_stroke(bar, 0.0, stroke, egui::StrokeKind::Middle);
-    };
     let faded = egui::Stroke::new(1.0, stroke.color.gamma_multiply(0.5));
-    let line = |along: f32| painter.line_segment([at(along, 0.0), at(along, 1.0)], faded);
     // Three bars of different sizes, spread along the axis.
     let spread = [
         ((0.0, 0.2), (0.25, 0.75)),
         ((0.35, 0.65), (0.1, 0.9)),
         ((0.8, 1.0), (0.3, 0.7)),
     ];
-    match arrange {
-        Arrange::Align(_, edge) => {
-            line(edge_at(edge, 0.0, 1.0));
-            for (length, across) in [(0.85, (0.12, 0.4)), (0.5, (0.6, 0.88))] {
-                let start = match edge {
-                    Edge::Min => 0.0,
-                    Edge::Center => (1.0 - length) * 0.5,
-                    Edge::Max => 1.0 - length,
-                };
-                bar((start, start + length), across);
-            }
-        }
-        Arrange::Distribute(_, edge) => {
-            for (along, across) in spread {
-                line(edge_at(edge, along.0, along.1));
-                bar(along, across);
-            }
-        }
-        Arrange::Space(_) => {
-            for (along, across) in spread {
-                bar(along, across);
-            }
-            for gap in [(0.2, 0.35), (0.65, 0.8)] {
-                painter.line_segment([at(gap.0, 0.5), at(gap.1, 0.5)], faded);
-                for end in [gap.0, gap.1] {
-                    painter.line_segment([at(end, 0.4), at(end, 0.6)], faded);
-                }
-            }
+    for (along, across) in spread {
+        let bar = egui::Rect::from_two_pos(at(along.0, across.0), at(along.1, across.1));
+        painter.rect_stroke(bar, 0.0, stroke, egui::StrokeKind::Middle);
+    }
+    for gap in [(0.2, 0.35), (0.65, 0.8)] {
+        painter.line_segment([at(gap.0, 0.5), at(gap.1, 0.5)], faded);
+        for end in [gap.0, gap.1] {
+            painter.line_segment([at(end, 0.4), at(end, 0.6)], faded);
         }
     }
 }

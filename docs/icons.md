@@ -8,8 +8,8 @@ An icon is anything that paints into a rect with a stroke: `FnOnce(&egui::Painte
 
 | Kind | When to use | How |
 |---|---|---|
-| **Font glyph** | Fixed pictograms: trash can, padlock, tool, new piece and boolean operation icons | `paint_glyph(painter, rect, stroke, glyph::TRASH)` |
-| **Painted** | Icons built from geometry or that depend on state: reorder arrows | Draw with `painter` lines and shapes inside `rect`, in `stroke` |
+| **Font glyph** | Fixed pictograms: trash can, padlock, tool, new piece, boolean operation, align and distribute icons | `paint_glyph(painter, rect, stroke, glyph::TRASH)` |
+| **Painted** | Icons built from geometry or that depend on state: reorder arrows, spacing icons | Draw with `painter` lines and shapes inside `rect`, in `stroke` |
 
 Prefer a glyph for a new pictogram. Paint an icon only when it depends on state or must follow the canvas geometry.
 
@@ -52,8 +52,20 @@ Constants are in `icons::glyph`:
 | `REGULAR_POLYGON` | `U+E138` | Regular polygon tool (Tools panel) |
 | `NEW_PIECE` | `U+E13C` | New piece mode (Tools panel) |
 | `SUBTRACT` | `U+E13D` | Subtract operation (Tools panel) |
-| `INTERSECT` | `U+E13F` | Intersect operation (Tools panel) |
 | `UNION` | `U+E13E` | Union operation (Tools panel) |
+| `INTERSECT` | `U+E13F` | Intersect operation (Tools panel) |
+| `ALIGN_LEFT` | `U+E140` | Align left edges (Align panel) |
+| `ALIGN_CENTER_X` | `U+E141` | Align horizontal centers (Align panel) |
+| `ALIGN_RIGHT` | `U+E142` | Align right edges (Align panel) |
+| `ALIGN_TOP` | `U+E143` | Align top edges (Align panel) |
+| `ALIGN_CENTER_Y` | `U+E144` | Align vertical centers (Align panel) |
+| `ALIGN_BOTTOM` | `U+E145` | Align bottom edges (Align panel) |
+| `DISTRIBUTE_TOP` | `U+E146` | Distribute top edges (Align panel) |
+| `DISTRIBUTE_CENTER_Y` | `U+E147` | Distribute vertical centers (Align panel) |
+| `DISTRIBUTE_BOTTOM` | `U+E148` | Distribute bottom edges (Align panel) |
+| `DISTRIBUTE_LEFT` | `U+E149` | Distribute left edges (Align panel) |
+| `DISTRIBUTE_CENTER_X` | `U+E14A` | Distribute horizontal centers (Align panel) |
+| `DISTRIBUTE_RIGHT` | `U+E14B` | Distribute right edges (Align panel) |
 
 ### Adding a glyph
 
