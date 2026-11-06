@@ -1,5 +1,9 @@
 use crate::model::{Bounds, PatternPiece, Project};
 
+mod align_edges;
+mod distribute;
+mod space;
+
 /// Below this, an offset counts as no move.
 const MIN_OFFSET_MM: f64 = 1.0e-9;
 
@@ -234,25 +238,16 @@ fn arrange_items(
 
     // The target of each item's min edge.
     let targets: Vec<(usize, f64)> = match arrange {
-        Arrange::Align(_, at) => {
-            let target = match at {
-                Edge::Min => low,
-                Edge::Center => (low + high) * 0.5,
-                Edge::Max => high,
-            };
-            (0..items.len())
-                .map(|index| (index, items[index].min + target - items[index].at(at)))
-                .collect()
-        }
+        Arrange::Align(_, at) => align_edges::align(&items, at, (low, high)),
         Arrange::Distribute(_, at) => {
             let order = sorted(&items, |item| item.at(at));
-            distribute(&items, &order, at, to, (low, high))
+            distribute::distribute(&items, &order, at, to, (low, high))
         }
         Arrange::Space(_) => {
             let order = sorted(&items, |item| item.min);
             match (spacing, to.key()) {
-                (Spacing::Fixed(gap), Some(key)) => pack(&items, &order, key, gap),
-                _ => space(&items, &order, to, (low, high)),
+                (Spacing::Fixed(gap), Some(key)) => space::pack(&items, &order, key, gap),
+                _ => space::space(&items, &order, to, (low, high)),
             }
         }
     };
@@ -274,94 +269,6 @@ fn sorted(items: &[Item], key: impl Fn(&Item) -> f64) -> Vec<usize> {
     let mut order: Vec<usize> = (0..items.len()).collect();
     order.sort_by(|a, b| key(&items[*a]).total_cmp(&key(&items[*b])));
     order
-}
-
-/// The outer items stay and the rest are spread between them; against the project or the
-/// parent, the outer items move to its edges first.
-fn distribute(
-    items: &[Item],
-    order: &[usize],
-    at: Edge,
-    to: AlignTo,
-    (low, high): (f64, f64),
-) -> Vec<(usize, f64)> {
-    let (Some(&first), Some(&last)) = (order.first(), order.last()) else {
-        return Vec::new();
-    };
-    if order.len() < 2 {
-        return Vec::new();
-    }
-    let (start, end) = if to.is_outer() {
-        (
-            low + items[first].at(at) - items[first].min,
-            high - (items[last].max - items[last].at(at)),
-        )
-    } else {
-        (items[first].at(at), items[last].at(at))
-    };
-    let steps = (order.len() - 1) as f64;
-    order
-        .iter()
-        .enumerate()
-        .map(|(position, &index)| {
-            let target = start + (end - start) * position as f64 / steps;
-            (index, items[index].min + target - items[index].at(at))
-        })
-        .collect()
-}
-
-/// Equal gaps between the outer items, or between the edges of the project or the parent.
-fn space(
-    items: &[Item],
-    order: &[usize],
-    to: AlignTo,
-    (low, high): (f64, f64),
-) -> Vec<(usize, f64)> {
-    if order.len() < 2 {
-        return Vec::new();
-    }
-    let (start, end) = if to.is_outer() {
-        (low, high)
-    } else {
-        (
-            items[order[0]].min,
-            order
-                .iter()
-                .map(|&index| items[index].max)
-                .fold(f64::MIN, f64::max),
-        )
-    };
-    let total: f64 = order.iter().map(|&index| items[index].size()).sum();
-    let gap = (end - start - total) / (order.len() - 1) as f64;
-    let mut position = start;
-    order
-        .iter()
-        .map(|&index| {
-            let target = position;
-            position += items[index].size() + gap;
-            (index, target)
-        })
-        .collect()
-}
-
-/// The key piece stays, and the others are packed away from it with `gap` between them.
-fn pack(items: &[Item], order: &[usize], key: u64, gap: f64) -> Vec<(usize, f64)> {
-    let Some(center) = order.iter().position(|&index| items[index].id == key) else {
-        return Vec::new();
-    };
-    let mut targets = Vec::with_capacity(order.len());
-    let mut position = items[order[center]].max + gap;
-    for &index in &order[center + 1..] {
-        targets.push((index, position));
-        position += items[index].size() + gap;
-    }
-    let mut position = items[order[center]].min - gap;
-    for &index in order[..center].iter().rev() {
-        let min = position - items[index].size();
-        targets.push((index, min));
-        position = min - gap;
-    }
-    targets
 }
 
 #[cfg(test)]

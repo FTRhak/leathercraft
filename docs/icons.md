@@ -8,8 +8,8 @@ An icon is anything that paints into a rect with a stroke: `FnOnce(&egui::Painte
 
 | Kind | When to use | How |
 |---|---|---|
-| **Font glyph** | Fixed pictograms: trash can, padlock, tool, new piece, boolean operation, align and distribute icons | `paint_glyph(painter, rect, stroke, glyph::TRASH)` |
-| **Painted** | Icons built from geometry or that depend on state: reorder arrows, spacing icons | Draw with `painter` lines and shapes inside `rect`, in `stroke` |
+| **Font glyph** | Fixed pictograms: trash can, padlock, tool, new piece, boolean operation, align, distribute and spacing icons | `paint_glyph(painter, rect, stroke, glyph::TRASH)` |
+| **Painted** | Icons built from geometry or that depend on state: reorder arrows | Draw with `painter` lines and shapes inside `rect`, in `stroke` |
 
 Prefer a glyph for a new pictogram. Paint an icon only when it depends on state or must follow the canvas geometry.
 
@@ -66,6 +66,8 @@ Constants are in `icons::glyph`:
 | `DISTRIBUTE_LEFT` | `U+E149` | Distribute left edges (Align panel) |
 | `DISTRIBUTE_CENTER_X` | `U+E14A` | Distribute horizontal centers (Align panel) |
 | `DISTRIBUTE_RIGHT` | `U+E14B` | Distribute right edges (Align panel) |
+| `SPACE_VERTICAL` | `U+E14C` | Distribute vertical spacing (Align panel) |
+| `SPACE_HORIZONTAL` | `U+E14D` | Distribute horizontal spacing (Align panel) |
 
 ### Adding a glyph
 

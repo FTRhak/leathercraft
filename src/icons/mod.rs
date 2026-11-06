@@ -33,6 +33,8 @@ pub mod glyph {
     pub const DISTRIBUTE_LEFT: char = '\u{E149}';
     pub const DISTRIBUTE_CENTER_X: char = '\u{E14A}';
     pub const DISTRIBUTE_RIGHT: char = '\u{E14B}';
+    pub const SPACE_VERTICAL: char = '\u{E14C}';
+    pub const SPACE_HORIZONTAL: char = '\u{E14D}';
 }
 
 fn icon_font() -> egui::FontFamily {

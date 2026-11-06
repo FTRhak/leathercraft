@@ -6,7 +6,6 @@ use leathercraft::i18n::{Label, Language};
 use leathercraft::model::Units;
 
 const ICON_BUTTON_SIZE: f32 = 32.0;
-const ICON_MARGIN: f32 = 6.0;
 
 /// The Align To choice; the key object itself is the primary selected piece or child.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -88,10 +87,9 @@ impl Default for AlignOptions {
     }
 }
 
-/// The font glyph of an Align or Distribute button; `Horizontal` works on left, center or
-/// right edges. Space buttons have no glyph and are painted.
-fn arrange_glyph(arrange: Arrange) -> Option<char> {
-    Some(match arrange {
+/// The font glyph of an arrange button; `Horizontal` works on left, center or right edges.
+fn arrange_glyph(arrange: Arrange) -> char {
+    match arrange {
         Arrange::Align(Axis::Horizontal, Edge::Min) => glyph::ALIGN_LEFT,
         Arrange::Align(Axis::Horizontal, Edge::Center) => glyph::ALIGN_CENTER_X,
         Arrange::Align(Axis::Horizontal, Edge::Max) => glyph::ALIGN_RIGHT,
@@ -104,44 +102,8 @@ fn arrange_glyph(arrange: Arrange) -> Option<char> {
         Arrange::Distribute(Axis::Horizontal, Edge::Min) => glyph::DISTRIBUTE_LEFT,
         Arrange::Distribute(Axis::Horizontal, Edge::Center) => glyph::DISTRIBUTE_CENTER_X,
         Arrange::Distribute(Axis::Horizontal, Edge::Max) => glyph::DISTRIBUTE_RIGHT,
-        Arrange::Space(_) => return None,
-    })
-}
-
-/// Align and Distribute buttons use font glyphs. Space buttons draw three bars along the axis
-/// the pieces move on, as `(min, max)` along it and across it, with the gaps between them
-/// marked; the vertical icon is the horizontal one with the coordinates swapped.
-fn paint_arrange_icon(
-    painter: &egui::Painter,
-    rect: egui::Rect,
-    stroke: egui::Stroke,
-    arrange: Arrange,
-) {
-    if let Some(glyph) = arrange_glyph(arrange) {
-        paint_glyph(painter, rect, stroke, glyph);
-        return;
-    }
-    let rect = rect.shrink(ICON_MARGIN);
-    let at = |along: f32, across: f32| match arrange.axis() {
-        Axis::Horizontal => rect.lerp_inside(egui::vec2(along, across)),
-        Axis::Vertical => rect.lerp_inside(egui::vec2(across, along)),
-    };
-    let faded = egui::Stroke::new(1.0, stroke.color.gamma_multiply(0.5));
-    // Three bars of different sizes, spread along the axis.
-    let spread = [
-        ((0.0, 0.2), (0.25, 0.75)),
-        ((0.35, 0.65), (0.1, 0.9)),
-        ((0.8, 1.0), (0.3, 0.7)),
-    ];
-    for (along, across) in spread {
-        let bar = egui::Rect::from_two_pos(at(along.0, across.0), at(along.1, across.1));
-        painter.rect_stroke(bar, 0.0, stroke, egui::StrokeKind::Middle);
-    }
-    for gap in [(0.2, 0.35), (0.65, 0.8)] {
-        painter.line_segment([at(gap.0, 0.5), at(gap.1, 0.5)], faded);
-        for end in [gap.0, gap.1] {
-            painter.line_segment([at(end, 0.4), at(end, 0.6)], faded);
-        }
+        Arrange::Space(Axis::Vertical) => glyph::SPACE_VERTICAL,
+        Arrange::Space(Axis::Horizontal) => glyph::SPACE_HORIZONTAL,
     }
 }
 
@@ -161,7 +123,9 @@ fn arrange_row(
                     ICON_BUTTON_SIZE,
                     false,
                     language.label(Label::Arrange(arrange)),
-                    |painter, rect, stroke| paint_arrange_icon(painter, rect, stroke, arrange),
+                    |painter, rect, stroke| {
+                        paint_glyph(painter, rect, stroke, arrange_glyph(arrange))
+                    },
                 );
                 if response.clicked() {
                     clicked = Some(arrange);
