@@ -246,6 +246,20 @@ pub(super) fn update_drag(cursor: Point, tolerance: f64, state: &mut EditorState
             }
         }
     }
+    // A stitch line can't be pushed off the leather, whether by moving or reshaping it or by
+    // reshaping what it lies on; the drag stops at the last place it fitted. A line that was
+    // already off, as in an older file, doesn't hold back other edits.
+    // Moving the whole piece moves its lines with it.
+    let stray = || {
+        let before = drag.original.stray_stitch_lines();
+        current
+            .stray_stitch_lines()
+            .into_iter()
+            .any(|id| !before.contains(&id))
+    };
+    if !matches!(drag.target, DragTarget::Piece) && stray() {
+        return;
+    }
     state.snap_feedback = feedback;
     if let Some(drag) = &mut state.drag {
         drag.current = current;

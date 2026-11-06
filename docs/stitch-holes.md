@@ -35,6 +35,7 @@ A stitch line is a `ChildShape` whose shape is `Shape::StitchLine`, so ids, sele
 | Align it | Select it with other children (Shift+click) and use the Align panel, also with **Align to parent** |
 
 - A stitch line is added to the selected piece whatever the operation mode is. With no piece selected, the status bar asks for one.
+- A stitch line stays on the leather of its piece. While drafting, a click whose vertex, or segment from the previous vertex, would leave the piece's outline or cross one of its holes places nothing, and the segment to the cursor turns red. A drag that would push a line off the piece stops where the line last fitted. This covers moving or reshaping the line, and reshaping the base or another child under it.
 - It needs at least two vertices. Finishing with fewer drops the draft.
 - While drafting, the canvas shows the vertices, the segment to the cursor, the holes the line would get, and its length and hole count next to the cursor.
 - The canvas shows the holes, not the line. The path is drawn faintly only while the line is selected or under the cursor, so it can be grabbed.
@@ -96,7 +97,16 @@ New lines default to Diamond with a pitch of `DEFAULT_PITCH_MM` (3.85 mm), the m
 
 `HoleKind::footprint` is the size for a round hole; for a slanted hole it is the extent of its outline along the path: `size·cos + width·sin` for a French slot, `max(size·cos, width·sin)` for a diamond. A very short run between two sharp vertices has a small actual pitch, so it can trigger `HolesOverlap` too.
 
-A stitch line can't be a base (`BaseMustBeClosed`). Holes outside the piece's outline are not an error: a line can be dragged across the edge, like any child.
+A stitch line can't be a base (`BaseMustBeClosed`). A path off the piece's outline isn't a validation error, so older files with such lines still load. The editor keeps new and edited lines on the piece instead (see below).
+
+### Staying on the piece
+
+- `PatternPiece::stitch_area` is the leather a line must stay on: `region`, or the base while the shapes don't combine.
+- `Region::contains_path` holds when every point of the path is inside the region and no segment crosses an edge of the outline or of a hole. A point exactly on an edge counts as `ring_contains` decides.
+- `PatternPiece::stray_stitch_lines` lists the stitch lines whose `path` (with rounded vertices as arcs) fails `contains_path`.
+- `handle_stitch` places a vertex only if `stitch_allowed` holds, which checks the segment from the last vertex, or the first point alone. Without a selected piece any point goes, since finishing reports the missing piece anyway.
+- `update_drag` keeps the previous preview when the drag would add a line to `stray_stitch_lines`. Lines that were already stray when the drag began don't block it. Dragging a whole piece skips the check.
+- Not covered: numeric edits in Properties, aligning children, and adding or reordering a child with the shape tools. These can still leave a line off the piece.
 
 ## Hole placement
 
@@ -157,7 +167,7 @@ The feature has no `ProjectEvent` of its own:
 |---|---|
 | `shapes::stitch` | Even spacing and actual pitch on a straight run; holes at both ends and at sharp vertices; rounded vertices don't anchor; slant per kind and the bisector at a vertex; outline points per kind; overlap and parameter limits; `distance_to`, handles, `translate`; Shift snapping; bands; every validation error, and a stitch line as a base |
 | `shapes` | A stitch line is open, `contains` is false, `to_polygon` keeps it, only inner vertices round |
-| `boolean` | `region` ignores stitch lines; `punched_region` cuts the holes inside the outline and ignores those outside |
+| `boolean` | `region` ignores stitch lines; `punched_region` cuts the holes inside the outline and ignores those outside; `contains_path` rejects an end outside, a segment across a hole and a point in a hole; `stray_stitch_lines` finds a line that crosses the edge |
 | `events` | Adding through `AddChild`; an invalid pitch is rejected and leaves the project unchanged |
 | `exports` | SVG circles and polygons in their group with offset coordinates; DXF `CIRCLE` and `LWPOLYLINE` on `STITCH_HOLES` |
 | `persistence` | Round-trip with sharp and rounded vertices; the `stitch_line` and `hole` keys; no `radii` key when sharp |
@@ -170,7 +180,7 @@ Drawing, the draft and the Properties fields have no tests. Check them with `car
 - **Slant per line:** a `slant` field with `#[serde(default)]`, for left- and right-handed irons, read by `HoleKind::slant` and `footprint`.
 - **SPI input:** a pitch field in stitches per inch, converted with 25.4 / SPI.
 - **A second row:** a stitch line offset from the first, for double stitching.
-- **Flagging stray holes:** mark holes outside the outline on the canvas, using `Region::contains`.
+- **Flagging stray lines:** mark the lines in `stray_stitch_lines` on the canvas, such as those from older files or numeric edits.
 - **A closed stitch line:** around a whole outline, the first and last anchors would merge; `path_with_anchors` would need to wrap like `round_corners`.
 
 ## Appendix: reference data

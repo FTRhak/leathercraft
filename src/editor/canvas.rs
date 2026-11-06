@@ -139,14 +139,7 @@ pub(super) fn canvas(
     draw_stitch_holes(&painter, ui, response.hover_pos(), view, project, state);
     draw_edges(&painter, response.hover_pos(), view, project, state);
     if state.tool == Tool::StitchHoles {
-        draw_stitch_draft(
-            &painter,
-            ui,
-            response.hover_pos(),
-            view,
-            project.units,
-            state,
-        );
+        draw_stitch_draft(&painter, ui, response.hover_pos(), view, project, state);
     } else {
         draw_draft(&painter, response.hover_pos(), view, project.units, state);
     }
@@ -403,7 +396,7 @@ fn handle_stitch(
         let shift = ui.input(|input| input.modifiers.shift);
         let point = snap_draw(project, view, state, view.to_world(position));
         let point = stitch_target(state, point, shift);
-        if state.draft.last() != Some(&point) {
+        if state.draft.last() != Some(&point) && stitch_allowed(project, state, point) {
             state.draft.push(point);
         }
     }
@@ -428,6 +421,26 @@ fn stitch_target(state: &EditorState, point: Point, shift: bool) -> Point {
         Some(&last) if shift => StitchLine::snap(last, point),
         _ => point,
     }
+}
+
+/// Whether the next vertex of a stitch line may go at `point`: it and the segment to it from
+/// the last vertex must stay on the selected piece's leather. Without a selected piece any
+/// point goes, and finishing the line reports that a piece is needed.
+fn stitch_allowed(project: &Project, state: &EditorState, point: Point) -> bool {
+    let Some(piece) = state
+        .selected
+        .and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
+    else {
+        return true;
+    };
+    let path: Vec<Point> = state
+        .draft
+        .last()
+        .copied()
+        .into_iter()
+        .chain([point])
+        .collect();
+    piece.stitch_area().contains_path(&path)
 }
 
 /// The stitch line of the draft with the current settings, or `None` with fewer than two points.
@@ -917,13 +930,14 @@ fn draw_stitch_line(
     }
 }
 
-/// The stitch line being drawn: its vertices, the segment to the cursor, and its holes.
+/// The stitch line being drawn: its vertices, the segment to the cursor, and its holes. A
+/// segment that would leave the piece is drawn alone, in the error color.
 fn draw_stitch_draft(
     painter: &egui::Painter,
     ui: &egui::Ui,
     hover: Option<egui::Pos2>,
     view: Viewport,
-    units: Units,
+    project: &Project,
     state: &EditorState,
 ) {
     let Some(&last) = state.draft.last() else {
@@ -934,6 +948,17 @@ fn draw_stitch_draft(
     let target = hover
         .and(state.hover_target)
         .map(|point| stitch_target(state, point, shift));
+    let (target, rejected) = match target {
+        Some(target) if !stitch_allowed(project, state, target) => (None, Some(target)),
+        target => (target, None),
+    };
+    if let Some(rejected) = rejected {
+        painter.line_segment(
+            [view.to_screen(last), view.to_screen(rejected)],
+            egui::Stroke::new(1.0, ui.visuals().error_fg_color),
+        );
+    }
+    let units = project.units;
     if let Some(target) = target
         && target != last
     {

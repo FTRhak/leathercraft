@@ -51,6 +51,28 @@ impl Region {
         ring_contains(&self.outline, point)
             && !self.holes.iter().any(|hole| ring_contains(hole, point))
     }
+
+    /// Whether the whole open path lies on the leather: every point inside, and no segment
+    /// crossing an edge of the outline or of a hole.
+    pub fn contains_path(&self, path: &[Point]) -> bool {
+        path.iter().all(|&point| self.contains(point))
+            && path.windows(2).all(|segment| {
+                self.rings().all(|ring| {
+                    (0..ring.len()).all(|index| {
+                        let next = ring[(index + 1) % ring.len()];
+                        !segments_cross(segment[0], segment[1], ring[index], next)
+                    })
+                })
+            })
+    }
+}
+
+/// Whether the segments `ab` and `cd` cross at a point inside both.
+fn segments_cross(a: Point, b: Point, c: Point, d: Point) -> bool {
+    let side = |p: Point, q: Point, r: Point| (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+    let (abc, abd) = (side(a, b, c), side(a, b, d));
+    let (cda, cdb) = (side(c, d, a), side(c, d, b));
+    abc * abd < 0.0 && cda * cdb < 0.0
 }
 
 fn contour(points: &[Point]) -> Vec<[f64; 2]> {
@@ -94,6 +116,28 @@ impl PatternPiece {
             }),
             _ => Err(Message::ResultSplit { name }),
         }
+    }
+
+    /// The leather a stitch line must stay on: the region, or the base while the shapes don't
+    /// combine into one.
+    pub fn stitch_area(&self) -> Region {
+        self.region().unwrap_or_else(|_| Region {
+            outline: self.base.ring(),
+            holes: Vec::new(),
+        })
+    }
+
+    /// The ids of the stitch lines whose path leaves `stitch_area`.
+    pub fn stray_stitch_lines(&self) -> Vec<u64> {
+        let area = self.stitch_area();
+        self.children
+            .iter()
+            .filter(|child| match &child.shape {
+                Shape::StitchLine(line) => !area.contains_path(&line.path()),
+                _ => false,
+            })
+            .map(|child| child.id)
+            .collect()
     }
 
     /// The region with every stitch hole punched through, for the 3D preview. Holes outside
@@ -286,5 +330,37 @@ mod tests {
         assert!(area(&punched) < area(&region));
         assert!(!punched.contains(Point::new(20.0, 10.0)));
         assert!(punched.contains(Point::new(30.0, 10.0)));
+    }
+
+    #[test]
+    fn a_path_must_stay_on_the_leather() {
+        let region = piece(vec![(BooleanOp::Subtract, square(30.0, 50.0, 20.0))])
+            .region()
+            .unwrap();
+        let path = |points: &[(f64, f64)]| -> Vec<Point> {
+            points.iter().map(|&(x, y)| Point::new(x, y)).collect()
+        };
+        assert!(region.contains_path(&path(&[(10.0, 10.0), (70.0, 10.0), (70.0, 110.0)])));
+        // An end outside the outline.
+        assert!(!region.contains_path(&path(&[(10.0, 10.0), (90.0, 10.0)])));
+        // Both ends inside, but the segment crosses the hole.
+        assert!(!region.contains_path(&path(&[(10.0, 60.0), (70.0, 60.0)])));
+        // A point in the hole.
+        assert!(!region.contains_path(&path(&[(10.0, 10.0), (40.0, 60.0)])));
+    }
+
+    #[test]
+    fn stray_stitch_lines_are_found() {
+        use crate::shapes::{HoleKind, StitchLine};
+        let stitch = |points: Vec<Point>| {
+            Shape::StitchLine(StitchLine::new(points, HoleKind::Round, 4.0, 1.2).unwrap())
+        };
+        let inside = stitch(vec![Point::new(10.0, 10.0), Point::new(70.0, 10.0)]);
+        let across = stitch(vec![Point::new(10.0, 20.0), Point::new(100.0, 20.0)]);
+        let piece = piece(vec![
+            (BooleanOp::Subtract, inside),
+            (BooleanOp::Subtract, across),
+        ]);
+        assert_eq!(piece.stray_stitch_lines(), vec![2]);
     }
 }

@@ -194,7 +194,7 @@ pub struct ToolSettings<'a> {
     pub line_style: &'a mut LineStyle,
     /// The holes of new stitch lines.
     pub stitch: &'a mut StitchSettings,
-    /// Whether a piece is selected; the tools that need one are hidden otherwise.
+    /// Whether a piece is selected; the tools that need one are disabled otherwise.
     pub piece_selected: bool,
 }
 
@@ -214,10 +214,7 @@ pub fn show_toolbar(ui: &mut egui::Ui, settings: ToolSettings, units: Units, lan
     }
     egui::ScrollArea::horizontal().show(ui, |ui| {
         ui.horizontal(|ui| {
-            for option in Tool::ALL {
-                if option.needs_piece() && !piece_selected {
-                    continue;
-                }
+            let mut tool_button = |ui: &mut egui::Ui, option: Tool| {
                 let name = language.label(option.label());
                 let response = icon_button(
                     ui,
@@ -229,9 +226,20 @@ pub fn show_toolbar(ui: &mut egui::Ui, settings: ToolSettings, units: Units, lan
                 if response.clicked() {
                     *tool = option;
                 }
+            };
+            // Tools that start a piece or combine with it, then the operation mode, then the
+            // tools that only add to the selected piece.
+            for option in Tool::ALL.into_iter().filter(|option| !option.needs_piece()) {
+                tool_button(ui, option);
             }
             ui.separator();
             op_mode_dropdown(ui, op_mode, language);
+            ui.separator();
+            ui.add_enabled_ui(piece_selected, |ui| {
+                for option in Tool::ALL.into_iter().filter(|option| option.needs_piece()) {
+                    tool_button(ui, option);
+                }
+            });
             match *tool {
                 Tool::RegularPolygon => {
                     ui.separator();
