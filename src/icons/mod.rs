@@ -9,6 +9,8 @@ pub mod glyph {
     pub const LOCK: char = '\u{E115}';
     pub const UNLOCK: char = '\u{E116}';
     pub const HISTORY: char = '\u{E121}';
+    pub const PROPERTIES: char = '\u{E122}';
+    pub const LAYOUT: char = '\u{E123}';
     pub const SELECT: char = '\u{E130}';
     pub const DRAW: char = '\u{E132}';
     pub const RECTANGLE: char = '\u{E133}';

@@ -39,6 +39,12 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
             PanelTab::History => {
                 icon_text(&self.style, egui::TextStyle::Button, glyph::HISTORY, text)
             }
+            PanelTab::Layout => {
+                icon_text(&self.style, egui::TextStyle::Button, glyph::LAYOUT, text)
+            }
+            PanelTab::Properties => {
+                icon_text(&self.style, egui::TextStyle::Button, glyph::PROPERTIES, text)
+            }
             _ => text.into(),
         }
     }
