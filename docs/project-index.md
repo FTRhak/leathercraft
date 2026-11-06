@@ -29,10 +29,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/editor_state_struct.rs` | 440 | 3,700 | bin | `EditorState` and its methods (primary piece plus multi-selection, primary child plus multi-selection of children in that piece, selected edge or vertex; snap settings, Alt suspension, snap feedback and hover target: `active_snap`, `snap_point`, `save_snap_when_settled`), `document_name` |
 | `src/editor/drag_state_struct.rs` | 60 | 480 | bin | `ShapeRef`, `DragTarget`, `DragState` (with the `group` of pieces or `child_group` of children moved along, and the snap `targets` and `moving` shapes gathered at the start) |
 | `src/editor/shape_draft_struct.rs` | 9 | 60 | bin | `ShapeDraft` |
-| `src/editor/canvas.rs` | 1,288 | 10,400 | bin | `canvas`, `Viewport` (`hit_tolerance`), tool behavior (Shift+click toggles a child of the selected piece, else a piece; the Edge tool picks a vertex or a polygon edge; a line or stitch line is always added as a child; the Stitch holes tool clicks a draft), hit testing (pieces and their lines, children with a line tolerance, handles, vertices, polygon edges), painting (centerlines in their dash pattern and stitch holes above all outlines); snapping of drawing tools (`draw_targets`, `snap_draw`, the hover target) and `draw_snap_feedback` |
+| `src/editor/canvas.rs` | 1,290 | 10,400 | bin | `canvas`, `Viewport` (`hit_tolerance`), tool behavior (Shift+click toggles a child of the selected piece, else a piece; the Edge tool picks a vertex or a polygon edge; a line or stitch line is always added as a child; the Stitch holes tool clicks a draft), hit testing (pieces and their lines, children with a line tolerance, handles, vertices, polygon edges), painting (centerlines in their dash pattern and stitch holes above all outlines); snapping of drawing tools (`draw_targets`, `snap_draw`, the hover target) and `draw_snap_feedback` |
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
 | `src/editor/drag.rs` | 309 | 2,100 | bin | `begin_drag`, `begin_handle_drag`, `snap_setup` (what a drag snaps to), `update_drag` (snapped offset or handle; stops before a stitch line leaves its piece), `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
-| `src/editor/grid.rs` | 72 | 600 | bin | `draw_grid`: canvas grid and axes, grid steps; `draw_snap_dots`: the snap grid |
+| `src/editor/palette.rs` | 46 | 400 | bin | `Palette` (`DARK`, `LIGHT`, `of`: picked from `visuals.dark_mode`): the theme-dependent canvas colors, used by `canvas` and `grid` |
+| `src/editor/grid.rs` | 73 | 600 | bin | `draw_grid`: canvas grid and axes, grid steps; `draw_snap_dots`: the snap grid |
 | `src/editor/ui.rs` | 401 | 3,700 | bin | `editor_ui` (menu bar, tool bar, status bar, dock area), `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
 | `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History, Layout and Properties tab titles have icons; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/icons/mod.rs` | 113 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
@@ -44,7 +45,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/snap/mod.rs` | 43 | 400 | bin | Snap panel: `show_panel` edits `SnapSettings` (on/off, grid and step, vertices, smart guides, distance in px) |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
-| `src/panels/settings/mod.rs` | 95 | 700 | bin | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` with Default material and Hotkeys tabs |
+| `src/panels/settings/mod.rs` | 104 | 750 | bin | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` with Default material, Hotkeys and Appearance tabs |
+| `src/panels/settings/appearance.rs` | 24 | 200 | bin | Appearance tab: `appearance_tab`, the theme radio buttons |
 | `src/panels/settings/material.rs` | 187 | 1,500 | bin | Default material tab: `material_tab`, its own material form with Reset to defaults |
 | `src/panels/settings/hotkeys.rs` | 190 | 1,600 | bin | Hotkeys tab: `Capture`, `hotkeys_tab`, `shortcut_button`, key capture |
 | `src/panels/properties/mod.rs` | 81 | 650 | bin | Properties panel: `EditorView`, `ViewControls`, `Selection`, view or preview controls (tool and navigation hints), display units, `show_panel`; re-exports `line_style_fields` and `stitch_fields` for the tool bar |
@@ -57,7 +59,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/properties/regular_polygon.rs` | 28 | 250 | bin | Regular polygon's center, radius, sides and rotation |
 | `src/panels/properties/line.rs` | 69 | 700 | bin | Centerline's ends, length, angle and style (`line_style_fields`, shared with the tool bar) |
 | `src/panels/properties/stitch.rs` | 129 | 1,000 | bin | Stitch line's hole type, pitch and size (`stitch_fields`, shared with the tool bar), and its length, hole count, actual pitch and thread hint (`stitch_details`) |
-| `src/preview/mod.rs` | 261 | 2,250 | bin | 3D scene, camera, mesh extrusion from each piece's `punched_region` |
+| `src/preview/mod.rs` | 302 | 2,600 | bin | 3D scene, camera, mesh extrusion from each piece's `punched_region`; `apply_theme` sets the background and ground plane colors for the theme |
 | `src/model.rs` | 594 | 4,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation (a base must be closed; a line's ends and dash count; a stitch line's points, hole parameters, hole count and overlap in `validate_stitch_line`) |
 | `src/boolean.rs` | 290 | 2,500 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes, skipping open lines; `punched_region`: the region with stitch holes cut, for the preview; `stitch_area`, `stray_stitch_lines`: the leather a stitch line must stay on |
 | `src/material.rs` | 462 | 2,800 | lib | `Material` and the scales of its properties |
@@ -84,10 +86,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/i18n/en.rs` | 532 | 5,100 | lib | English catalog |
 | `src/history.rs` | 725 | 4,950 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
 | `src/persistence.rs` | 230 | 1,750 | lib | `save_project`, `load_project`, `write_export` |
-| `src/settings/mod.rs` | 147 | 1,200 | bin | `settings.json` in the OS config directory: language, panel layout, snap settings (`load_snap`, `save_snap`), and `Preferences` (default material, hotkeys) with `load_preferences`, `save_preferences` |
+| `src/settings/mod.rs` | 165 | 1,350 | bin | `settings.json` in the OS config directory: language, panel layout, snap settings (`load_snap`, `save_snap`), and `Preferences` (default material, hotkeys, theme) with `load_preferences`, `save_preferences` |
+| `src/settings/theme.rs` | 45 | 350 | bin | `Theme` (Dark, Light; `ALL`, `label`), `apply_theme`: sets egui's theme when `Preferences::theme` changes |
 | `src/settings/hotkeys.rs` | 340 | 2,700 | bin | `Action` (bindable commands, default shortcuts), `Hotkeys` (`from_json`, `to_json`, `first`, conflicts, `triggered`), `format_shortcut`, `parse_shortcut`; tests |
 | `src/document.rs` | 70 | 550 | bin | `ActiveProject` (`new`, project and history), `ProjectMessage`, `HistoryMessage`, `apply_project_events` |
-| `src/main.rs` | 51 | 350 | bin | App wiring and system schedule; loads `Preferences` and starts the project with their default material; the editor UI starts one pass after the icon font is installed |
+| `src/main.rs` | 52 | 360 | bin | App wiring and system schedule (including `settings::apply_theme`); loads `Preferences` and starts the project with their default material; the editor UI starts one pass after the icon font is installed |
 | `src/lib.rs` | 11 | 45 | lib | Module declarations |
 
 ## Library crate (core, no Bevy)
@@ -162,7 +165,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 15-19 | Constants | Zoom limits, hit radii, edge label limit |
+| 18-32 | Constants | Zoom limits, hit radii, edge label limit, `SNAP_COLOR`, `SELECTED_COLOR` |
 | 21-36 | Viewport | `Viewport` (`to_screen`, `to_world`) |
 | 61-253 | Canvas | `canvas` (runs `EditorState::zoom_request`), `selection_bounds` (selected children, else selected pieces), `fit_view` |
 | 114-195 | Select and Edge tools | `handle_select`, `handle_edge` (click picks a vertex of the selected piece, else a polygon edge; drag moves a vertex; Esc clears), `child_of_selected_at`, `select_at` |
@@ -206,8 +209,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 105 | `material_fields`, shared by the dialog and the Material panel |
 | | 189 | `show_panel`, which returns the `ProjectEvent` to send |
 | | 214 | `new_project_dialog` |
-| `settings/mod.rs` | 12-42 | `DIALOG_WIDTH`, `SettingsTab`, `SettingsDraft` (edited copy of `Preferences`), `SettingsResult` |
-| | 45 | `settings_dialog`: modal with Default material and Hotkeys tabs; OK is disabled while shortcuts conflict |
+| `settings/mod.rs` | 14-44 | `DIALOG_WIDTH`, `SettingsTab`, `SettingsDraft` (edited copy of `Preferences`), `SettingsResult` |
+| | 47 | `settings_dialog`: modal with Default material, Hotkeys and Appearance tabs; OK is disabled while shortcuts conflict |
 | `settings/material.rs` | 16 | `material_tab`: its own form on the draft's default material, independent of `material_fields`, with Reset to defaults |
 | | 37-187 | `basic_rows`, `physical_rows`, `combo`, `thickness_row`, `color_row`, `swatch` |
 | `settings/hotkeys.rs` | 8-21 | `HOTKEYS_HEIGHT`, `Capture`, `HotkeyChange` |
@@ -230,12 +233,13 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Symbols |
 |---:|---|
-| 11-46 | Scene constants, `PreviewPlugin`, `PreviewSettings` |
-| 48-70 | `setup_scene` |
-| 73-123 | `rebuild_preview`, which skips pieces without a valid region |
-| 125-142 | `update_camera` |
-| 144-157 | `show_controls` |
-| 159-261 | `build_piece_mesh` (from a `Region`) |
+| 12-51 | Scene constants, `PreviewPlugin`, `PreviewSettings`, `Ground` |
+| 53-76 | `setup_scene` |
+| 78-112 | `clear_color`, `ground_color`, `apply_theme` (follows `Preferences::theme`) |
+| 114-164 | `rebuild_preview`, which skips pieces without a valid region |
+| 166-183 | `update_camera` |
+| 185-198 | `show_controls` |
+| 200-302 | `build_piece_mesh` (from a `Region`) |
 
 ## Where to look for common tasks
 

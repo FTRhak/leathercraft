@@ -1,14 +1,16 @@
 # Settings and preferences (`settings`, `panels::settings`)
 
-How the app keeps interface state between runs, and how the user edits the default material and the hotkeys in the Settings window. All of it is interface state of the binary: nothing here is part of a `Project` or the `.leathercraft` format.
+How the app keeps interface state between runs, and how the user edits the default material, the hotkeys and the theme in the Settings window. All of it is interface state of the binary: nothing here is part of a `Project` or the `.leathercraft` format.
 
 | File | Contents |
 |---|---|
 | `src/settings/mod.rs` | `settings.json` storage: `Settings` (private), `Preferences`, `load_preferences`, `save_preferences`, `load_language`, `save_language`, `load_dock`, `save_dock` |
 | `src/settings/hotkeys.rs` | `Action`, `Hotkeys`, `format_shortcut`, `parse_shortcut`, tests |
+| `src/settings/theme.rs` | `Theme` (Dark, Light), `apply_theme`: sets egui's theme when `Preferences::theme` changes |
 | `src/panels/settings/mod.rs` | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` |
 | `src/panels/settings/material.rs` | Default material tab: `material_tab` |
 | `src/panels/settings/hotkeys.rs` | Hotkeys tab: `Capture`, `hotkeys_tab`, `capture_keys` |
+| `src/panels/settings/appearance.rs` | Appearance tab: `appearance_tab` (the theme) |
 | `src/editor/ui.rs` | Opening the window (`edit_menu`), applying its result (`editor_ui`), dispatching hotkeys (`handle_hotkeys`), menu shortcuts (`action_button`), language picker (`language_control`) |
 | `src/panels/dock/mod.rs` | `PanelDock::load`, `save_on_release`: the panel layout section |
 | `src/main.rs` | Loads the language and `Preferences` at startup |
@@ -19,6 +21,7 @@ How the app keeps interface state between runs, and how the user edits the defau
 |---|---|
 | Open the Settings window | **Edit → Settings…** |
 | Change the material new projects start with | **Default material** tab |
+| Switch between the dark and light theme | **Appearance** tab |
 | Change a shortcut | **Hotkeys** tab: click the shortcut, then press the new keys |
 | Add a shortcut to a command | Click **+** in its row, then press the keys |
 | Remove a shortcut | Click **×** next to it |
@@ -26,7 +29,7 @@ How the app keeps interface state between runs, and how the user edits the defau
 | Keep the changes | **OK** |
 | Discard the changes | **Cancel** or Esc |
 
-- Changes take effect only on **OK**. Cancel, Esc or closing discards the whole draft, both tabs included.
+- Changes take effect only on **OK**. Cancel, Esc or closing discards the whole draft, all tabs included.
 - Clicking outside the window does nothing, so a stray click can't lose the edits.
 - Esc first closes an open drop-down, and only then the window.
 - While a shortcut waits for keys, its button reads *Press keys… (Esc to cancel)*. The next key press, with its modifiers, becomes the shortcut. Esc on its own cancels; Esc with a modifier is a valid shortcut.
@@ -71,7 +74,8 @@ One file, `<config dir>/leathercraft/settings.json`, where the config directory 
     "redo": ["Ctrl+Shift+Z", "Ctrl+Y"],
     "delete": []
   },
-  "snap": { "enabled": true, "grid": true, "grid_step_mm": 1.0, "vertices": true, "guides": true, "distance_px": 8.0 }
+  "snap": { "enabled": true, "grid": true, "grid_step_mm": 1.0, "vertices": true, "guides": true, "distance_px": 8.0 },
+  "theme": "light"
 }
 ```
 
@@ -81,6 +85,7 @@ One file, `<config dir>/leathercraft/settings.json`, where the config directory 
 | `dock` | raw `serde_json::Value` | `PanelDock` | `save_dock`, on a pointer release when the layout differs from the last saved one | `default_state()` layout |
 | `default_material` | raw `serde_json::Value` | `Preferences::default_material` | `save_preferences`, on Settings OK | `Material::default()` |
 | `hotkeys` | raw `serde_json::Value` | `Preferences::hotkeys` | `save_preferences`, on Settings OK | Per action: `Action::default_shortcuts` |
+| `theme` | raw `serde_json::Value`, `"dark"` or `"light"` | `Preferences::theme` | `save_preferences`, on Settings OK | `Theme::Dark`, with a warning in the log |
 | `snap` | raw `serde_json::Value` | `EditorState::snap` (`leathercraft::snap::SnapSettings`) | `save_snap`, from `EditorState::save_snap_when_settled` once a value changed and no pointer button is down, or at once by the F9 hotkey | `SnapSettings::default()`; missing fields take their defaults (`#[serde(default)]`), and numbers are clamped (`clamped`). See `docs/snap.md` |
 
 Every section is optional and omitted while unset (`skip_serializing_if`). `language` stays absent until the user picks one, so the OS locale keeps applying until then.
@@ -180,7 +185,7 @@ settings_dialog(ctx, draft, language) -> Option<SettingsResult>
 | Field | Meaning |
 |---|---|
 | `preferences` | The edited copy, public so the caller can apply it |
-| `tab` | `SettingsTab::Material` (default) or `SettingsTab::Hotkeys` |
+| `tab` | `SettingsTab::Material` (default), `SettingsTab::Hotkeys` or `SettingsTab::Appearance` |
 | `capture` | `Some(Capture)` while a shortcut waits for keys |
 
 ### `settings_dialog`
@@ -215,6 +220,12 @@ An `egui::Modal` of fixed width `DIALOG_WIDTH` (420 px), with the title, a row o
 
 - Clicking another shortcut while one is waiting moves the capture to the new one.
 - Conflicting shortcuts are drawn in `error_fg_color`, and the conflict message appears next to **Reset to defaults**.
+
+### Appearance tab (`appearance_tab`)
+
+- **Theme**: radio buttons for `Theme::ALL`, editing `draft.preferences.theme`. Like the other tabs, it applies only on OK.
+- `settings::apply_theme` (in `EguiPrimaryContextPass`) calls `ctx.set_theme` when the theme differs from the one it last applied, including on the first pass. `preview::apply_theme` (in `Update`) sets `ClearColor` and the ground plane's color the same way.
+- The canvas reads `visuals.dark_mode` through `editor::palette::Palette::of`, which picks the grid, outline, label, stitch hole, centerline and edge colors for that background. Selection, snap and boolean-operation colors are the same in both themes.
 
 ### Key capture (`capture_keys`)
 

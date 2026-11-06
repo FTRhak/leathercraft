@@ -1,9 +1,11 @@
-//! The Settings window: the default material and the hotkeys.
+//! The Settings window: the default material, the hotkeys and the appearance.
 
+mod appearance;
 mod hotkeys;
 mod material;
 
 use crate::settings::Preferences;
+use appearance::appearance_tab;
 use bevy_egui::egui::{self, Key, Modifiers};
 use hotkeys::{Capture, capture_keys, hotkeys_tab};
 use leathercraft::i18n::{Label, Language};
@@ -16,6 +18,7 @@ enum SettingsTab {
     #[default]
     Material,
     Hotkeys,
+    Appearance,
 }
 
 /// The preferences being edited while the Settings window is open; applied only on OK.
@@ -65,11 +68,17 @@ pub fn settings_dialog(
                 SettingsTab::Hotkeys,
                 language.label(Label::Hotkeys),
             );
+            ui.selectable_value(
+                &mut draft.tab,
+                SettingsTab::Appearance,
+                language.label(Label::Appearance),
+            );
         });
         ui.separator();
         match draft.tab {
             SettingsTab::Material => material_tab(ui, draft, language),
             SettingsTab::Hotkeys => hotkeys_tab(ui, draft, language),
+            SettingsTab::Appearance => appearance_tab(ui, draft, language),
         }
         ui.add_space(6.0);
         ui.separator();

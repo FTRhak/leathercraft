@@ -1,4 +1,5 @@
 use crate::document::ActiveProject;
+use crate::settings::{Preferences, Theme};
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;
@@ -19,7 +20,7 @@ impl Plugin for PreviewPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PreviewSettings>()
             .add_systems(Startup, setup_scene)
-            .add_systems(Update, (rebuild_preview, update_camera));
+            .add_systems(Update, (rebuild_preview, update_camera, apply_theme));
     }
 }
 
@@ -28,6 +29,9 @@ struct PreviewCamera;
 
 #[derive(Component)]
 struct PreviewPiece;
+
+#[derive(Component)]
+struct Ground;
 
 #[derive(Resource)]
 pub struct PreviewSettings {
@@ -65,9 +69,46 @@ fn setup_scene(
     ));
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::default().mesh().size(24.0, 24.0))),
-        MeshMaterial3d(materials.add(Color::srgb(0.13, 0.15, 0.18))),
+        MeshMaterial3d(materials.add(ground_color(Theme::default()))),
         Transform::from_xyz(0.0, -0.02, 0.0),
+        Ground,
     ));
+}
+
+/// The background behind the ground plane.
+fn clear_color(theme: Theme) -> Color {
+    match theme {
+        Theme::Dark => Color::srgb_u8(43, 44, 47),
+        Theme::Light => Color::srgb_u8(214, 217, 222),
+    }
+}
+
+fn ground_color(theme: Theme) -> Color {
+    match theme {
+        Theme::Dark => Color::srgb(0.13, 0.15, 0.18),
+        Theme::Light => Color::srgb(0.72, 0.74, 0.77),
+    }
+}
+
+/// Follows the interface theme, so the preview doesn't stay dark between light panels.
+fn apply_theme(
+    preferences: Res<Preferences>,
+    mut clear: ResMut<ClearColor>,
+    ground: Query<&MeshMaterial3d<StandardMaterial>, With<Ground>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut applied: Local<Option<Theme>>,
+) {
+    let theme = preferences.theme;
+    if *applied == Some(theme) {
+        return;
+    }
+    clear.0 = clear_color(theme);
+    for handle in &ground {
+        if let Some(material) = materials.get_mut(&handle.0) {
+            material.base_color = ground_color(theme);
+        }
+    }
+    *applied = Some(theme);
 }
 
 fn rebuild_preview(

@@ -1,6 +1,8 @@
 mod hotkeys;
+mod theme;
 
 pub use hotkeys::{Action, Hotkeys};
+pub use theme::{Theme, apply_theme};
 
 use bevy::prelude::*;
 use leathercraft::i18n::Language;
@@ -26,6 +28,8 @@ struct Settings {
     hotkeys: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     snap: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    theme: Option<serde_json::Value>,
 }
 
 /// The application preferences edited in the Settings window. Interface state, never part
@@ -35,6 +39,7 @@ pub struct Preferences {
     /// The material the new-project dialog and the startup project start from.
     pub default_material: Material,
     pub hotkeys: Hotkeys,
+    pub theme: Theme,
 }
 
 /// The saved preferences; a missing or unusable section keeps its default.
@@ -54,18 +59,31 @@ pub fn load_preferences() -> Preferences {
         .filter(Material::has_valid_thickness)
         .unwrap_or_default();
     let hotkeys = settings.hotkeys.map(Hotkeys::from_json).unwrap_or_default();
+    let theme = settings
+        .theme
+        .and_then(|value| match serde_json::from_value::<Theme>(value) {
+            Ok(theme) => Some(theme),
+            Err(error) => {
+                bevy::log::warn!("Ignoring saved theme: {error}");
+                None
+            }
+        })
+        .unwrap_or_default();
     Preferences {
         default_material,
         hotkeys,
+        theme,
     }
 }
 
 pub fn save_preferences(preferences: &Preferences) {
     let material = serde_json::to_value(preferences.default_material).ok();
     let hotkeys = preferences.hotkeys.to_json();
+    let theme = serde_json::to_value(preferences.theme).ok();
     update_settings(|settings| {
         settings.default_material = material;
         settings.hotkeys = Some(hotkeys);
+        settings.theme = theme;
     });
 }
 

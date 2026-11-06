@@ -1,4 +1,5 @@
 use super::canvas::Viewport;
+use super::palette::Palette;
 use bevy_egui::egui;
 use leathercraft::model::Point;
 
@@ -25,8 +26,9 @@ pub(super) fn draw_grid(
         .unwrap_or(GRID_STEPS_MM[GRID_STEPS_MM.len() - 1]);
     let top_left = view.to_world(rect.left_top());
     let bottom_right = view.to_world(rect.right_bottom());
-    let line = egui::Stroke::new(1.0, egui::Color32::from_gray(60));
-    let axis = egui::Stroke::new(1.5, egui::Color32::from_gray(110));
+    let palette = Palette::of(painter);
+    let line = egui::Stroke::new(1.0, palette.grid_line);
+    let axis = egui::Stroke::new(1.5, palette.grid_axis);
 
     let first_x = (top_left.x / step).floor() as i64;
     let last_x = (bottom_right.x / step).ceil() as i64;
@@ -62,7 +64,7 @@ fn draw_snap_dots(
     if (last_x - first_x + 1) * (last_y - first_y + 1) > MAX_SNAP_DOTS {
         return;
     }
-    let color = egui::Color32::from_gray(95);
+    let color = Palette::of(painter).snap_dot;
     for x in first_x..=last_x {
         for y in first_y..=last_y {
             let position = view.to_screen(Point::new(x as f64 * step, y as f64 * step));

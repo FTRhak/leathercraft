@@ -1,6 +1,7 @@
 use super::drag::{begin_drag, begin_handle_drag, finish_drag, update_drag};
 use super::drag_state_struct::ShapeRef;
 use super::grid::draw_grid;
+use super::palette::Palette;
 use super::{EditorState, ShapeDraft, ShapePart, format_length, send};
 use crate::document::ProjectMessage;
 use crate::panels::tools::{Tool, ZoomRequest};
@@ -28,8 +29,8 @@ const SELECTED_CENTERLINE_WIDTH_PX: f32 = 1.5;
 const MIN_DASH_PERIOD_PX: f32 = 3.0;
 /// Below this pitch on screen, stitch holes are drawn as a faded dotted path.
 const MIN_HOLE_PITCH_PX: f32 = 3.0;
-const HOLE_COLOR: egui::Color32 = egui::Color32::from_gray(205);
 const SNAP_COLOR: egui::Color32 = egui::Color32::from_rgb(230, 90, 220);
+const SELECTED_COLOR: egui::Color32 = egui::Color32::from_rgb(240, 160, 70);
 
 #[derive(Clone, Copy)]
 pub(super) struct Viewport {
@@ -736,16 +737,17 @@ fn draw_handles(painter: &egui::Painter, view: Viewport, shape: &Shape, color: e
 }
 
 fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state: &EditorState) {
-    let text_color = egui::Color32::from_gray(220);
+    let palette = Palette::of(painter);
+    let text_color = palette.label;
     let error_color = egui::Color32::from_rgb(235, 80, 80);
     let fill_color = egui::Color32::from_rgba_unmultiplied(128, 128, 128, 80);
     for piece in &project.pieces {
         let piece = state.displayed(piece);
         let selected = state.selected == Some(piece.id);
         let stroke = if state.is_selected(piece.id) {
-            egui::Stroke::new(2.5, egui::Color32::from_rgb(240, 160, 70))
+            egui::Stroke::new(2.5, SELECTED_COLOR)
         } else {
-            egui::Stroke::new(1.5, egui::Color32::from_rgb(190, 190, 200))
+            egui::Stroke::new(1.5, palette.outline)
         };
         let region = piece.region();
         match &region {
@@ -817,14 +819,14 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
             Some(child) => {
                 if let Shape::Line(line) = &child.shape {
                     if !piece.locked {
-                        draw_handles(painter, view, &child.shape, CENTERLINE_SELECTED_COLOR);
+                        draw_handles(painter, view, &child.shape, SELECTED_COLOR);
                     }
                     draw_line_label(painter, view, line, project.units, state);
                     continue;
                 }
                 if let Shape::StitchLine(_) = &child.shape {
                     if !piece.locked {
-                        draw_handles(painter, view, &child.shape, CENTERLINE_SELECTED_COLOR);
+                        draw_handles(painter, view, &child.shape, SELECTED_COLOR);
                     }
                     continue;
                 }
@@ -857,9 +859,6 @@ fn draw_pieces(painter: &egui::Painter, view: Viewport, project: &Project, state
     }
 }
 
-const CENTERLINE_COLOR: egui::Color32 = egui::Color32::from_rgb(120, 195, 215);
-const CENTERLINE_SELECTED_COLOR: egui::Color32 = egui::Color32::from_rgb(240, 160, 70);
-
 /// The lines of every piece, on top of all outlines and never clipped by them.
 fn draw_centerlines(
     painter: &egui::Painter,
@@ -875,11 +874,14 @@ fn draw_centerlines(
                 continue;
             };
             let stroke = if primary && state.selected_children().contains(&child.id) {
-                egui::Stroke::new(SELECTED_CENTERLINE_WIDTH_PX, CENTERLINE_SELECTED_COLOR)
+                egui::Stroke::new(SELECTED_CENTERLINE_WIDTH_PX, SELECTED_COLOR)
             } else if state.is_selected(piece.id) {
-                egui::Stroke::new(CENTERLINE_WIDTH_PX, CENTERLINE_COLOR)
+                egui::Stroke::new(CENTERLINE_WIDTH_PX, Palette::of(painter).centerline)
             } else {
-                egui::Stroke::new(CENTERLINE_WIDTH_PX, CENTERLINE_COLOR.gamma_multiply(0.8))
+                egui::Stroke::new(
+                    CENTERLINE_WIDTH_PX,
+                    Palette::of(painter).centerline.gamma_multiply(0.8),
+                )
             };
             draw_line(painter, view, line, stroke);
         }
@@ -908,11 +910,11 @@ fn draw_stitch_holes(
             let hovered =
                 hover.is_some_and(|point| line.distance_to(point) <= view.hit_tolerance());
             let color = if selected {
-                CENTERLINE_SELECTED_COLOR
+                SELECTED_COLOR
             } else if state.is_selected(piece.id) {
-                HOLE_COLOR
+                Palette::of(painter).hole
             } else {
-                HOLE_COLOR.gamma_multiply(0.8)
+                Palette::of(painter).hole.gamma_multiply(0.8)
             };
             if selected || hovered {
                 let path = to_screen(view, &line.path());
@@ -992,7 +994,7 @@ fn draw_stitch_draft(
     {
         points.push(target);
     }
-    let color = CENTERLINE_SELECTED_COLOR;
+    let color = SELECTED_COLOR;
     let screen = to_screen(view, &points);
     painter.add(egui::Shape::line(
         screen,
@@ -1057,7 +1059,7 @@ fn draw_line_label(
         egui::Align2::CENTER_BOTTOM,
         format_length(state.language, units, line.length()),
         egui::FontId::proportional(11.0),
-        egui::Color32::from_gray(220),
+        Palette::of(painter).label,
     );
 }
 
@@ -1069,7 +1071,7 @@ fn draw_edges(
     project: &Project,
     state: &EditorState,
 ) {
-    let color = egui::Color32::from_rgb(250, 215, 90);
+    let color = Palette::of(painter).edge;
     let segment = |piece: u64, shape: ShapeRef, edge: usize| {
         let piece = project
             .pieces
@@ -1168,7 +1170,7 @@ fn draw_edge_labels(
             egui::Align2::CENTER_BOTTOM,
             format_length(state.language, units, (b.x - a.x).hypot(b.y - a.y)),
             egui::FontId::proportional(11.0),
-            egui::Color32::from_gray(220),
+            Palette::of(painter).label,
         );
     }
 }
@@ -1254,7 +1256,7 @@ fn draw_shape_draft(painter: &egui::Painter, view: Viewport, units: Units, state
             painter,
             view,
             line,
-            egui::Stroke::new(1.5, CENTERLINE_COLOR),
+            egui::Stroke::new(1.5, Palette::of(painter).centerline),
         ),
         _ => {
             painter.add(egui::Shape::closed_line(

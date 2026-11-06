@@ -196,6 +196,11 @@ pub enum Label {
     SettingsTitle,
     DefaultMaterial,
     Hotkeys,
+    /// The Settings tab with the theme.
+    Appearance,
+    ThemeField,
+    ThemeDark,
+    ThemeLight,
     /// Shown on a shortcut button while it waits for keys.
     PressKeys,
     AddShortcut,
