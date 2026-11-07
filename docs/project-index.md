@@ -32,24 +32,26 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/canvas.rs` | 1,290 | 10,400 | bin | `canvas`, `Viewport` (`hit_tolerance`), tool behavior (Shift+click toggles a child of the selected piece, else a piece; the Edge tool picks a vertex or a polygon edge; a line or stitch line is always added as a child; the Stitch holes tool clicks a draft), hit testing (pieces and their lines, children with a line tolerance, handles, vertices, polygon edges), painting (centerlines in their dash pattern and stitch holes above all outlines); snapping of drawing tools (`draw_targets`, `snap_draw`, the hover target) and `draw_snap_feedback` |
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
 | `src/editor/drag.rs` | 309 | 2,100 | bin | `begin_drag`, `begin_handle_drag`, `snap_setup` (what a drag snaps to), `update_drag` (snapped offset or handle; stops before a stitch line leaves its piece), `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
-| `src/editor/palette.rs` | 46 | 400 | bin | `Palette` (`DARK`, `LIGHT`, `of`: picked from `visuals.dark_mode`): the theme-dependent canvas colors, used by `canvas` and `grid` |
 | `src/editor/grid.rs` | 73 | 600 | bin | `draw_grid`: canvas grid and axes, grid steps; `draw_snap_dots`: the snap grid |
 | `src/editor/ui.rs` | 401 | 3,700 | bin | `editor_ui` (menu bar, tool bar, status bar, dock area), `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
 | `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History, Layout and Properties tab titles have icons; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/ui_components/icons/mod.rs` | 113 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
-| `src/ui_components/mod.rs` | 2 | 20 | bin | Reusable UI component module declarations |
+| `src/ui_components/mod.rs` | 4 | 30 | bin | Reusable UI component module declarations |
+| `src/ui_components/button/mod.rs` | 96 | 800 | bin | `Button`: the design-system text button (`primary`, `secondary`, `outline`), an `egui::Widget` drawn in its default, hover or disabled state (disabled through `ui.add_enabled`), with a focus ring |
+| `src/ui_components/button/style.rs` | 88 | 900 | bin | `ButtonKind`, `ButtonState`, `ButtonStyle::of`: fill, stroke and text color of each kind and state for the dark and light theme (from the Brilliant `Button` component); `focus_color` |
 | `src/ui_components/dock/mod.rs` | 185 | 1,550 | bin | `PanelTab` (including `Snap`; the tools are a fixed tool bar, not a tab), `PanelDock`: panel arrangement, default layout, saving and restoring it |
+| `src/ui_components/palette.rs` | 46 | 400 | bin | `Palette` (`DARK`, `LIGHT`, `of`: picked from `visuals.dark_mode`): the theme-dependent canvas colors, used by `canvas` and `grid` |
 | `src/panels/tools/mod.rs` | 333 | 1,650 | bin | `Tool` (with `Centerline` and `StitchHoles`), `StitchSettings`, `ToolSettings`, `ZoomRequest` (All or Selection), `Tool::needs_piece` (Centerline and Stitch holes are enabled, and reachable by hotkey, only while a piece is selected; otherwise the tool falls back to Select), tool, new-piece and operation icons from font glyphs; `show_toolbar`: the full-width tool bar under the menu bar (drawn by `editor_ui`, not a dock tab), one scrolling line of tool buttons, the new-piece and boolean operation modes as one dropdown (`op_mode_dropdown`), then the Centerline and Stitch holes buttons, then Zoom to fit and Zoom to selection (`paint_fit_icon`, `paint_fit_selection_icon`: painted corner brackets, the second with a square inside and enabled only with a selection; they set `ToolSettings::zoom_request`), then the current tool's settings (regular polygon sides, centerline style, stitch holes) |
 | `src/panels/layout/mod.rs` | 273 | 2,800 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls (none for a centerline); Shift+click toggles a piece or child |
 | `src/panels/align/mod.rs` | 248 | 2,000 | bin | Align panel: `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), align, distribute and spacing icons from font glyphs (`arrange_glyph`), `show_panel` |
 | `src/panels/snap/mod.rs` | 43 | 400 | bin | Snap panel: `show_panel` edits `SnapSettings` (on/off, grid and step, vertices, smart guides, distance in px) |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
-| `src/panels/settings/mod.rs` | 104 | 750 | bin | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` with Default material, Hotkeys and Appearance tabs |
+| `src/panels/settings/mod.rs` | 109 | 800 | bin | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` with Default material, Hotkeys and Appearance tabs, and a right-aligned footer of `Button`s (primary OK, secondary Cancel) |
 | `src/panels/settings/appearance.rs` | 24 | 200 | bin | Appearance tab: `appearance_tab`, the theme radio buttons |
-| `src/panels/settings/material.rs` | 187 | 1,500 | bin | Default material tab: `material_tab`, its own material form with Reset to defaults |
-| `src/panels/settings/hotkeys.rs` | 190 | 1,600 | bin | Hotkeys tab: `Capture`, `hotkeys_tab`, `shortcut_button`, key capture |
+| `src/panels/settings/material.rs` | 191 | 1,500 | bin | Default material tab: `material_tab`, its own material form with an outline Reset to defaults `Button` |
+| `src/panels/settings/hotkeys.rs` | 194 | 1,600 | bin | Hotkeys tab: `Capture`, `hotkeys_tab`, `shortcut_button`, key capture; an outline Reset to defaults `Button` |
 | `src/panels/properties/mod.rs` | 81 | 650 | bin | Properties panel: `EditorView`, `ViewControls`, `Selection`, view or preview controls (tool and navigation hints), display units, `show_panel`; re-exports `line_style_fields` and `stitch_fields` for the tool bar |
 | `src/panels/properties/piece.rs` | 95 | 800 | bin | Selected piece's name, size or result error, title and fields of its base or child, To Polygon button |
 | `src/panels/properties/shape.rs` | 56 | 500 | bin | `shape_fields`: dispatch to the file of each shape type; the selected vertex's corner radius |
@@ -188,7 +190,12 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | Symbols |
 |---|---:|---|
-| `mod.rs` | 1 | Module declarations |
+| `mod.rs` | 1-4 | Module declarations |
+| `button/mod.rs` | 17-46 | `Button`: `new`, `primary`, `secondary`, `outline` |
+| | 48-96 | `impl egui::Widget for Button`: size from the label, state from enabled and hover, paint, focus ring |
+| `button/style.rs` | 8-24 | `ButtonKind`, `ButtonState` |
+| | 26-80 | `ButtonStyle`, `ButtonStyle::of` (dark and light tables) |
+| | 82-88 | `focus_color` |
 | `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
 | | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
 | | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
@@ -301,6 +308,7 @@ Apart from shortcut parsing, `document`, `editor`, `preview`, `settings` and `pa
 | File | Status |
 |---|---|
 | `CLAUDE.md` | Current. Loaded automatically in every session, so keep it short. |
+| `docs/design.md` | Current. Spec for colors and components: every color comes from `Palette` with a dark and a light value, naming by role, nested per-component color structs, how to write a reusable component, and the colors not yet migrated. |
 | `docs/icons.md` | Current. Spec for the icon font, `paint_glyph` and `icon_button`: adding glyphs, sizes, toggles, disabled state. |
 | `docs/history.md` | Current. Spec for undo, redo and the History panel: user controls, snapshots and merging, the message flow in the binary, adding a new edit. |
 | `docs/settings.md` | Current. Spec for `settings.json` and the Settings window: sections and their fallbacks, `Action` and `Hotkeys`, shortcut text format, the draft and key capture, adding a hotkey or preference. |

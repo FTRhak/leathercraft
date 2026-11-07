@@ -1,5 +1,5 @@
 use super::canvas::Viewport;
-use super::palette::Palette;
+use crate::ui_components::palette::Palette;
 use bevy_egui::egui;
 use leathercraft::model::Point;
 

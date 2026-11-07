@@ -66,3 +66,5 @@ The UI never writes to the project. It sends a `ProjectEvent` wrapped in `docume
 ## Conventions
 
 Library functions in `model`, `events` and `persistence` return `Result<_, i18n::Message>`, which the UI renders in the current language; `exports` uses the `ExportError` enum, which converts into a `Message`. New user-facing text goes through `i18n`; log messages stay in English.
+
+Every color comes from `ui_components::palette::Palette`, with a value for both themes; add a new color there instead of writing a literal. See `docs/design.md` for this and for writing UI components.

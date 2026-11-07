@@ -3,12 +3,12 @@ use super::{
     format_length, panel_viewer::PanelViewer, send,
 };
 use crate::document::{ActiveProject, HistoryMessage, ProjectMessage};
-use crate::ui_components::dock::{PanelDock, PanelTab};
 use crate::panels::material::{self, DialogResult};
 use crate::panels::settings::{SettingsDraft, SettingsResult, settings_dialog};
 use crate::panels::tools;
 use crate::preview::PreviewSettings;
 use crate::settings::{self, Action, Hotkeys, Preferences};
+use crate::ui_components::dock::{PanelDock, PanelTab};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, egui};
 use egui_dock::DockArea;

@@ -1,6 +1,7 @@
 //! The Material tab of the Settings window: the default material of new projects.
 
 use super::SettingsDraft;
+use crate::ui_components::button::Button;
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::material::{
@@ -29,7 +30,10 @@ pub(super) fn material_tab(ui: &mut egui::Ui, draft: &mut SettingsDraft, languag
             .show(ui, |ui| physical_rows(ui, material, language));
     });
     ui.add_space(4.0);
-    if ui.button(language.label(Label::ResetToDefaults)).clicked() {
+    if ui
+        .add(Button::outline(language.label(Label::ResetToDefaults)))
+        .clicked()
+    {
         *material = Material::default();
     }
 }

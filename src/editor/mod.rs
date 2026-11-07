@@ -4,7 +4,6 @@ mod drag;
 mod drag_state_struct;
 mod editor_state_struct;
 mod grid;
-mod palette;
 mod panel_viewer;
 mod shape_draft_struct;
 mod ui;

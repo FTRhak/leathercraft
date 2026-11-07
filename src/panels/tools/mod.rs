@@ -1,5 +1,5 @@
-use crate::ui_components::icons::{glyph, icon_button, icon_text, paint_glyph};
 use crate::panels::properties::{line_style_fields, stitch_fields};
+use crate::ui_components::icons::{glyph, icon_button, icon_text, paint_glyph};
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::model::{BooleanOp, Point, Units};

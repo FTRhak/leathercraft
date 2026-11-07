@@ -3,15 +3,15 @@
 use bevy_egui::egui;
 
 /// The canvas colors that depend on the theme, so that they stay readable on its background.
-pub(super) struct Palette {
-    pub(super) grid_line: egui::Color32,
-    pub(super) grid_axis: egui::Color32,
-    pub(super) snap_dot: egui::Color32,
-    pub(super) outline: egui::Color32,
-    pub(super) label: egui::Color32,
-    pub(super) hole: egui::Color32,
-    pub(super) centerline: egui::Color32,
-    pub(super) edge: egui::Color32,
+pub(crate) struct Palette {
+    pub(crate) grid_line: egui::Color32,
+    pub(crate) grid_axis: egui::Color32,
+    pub(crate) snap_dot: egui::Color32,
+    pub(crate) outline: egui::Color32,
+    pub(crate) label: egui::Color32,
+    pub(crate) hole: egui::Color32,
+    pub(crate) centerline: egui::Color32,
+    pub(crate) edge: egui::Color32,
 }
 
 impl Palette {
@@ -36,7 +36,7 @@ impl Palette {
         edge: egui::Color32::from_rgb(200, 145, 0),
     };
 
-    pub(super) fn of(painter: &egui::Painter) -> &'static Self {
+    pub(crate) fn of(painter: &egui::Painter) -> &'static Self {
         if painter.ctx().style().visuals.dark_mode {
             &Self::DARK
         } else {

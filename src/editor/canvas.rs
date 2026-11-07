@@ -1,7 +1,7 @@
 use super::drag::{begin_drag, begin_handle_drag, finish_drag, update_drag};
 use super::drag_state_struct::ShapeRef;
 use super::grid::draw_grid;
-use super::palette::Palette;
+use crate::ui_components::palette::Palette;
 use super::{EditorState, ShapeDraft, ShapePart, format_length, send};
 use crate::document::ProjectMessage;
 use crate::panels::tools::{Tool, ZoomRequest};

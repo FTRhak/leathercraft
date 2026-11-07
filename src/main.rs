@@ -11,8 +11,8 @@ use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 use document::{ActiveProject, HistoryMessage, ProjectMessage};
 use editor::{EditorState, ViewMode};
 use leathercraft::model::Project;
-use ui_components::dock::PanelDock;
 use preview::PreviewPlugin;
+use ui_components::dock::PanelDock;
 
 fn main() {
     let language = settings::load_language();

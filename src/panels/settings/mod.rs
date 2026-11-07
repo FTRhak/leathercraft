@@ -5,6 +5,7 @@ mod hotkeys;
 mod material;
 
 use crate::settings::Preferences;
+use crate::ui_components::button::Button;
 use appearance::appearance_tab;
 use bevy_egui::egui::{self, Key, Modifiers};
 use hotkeys::{Capture, capture_keys, hotkeys_tab};
@@ -82,15 +83,19 @@ pub fn settings_dialog(
         }
         ui.add_space(6.0);
         ui.separator();
-        ui.horizontal(|ui| {
+        // Right to left, so OK ends up at the right edge with Cancel before it.
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let can_save = draft.capture.is_none() && !draft.preferences.hotkeys.has_conflicts();
             if ui
-                .add_enabled(can_save, egui::Button::new(language.label(Label::Ok)))
+                .add_enabled(can_save, Button::primary(language.label(Label::Ok)))
                 .clicked()
             {
                 return Some(SettingsResult::Save);
             }
-            if ui.button(language.label(Label::Cancel)).clicked() {
+            if ui
+                .add(Button::secondary(language.label(Label::Cancel)))
+                .clicked()
+            {
                 return Some(SettingsResult::Cancel);
             }
             None

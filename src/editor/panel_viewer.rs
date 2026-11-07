@@ -1,9 +1,9 @@
 use super::{EditorState, ViewMode, canvas, send};
 use crate::document::{HistoryMessage, ProjectMessage};
-use crate::ui_components::icons::{glyph, icon_text};
-use crate::ui_components::dock::PanelTab;
 use crate::panels::{align, history, layout, material, properties, snap};
 use crate::preview::PreviewSettings;
+use crate::ui_components::dock::PanelTab;
+use crate::ui_components::icons::{glyph, icon_text};
 use bevy::prelude::*;
 use bevy_egui::egui;
 use egui_dock::TabViewer;

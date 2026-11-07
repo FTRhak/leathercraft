@@ -2,6 +2,7 @@
 
 use super::SettingsDraft;
 use crate::settings::{Action, Hotkeys};
+use crate::ui_components::button::Button;
 use bevy_egui::egui::{self, Key, KeyboardShortcut, Modifiers};
 use leathercraft::i18n::{Label, Language};
 
@@ -72,7 +73,10 @@ pub(super) fn hotkeys_tab(ui: &mut egui::Ui, draft: &mut SettingsDraft, language
         });
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        if ui.button(language.label(Label::ResetToDefaults)).clicked() {
+        if ui
+            .add(Button::outline(language.label(Label::ResetToDefaults)))
+            .clicked()
+        {
             change = Some(HotkeyChange::Reset);
         }
         if hotkeys.has_conflicts() {
