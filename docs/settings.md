@@ -22,6 +22,7 @@ How the app keeps interface state between runs, and how the user edits the defau
 | Open the Settings window | **Edit → Settings…** |
 | Change the material new projects start with | **Default material** tab |
 | Switch between the dark and light theme | **Appearance** tab |
+| Find a command or shortcut | **Hotkeys** tab: type in the search field above the list |
 | Change a shortcut | **Hotkeys** tab: click the shortcut, then press the new keys |
 | Add a shortcut to a command | Click **+** in its row, then press the keys |
 | Remove a shortcut | Click **×** next to it |
@@ -187,6 +188,7 @@ settings_dialog(ctx, draft, language) -> Option<SettingsResult>
 | `preferences` | The edited copy, public so the caller can apply it |
 | `tab` | `SettingsTab::Material` (default), `SettingsTab::Hotkeys` or `SettingsTab::Appearance` |
 | `capture` | `Some(Capture)` while a shortcut waits for keys |
+| `hotkey_filter` | The text of the Hotkeys search field; kept while switching tabs, dropped with the draft |
 
 ### `settings_dialog`
 
@@ -194,14 +196,14 @@ An `egui::Modal` of fixed width `DIALOG_WIDTH` (420 px), with the title, a row o
 
 - `capture_keys` runs **before** the modal is drawn, so a captured key reaches neither the window's widgets nor the Esc check.
 - OK is enabled only when `capture.is_none()` and there are no conflicts.
-- Esc returns `Cancel` only when no popup (combo box) is open, so the first Esc closes the popup.
+- Esc returns `Cancel` only when no popup (combo box) is open, so the first Esc closes the popup. Esc in a focused input field only leaves the field: the input consumes the key.
 - The modal has no backdrop-click handling, so clicking outside is ignored.
 
 ### Default material tab (`material_tab`)
 
 - Two striped grids, **Basic properties** (origin, treatment, thickness, color, texture) and **Physical properties** (strength, flexibility, water and heat resistance), editing `draft.preferences.default_material`.
 - It has its own form, separate from `panels::material::material_fields`, which edits a piece through events. A new `Material` property has to be added to both.
-- Thickness is a `DragValue` limited to `MIN_THICKNESS_MM..=MAX_THICKNESS_MM`, always in millimeters whatever the display units, with the thickness category next to it. Since the range is enforced, the saved material always passes `has_valid_thickness`.
+- Thickness is a `NumberInput` (step 0.1, two decimals, the `mm` unit) limited to `MIN_THICKNESS_MM..=MAX_THICKNESS_MM`, always in millimeters whatever the display units, with the thickness category next to it. Since the range is enforced, the saved material always passes `has_valid_thickness`.
 - Values that have a description in the catalog show it on hover, both in the list and on the closed combo box.
 - Colors are grouped by `ColorGroup`, each with a swatch.
 - **Reset to defaults** sets the draft material to `Material::default()`; the hotkeys are untouched.
@@ -209,7 +211,8 @@ An `egui::Modal` of fixed width `DIALOG_WIDTH` (420 px), with the title, a row o
 
 ### Hotkeys tab (`hotkeys_tab`)
 
-- A scrollable grid (max height 360 px) with one row per `Action::ALL` entry: its label, then a button per shortcut with a **×** after each, then **+**.
+- A `SearchInput` above the list filters it: a row is shown when its label or one of its shortcuts, as displayed, contains the text, ignoring case. Removing or capturing works on the real indices, so filtering never changes which shortcut is edited.
+- A scrollable grid (max height 360 px) with one row per shown `Action::ALL` entry: its label, then a button per shortcut with a **×** after each, then **+**.
 - Clicks are collected into one `HotkeyChange` and applied after the grid is drawn, so the list isn't changed while it is being iterated:
 
 | Change | Effect |

@@ -148,6 +148,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::ThemeDark => "Dark",
         Label::ThemeLight => "Light",
         Label::PressKeys => "Press keys… (Esc to cancel)",
+        Label::SearchHotkeys => "Search for a command or key…",
         Label::AddShortcut => "Add a shortcut",
         Label::RemoveShortcut => "Remove the shortcut",
         Label::ResetToDefaults => "Reset to defaults",

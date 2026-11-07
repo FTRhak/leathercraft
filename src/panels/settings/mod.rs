@@ -29,6 +29,8 @@ pub struct SettingsDraft {
     pub preferences: Preferences,
     tab: SettingsTab,
     capture: Option<Capture>,
+    /// The text the Hotkeys list is filtered by.
+    hotkey_filter: String,
 }
 
 impl SettingsDraft {
@@ -37,6 +39,7 @@ impl SettingsDraft {
             preferences: preferences.clone(),
             tab: SettingsTab::default(),
             capture: None,
+            hotkey_filter: String::new(),
         }
     }
 }

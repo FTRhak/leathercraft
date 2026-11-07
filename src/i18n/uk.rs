@@ -150,6 +150,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::ThemeDark => "Темна",
         Label::ThemeLight => "Світла",
         Label::PressKeys => "Натисніть клавіші… (Esc — скасувати)",
+        Label::SearchHotkeys => "Пошук дії або клавіші…",
         Label::AddShortcut => "Додати комбінацію",
         Label::RemoveShortcut => "Видалити комбінацію",
         Label::ResetToDefaults => "Скинути до типових",

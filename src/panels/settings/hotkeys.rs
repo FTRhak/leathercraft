@@ -3,6 +3,7 @@
 use super::SettingsDraft;
 use crate::settings::{Action, Hotkeys};
 use crate::ui_components::button::Button;
+use crate::ui_components::input::SearchInput;
 use bevy_egui::egui::{self, Key, KeyboardShortcut, Modifiers};
 use leathercraft::i18n::{Label, Language};
 
@@ -22,7 +23,14 @@ enum HotkeyChange {
 }
 
 pub(super) fn hotkeys_tab(ui: &mut egui::Ui, draft: &mut SettingsDraft, language: Language) {
+    ui.add(
+        SearchInput::new(&mut draft.hotkey_filter)
+            .hint(language.label(Label::SearchHotkeys))
+            .width(ui.available_width()),
+    );
+    ui.add_space(6.0);
     let hotkeys = &draft.preferences.hotkeys;
+    let filter = draft.hotkey_filter.trim().to_lowercase();
     let mut change = None;
     egui::ScrollArea::vertical()
         .max_height(HOTKEYS_HEIGHT)
@@ -31,7 +39,13 @@ pub(super) fn hotkeys_tab(ui: &mut egui::Ui, draft: &mut SettingsDraft, language
                 .num_columns(2)
                 .striped(true)
                 .show(ui, |ui| {
-                    for action in Action::ALL {
+                    let shown: Vec<Action> = Action::ALL
+                        .into_iter()
+                        .filter(|&action| {
+                            matches_filter(ui.ctx(), hotkeys, action, &filter, language)
+                        })
+                        .collect();
+                    for action in shown {
                         ui.label(language.label(action.label()));
                         ui.horizontal_wrapped(|ui| {
                             for (index, shortcut) in hotkeys.shortcuts(action).iter().enumerate() {
@@ -103,6 +117,27 @@ pub(super) fn hotkeys_tab(ui: &mut egui::Ui, draft: &mut SettingsDraft, language
         }
         None => {}
     }
+}
+
+/// Whether `action` is shown for `filter`, already in lower case: an empty filter shows all,
+/// otherwise its name or one of its shortcuts must contain it.
+fn matches_filter(
+    ctx: &egui::Context,
+    hotkeys: &Hotkeys,
+    action: Action,
+    filter: &str,
+    language: Language,
+) -> bool {
+    filter.is_empty()
+        || language
+            .label(action.label())
+            .to_lowercase()
+            .contains(filter)
+        || hotkeys.shortcuts(action).iter().any(|shortcut| {
+            ctx.format_shortcut(shortcut)
+                .to_lowercase()
+                .contains(filter)
+        })
 }
 
 /// The button of an existing shortcut, or the `+` button when `shortcut` is `None`.

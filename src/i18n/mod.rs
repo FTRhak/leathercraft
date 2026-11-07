@@ -203,6 +203,8 @@ pub enum Label {
     ThemeLight,
     /// Shown on a shortcut button while it waits for keys.
     PressKeys,
+    /// The hint of the search field above the Hotkeys list.
+    SearchHotkeys,
     AddShortcut,
     RemoveShortcut,
     ResetToDefaults,

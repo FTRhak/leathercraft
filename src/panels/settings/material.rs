@@ -3,6 +3,7 @@
 use super::SettingsDraft;
 use crate::ui_components::button::Button;
 use crate::ui_components::dropdown::{Dropdown, DropdownItem, dropdown_value, group_label};
+use crate::ui_components::input::NumberInput;
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::material::{
@@ -14,6 +15,7 @@ use leathercraft::model::Units;
 const COMBO_WIDTH: f32 = 200.0;
 const COMBO_POPUP_HEIGHT: f32 = 360.0;
 const SWATCH: egui::Vec2 = egui::Vec2::splat(14.0);
+const THICKNESS_STEP_MM: f64 = 0.1;
 
 pub(super) fn material_tab(ui: &mut egui::Ui, draft: &mut SettingsDraft, language: Language) {
     let material = &mut draft.preferences.default_material;
@@ -145,11 +147,11 @@ fn thickness_row(ui: &mut egui::Ui, language: Language, material: &mut Material)
     ui.horizontal(|ui| {
         // Leather is always specified in millimeters, whatever the display units are.
         ui.add(
-            egui::DragValue::new(&mut material.thickness_mm)
+            NumberInput::new(&mut material.thickness_mm)
                 .range(MIN_THICKNESS_MM..=MAX_THICKNESS_MM)
-                .speed(0.05)
-                .max_decimals(2)
-                .suffix(format!(" {}", language.unit_symbol(Units::Millimeters))),
+                .step(THICKNESS_STEP_MM)
+                .decimals(2)
+                .unit(language.unit_symbol(Units::Millimeters)),
         );
         ui.label(language.label(Label::Thickness(material.thickness_category())));
     });
