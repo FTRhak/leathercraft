@@ -14,8 +14,10 @@ use crate::preview::PreviewSettings;
 use crate::settings::{self, Action, Hotkeys, Preferences};
 use crate::ui_components::dock::{PanelDock, PanelTab, dock_style};
 use crate::ui_components::dropdown::{Dropdown, DropdownItem, dropdown_value};
+use crate::ui_components::status_bar::{self, StatusBar, Tone};
 use crate::ui_components::title_bar::{self, ModeIcon, ModeSwitch, Slot, WindowLabels};
 use bevy::prelude::*;
+use bevy::render::renderer::RenderAdapterInfo;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{EguiContexts, egui};
 use egui::containers::menu::MenuConfig;
@@ -23,8 +25,9 @@ use egui_dock::DockArea;
 use leathercraft::events::ProjectEvent;
 use leathercraft::exports;
 use leathercraft::history::{History, HistoryCommand};
-use leathercraft::i18n::{Label, Language};
+use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::Project;
+use leathercraft::shapes::Shape;
 
 // A Bevy system takes its resources as parameters.
 #[allow(clippy::too_many_arguments)]
@@ -40,6 +43,7 @@ pub fn editor_ui(
     mut preferences: ResMut<Preferences>,
     mut window: Single<&mut Window, With<PrimaryWindow>>,
     maximized: Res<WindowMaximized>,
+    adapter: Option<Res<RenderAdapterInfo>>,
     mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let ctx: &egui::Context = contexts.ctx_mut()?;
@@ -141,26 +145,7 @@ pub fn editor_ui(
         state.language,
     );
 
-    egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
-        ui.horizontal(|ui| {
-            let language = state.language;
-            let status = language.message(&state.status);
-            if state.status_is_error {
-                ui.colored_label(ui.visuals().error_fg_color, status);
-            } else {
-                ui.label(status);
-            }
-            if let Some(cursor) = state.cursor {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(format!(
-                        "{}, {}",
-                        format_length(language, project.units, cursor.x),
-                        format_length(language, project.units, cursor.y)
-                    ));
-                });
-            }
-        });
-    });
+    show_status_bar(ctx, project, state, *view_mode, adapter.as_deref());
 
     handle_hotkeys(
         ctx,
@@ -224,6 +209,101 @@ pub fn editor_ui(
         }
     }
     Ok(())
+}
+
+/// The status bar: the last message, the selection, the grid step and the cursor, and the
+/// graphics backend.
+fn show_status_bar(
+    ctx: &egui::Context,
+    project: &Project,
+    state: &EditorState,
+    view_mode: ViewMode,
+    adapter: Option<&RenderAdapterInfo>,
+) {
+    let language = state.language;
+    let units = project.units;
+    let message = language.message(&state.status);
+    let selection = selection_summary(project, state).map(|summary| language.message(&summary));
+    let snap = &state.snap;
+    let grid = (view_mode == ViewMode::Editor2d && snap.enabled && snap.grid).then(|| {
+        let step = units.from_millimeters(snap.grid_step_mm);
+        let step = format!("{step:.2}");
+        let step = step.trim_end_matches('0').trim_end_matches('.');
+        format!(
+            "{}: {step} {}",
+            language.label(Label::SnapGridStep),
+            language.unit_symbol(units)
+        )
+    });
+    let cursor = state.cursor.map(|cursor| {
+        format!(
+            "X: {}   Y: {}",
+            format_length(language, units, cursor.x),
+            format_length(language, units, cursor.y)
+        )
+    });
+    let renderer = adapter.map(|adapter| {
+        let backend = match adapter.backend.to_str() {
+            "vulkan" => "Vulkan",
+            "metal" => "Metal",
+            "dx12" => "DirectX 12",
+            "gl" => "OpenGL",
+            "webgpu" => "WebGPU",
+            other => other,
+        };
+        (format!("wgpu · {backend}"), adapter.name.clone())
+    });
+    status_bar::show(
+        ctx,
+        &StatusBar {
+            message: &message,
+            tone: if state.status_is_error {
+                Tone::Error
+            } else {
+                Tone::Ok
+            },
+            selection: selection.as_deref(),
+            grid: grid.as_deref(),
+            cursor: cursor.as_deref(),
+            renderer: renderer
+                .as_ref()
+                .map(|(backend, name)| (backend.as_str(), name.as_str())),
+        },
+    );
+}
+
+/// What the status bar says is selected: several pieces, several shapes of one piece, or one
+/// piece with its shapes and stitch holes.
+fn selection_summary(project: &Project, state: &EditorState) -> Option<Message> {
+    if state.pieces.len() > 1 {
+        return Some(Message::SelectedPieces {
+            count: state.pieces.len(),
+        });
+    }
+    let piece = project
+        .pieces
+        .iter()
+        .find(|piece| Some(piece.id) == state.selected)?;
+    let children = state.selected_children().len();
+    if children > 1 {
+        return Some(Message::SelectedShapes {
+            name: piece.name.clone(),
+            count: children,
+        });
+    }
+    let mut shapes = 1;
+    let mut holes = 0;
+    for child in &piece.children {
+        match &child.shape {
+            Shape::StitchLine(line) => holes += line.hole_count(),
+            _ => shapes += 1,
+        }
+    }
+    Some(Message::SelectedPiece {
+        name: piece.name.clone(),
+        shapes,
+        holes,
+    })
 }
 
 /// A menu button showing the action's first shortcut.

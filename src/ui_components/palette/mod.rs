@@ -17,6 +17,7 @@ mod layout;
 mod list;
 mod properties;
 mod status;
+mod status_bar;
 mod surfaces;
 mod tabs;
 mod text;
@@ -41,6 +42,7 @@ pub(crate) use input::{InputColors, InputPaint};
 pub(crate) use layout::LayoutColors;
 pub(crate) use list::{ListColors, ListItemPaint};
 pub(crate) use properties::PropertiesColors;
+pub(crate) use status_bar::StatusBarColors;
 pub(crate) use tabs::{TabColors, TabPaint};
 pub(crate) use title_bar::{ModePaint, ModeSwitchColors, TitleBarColors};
 pub(crate) use toolbar::{ToolButtonColors, ToolButtonPaint, ToolbarColors};
@@ -81,6 +83,7 @@ pub(crate) struct Palette {
     pub(crate) layout: LayoutColors,
     pub(crate) properties: PropertiesColors,
     pub(crate) title_bar: TitleBarColors,
+    pub(crate) status_bar: StatusBarColors,
     pub(crate) toolbar: ToolbarColors,
 }
 
@@ -124,6 +127,7 @@ impl Palette {
         layout: LayoutColors::DARK,
         properties: PropertiesColors::DARK,
         title_bar: TitleBarColors::DARK,
+        status_bar: StatusBarColors::DARK,
         toolbar: ToolbarColors::DARK,
     };
     const LIGHT: Self = Self {
@@ -152,6 +156,7 @@ impl Palette {
         layout: LayoutColors::LIGHT,
         properties: PropertiesColors::LIGHT,
         title_bar: TitleBarColors::LIGHT,
+        status_bar: StatusBarColors::LIGHT,
         toolbar: ToolbarColors::LIGHT,
     };
 

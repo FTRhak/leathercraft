@@ -435,6 +435,24 @@ pub(super) fn message(message: &Message) -> String {
         Message::PieceCount { count: 1 } => "1 piece".to_owned(),
         Message::PieceCount { count } => format!("{count} pieces"),
         Message::SelectedEdge { number } => format!("Edge {number}"),
+        Message::SelectedPiece {
+            name,
+            shapes,
+            holes,
+        } => {
+            let shapes = counted(*shapes, "shape", "shapes");
+            match holes {
+                0 => format!("Selected: {name} ({shapes})"),
+                _ => {
+                    let holes = counted(*holes, "stitch hole", "stitch holes");
+                    format!("Selected: {name} ({shapes} · {holes})")
+                }
+            }
+        }
+        Message::SelectedPieces { count } => format!("Selected: {count} pieces"),
+        Message::SelectedShapes { name, count } => {
+            format!("Selected: {count} shapes of '{name}'")
+        }
         Message::SelectedVertex { number } => format!("Vertex {number}"),
         Message::PieceMaterial { name } => format!("The material of '{name}'"),
         Message::DefaultPieceName { id } => format!("Piece {id}"),
@@ -611,4 +629,10 @@ fn range((min, max): (f64, Option<f64>)) -> String {
         Some(max) => format!("{min}–{max}"),
         None => format!("{min}+"),
     }
+}
+
+/// `1 shape`, `2 shapes`.
+fn counted(count: usize, one: &str, many: &str) -> String {
+    let noun = if count == 1 { one } else { many };
+    format!("{count} {noun}")
 }

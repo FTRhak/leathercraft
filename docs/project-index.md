@@ -33,7 +33,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
 | `src/editor/drag.rs` | 309 | 2,100 | bin | `begin_drag`, `begin_handle_drag`, `snap_setup` (what a drag snaps to), `update_drag` (snapped offset or handle; stops before a stitch line leaves its piece), `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
 | `src/editor/grid.rs` | 73 | 600 | bin | `draw_grid`: canvas grid and axes, grid steps; `draw_snap_dots`: the snap grid |
-| `src/editor/ui.rs` | 401 | 3,700 | bin | `editor_ui` (menu bar, tool bar, status bar, dock area), `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
+| `src/editor/ui.rs` | 562 | 5,000 | bin | `editor_ui` (menu bar, tool bar, status bar, dock area), `show_status_bar`, `selection_summary`, `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
 | `src/editor/panel_viewer.rs` | 192 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the Properties, Align, Layout and History tab titles have icons, built by `TabDecor`, which also decorates each tab button; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/ui_components/icons/mod.rs` | 105 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_font_id` (the font for glyphs laid out with text); shared `icon_button` (no caller at the moment, `#[allow(dead_code)]`) |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
@@ -48,6 +48,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/ui_components/group_button/style.rs` | 55 | 400 | bin | `SegmentState`, `paint`: picks the `Palette::group_button` entry for a state |
 | `src/ui_components/align_button/mod.rs` | 76 | 650 | bin | `AlignButton`: the Align panel button (from the Brilliant `AlignBtn`), an `egui::Widget`: a 32 × 28 px button with a font glyph and its name as tooltip, drawn default, hover or disabled, with a focus ring; `SIZE` |
 | `src/ui_components/align_button/style.rs` | 33 | 250 | bin | `AlignButtonState`, `paint`: picks the `Palette::align_button` entry for a state |
+| `src/ui_components/status_bar/mod.rs` | 174 | 1,400 | bin | `status_bar::show`, `StatusBar`, `Tone`: the bottom bar (from the Brilliant "Status Bar"): a success or error dot with the message and the selection on the left; grid step, cursor coordinates and graphics backend (adapter in the tooltip) on the right, laid out first so the left side is the one cut short |
 | `src/ui_components/tool_button/mod.rs` | 183 | 1,500 | bin | `ToolButton`: the tool bar button (from the Brilliant `ToolBtn`), an `egui::Widget`: a 32 px square with a font glyph (`glyph`) or a painted icon (`icon`), or a chip with a colored dot and a label (`chip`); `selected`, `shortcut` (added to the tooltip); drawn idle, hover, active (with a drop shadow) or disabled, with a focus ring |
 | `src/ui_components/tool_button/style.rs` | 37 | 300 | bin | `ToolButtonState`, `paint`: picks the `Palette::toolbar.button` entry for a state |
 | `src/ui_components/input/mod.rs` | 185 | 1,650 | bin | The design-system input fields (from the Brilliant `Number Input` and `Search Field`): re-exports `TextInput`, `NumberInput`, `SearchInput`; shared `Field` frame (allocate, state, paint, click-to-focus), `show_edit` (a frameless `TextEdit` centered in a rect), `escaped` (Esc leaves a field without closing the dialog), painted search, clear and stepper icons |
@@ -59,7 +60,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/ui_components/input/style.rs` | 44 | 350 | bin | `InputState` (default, hover, focus, accent, disabled), `paint`: picks the `Palette::input` entry for a state |
 | `src/ui_components/dock/mod.rs` | 191 | 1,600 | bin | `PanelTab` (including `Snap`; the tools are a fixed tool bar, not a tab), `PanelDock`: panel arrangement, default layout, saving and restoring it, and the `TabDecor` of its tabs |
 | `src/ui_components/dock/style.rs` | 187 | 1,500 | bin | The dock look from the Brilliant `DockTab` component: `dock_style` (the `egui_dock::Style` of the current theme), `TabDecor` (tab titles with the icon colored by state; the accent line on the open tab and the divider right of inactive ones, painted from `on_tab_button`) |
-| `src/ui_components/palette/mod.rs` | 166 | 1,050 | bin | `Palette` (`DARK`, `LIGHT`, `of` and `of_visuals`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge) and one field per color group, each group in its own submodule with its `DARK` and `LIGHT` values; `hex` and `hex_opt` (`0xRRGGBB` to `Color32`); re-exports the component paint types; `layout` is the Layout panel's group; used by `canvas`, `grid`, `button`, `tabs`, `dropdown`, `input`, `checkbox`, `radio`, `group_button`, `list`, `title_bar`, `tool_button`, `align_button`, the Properties panel and the Layout panel |
+| `src/ui_components/palette/mod.rs` | 166 | 1,050 | bin | `Palette` (`DARK`, `LIGHT`, `of` and `of_visuals`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge) and one field per color group, each group in its own submodule with its `DARK` and `LIGHT` values; `hex` and `hex_opt` (`0xRRGGBB` to `Color32`); re-exports the component paint types; `layout` is the Layout panel's group; used by `canvas`, `grid`, `button`, `tabs`, `dropdown`, `input`, `checkbox`, `radio`, `group_button`, `list`, `title_bar`, `status_bar`, `tool_button`, `align_button`, the Properties panel and the Layout panel |
 | `src/ui_components/palette/surfaces.rs` | 43 | 250 | bin | `Surfaces`: backgrounds from the canvas to chips |
 | `src/ui_components/palette/borders.rs` | 35 | 200 | bin | `Borders`: divider, panel, control, field and chip lines |
 | `src/ui_components/palette/text.rs` | 43 | 280 | bin | `TextColors`: seven steps of text brightness, including the panel group titles |
@@ -76,6 +77,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/ui_components/palette/properties.rs` | 31 | 200 | bin | `PropertiesColors`: Properties panel text (hint box title and text, parameter row names, W/H prefixes) |
 | `src/ui_components/palette/layout.rs` | 160 | 1,450 | bin | `LayoutColors` (`CardPaint`, `PieceRowPaint`, `RowButtonColors`: root row, piece cards and rows, shape rows, row buttons, the Base badge, and the union, subtract and intersect `FieldTone`s; hover, intersect and light values derived) |
 | `src/ui_components/palette/list.rs` | 62 | 450 | bin | `ListColors` (`ListItemPaint`: fill, stroke, icon, text and trailing per row state, plus the focus ring; hover, disabled and light values derived) |
+| `src/ui_components/palette/status_bar.rs` | 56 | 450 | bin | `StatusBarColors`: background, border, dividers, ok and error dot and message, selection, grid, cursor, renderer; light values derived |
 | `src/ui_components/palette/title_bar.rs` | 153 | 1,050 | bin | `TitleBarColors` (`MenuTitleStates`, `MenuTitlePaint`, `ModeSwitchColors`, `ModePaint`, `WindowButtonColors`: bar, logo, app name, menu titles, mode switch and window buttons; light values derived) |
 | `src/ui_components/palette/toolbar.rs` | 73 | 550 | bin | `ToolbarColors` (bar background, bottom border, dividers; `ToolButtonColors`, `ToolButtonPaint`: fill, stroke and content per tool button state, the active shadow and the focus ring; hover and light values derived) |
 | `src/ui_components/radio/mod.rs` | 127 | 1,050 | bin | `Radio`: the design-system radio button (from the Brilliant `Radio`), an `egui::Widget` with an optional label, drawn on (a dot) or off in its default, hover or disabled state, with a focus ring and focus-colored edge; the checkbox sizes and `Palette::checkbox` colors; `radio_value` (the counterpart of `ui.radio_value`); no caller yet |
@@ -115,8 +117,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/align/align_edges.rs` | 15 | 130 | lib | `align`: moves each item's edge or center onto the reference's |
 | `src/align/distribute.rs` | 35 | 300 | lib | `distribute`: spaces edges or centers evenly, between the outer items or across the project or parent |
 | `src/align/space.rs` | 55 | 500 | lib | `space` (equal automatic gaps), `pack` (fixed gap away from the key object) |
-| `src/i18n/uk.rs` | 679 | 6,700 | lib | Ukrainian catalog, `plural` helper |
-| `src/i18n/mod.rs` | 349 | 2,350 | lib | `Language`, `Label`, `Message` |
+| `src/i18n/uk.rs` | 701 | 7,000 | lib | Ukrainian catalog, `plural` helper |
+| `src/i18n/mod.rs` | 606 | 4,100 | lib | `Language`, `Label`, `Message` |
 | `src/exports/mod.rs` | 323 | 2,300 | lib | `ExportError`, shared helpers (`validate_export`, `centerlines`, `stitch_lines`, `HoleOutput`, `stitch_holes`, `number`), tests |
 | `src/exports/svg.rs` | 104 | 1,100 | lib | `to_svg`: outlines, then a group of centerlines with their dash pattern, then a group of stitch holes |
 | `src/exports/dxf.rs` | 60 | 550 | lib | `to_dxf`: outlines on `PATTERN`, each centerline dash as a `LINE` on `CENTERLINE`, stitch holes as `CIRCLE` or `LWPOLYLINE` on `STITCH_HOLES` |
@@ -128,7 +130,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/shapes/ellipse.rs` | 123 | 900 | lib | `Ellipse`, `CIRCLE_SEGMENTS` |
 | `src/shapes/regular_polygon.rs` | 154 | 1,150 | lib | `RegularPolygon`, `REGULAR_POLYGON_SIDES` |
 | `src/shapes/polygon.rs` | 116 | 850 | lib | `Polygon`, its edges and their lengths |
-| `src/i18n/en.rs` | 532 | 5,100 | lib | English catalog |
+| `src/i18n/en.rs` | 638 | 5,400 | lib | English catalog, `counted` helper |
 | `src/history.rs` | 725 | 4,950 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
 | `src/persistence.rs` | 230 | 1,750 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings/mod.rs` | 165 | 1,350 | bin | `settings.json` in the OS config directory: language, panel layout, snap settings (`load_snap`, `save_snap`), and `Preferences` (default material, hotkeys, theme) with `load_preferences`, `save_preferences` |
@@ -222,11 +224,12 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Area | Symbols |
 |---:|---|---|
-| 21-160 | Top-level layout | `editor_ui`, which also shows the dock area, the new-project dialog and the Settings window (OK saves `Preferences`) |
-| 163-266 | Menus | `action_button` (label plus the action's first shortcut), `file_menu`, `file_command` (New, Open, Save, Save As; shared with hotkeys), `edit_menu` (with Settings…), `window_menu` |
-| 268-372 | Input | `handle_hotkeys` (dispatches `Hotkeys::triggered`, skipped while drawing, in a dialog or in a text field), `delete_selection` (several children go as `RemoveChildren`, several pieces as `RemovePieces`, locked ones stay), `select_all` (all children of the selected piece while one is selected) |
-| 374-388 | Language | `language_control` |
-| 390-401 | File dialog | `project_dialog`, `save_as` |
+| 31-212 | Top-level layout | `editor_ui`, which also shows the dock area, the new-project dialog and the Settings window (OK saves `Preferences`) |
+| 213-307 | Status bar | `show_status_bar` (message, grid step while grid snapping in 2D, cursor, wgpu backend from `RenderAdapterInfo`), `selection_summary` (`SelectedPieces`, `SelectedShapes`, or `SelectedPiece` with shape and stitch-hole counts) |
+| 309-412 | Menus | `action_button` (label plus the action's first shortcut), `file_menu`, `file_command` (New, Open, Save, Save As; shared with hotkeys), `edit_menu` (with Settings…), `window_menu` |
+| 414-526 | Input | `handle_hotkeys` (dispatches `Hotkeys::triggered`, skipped while drawing, in a dialog or in a text field), `delete_selection` (several children go as `RemoveChildren`, several pieces as `RemovePieces`, locked ones stay), `select_all` (all children of the selected piece while one is selected) |
+| 528-549 | Language | `language_control` |
+| 551-562 | File dialog | `project_dialog`, `save_as` |
 
 ### `ui_components/`
 

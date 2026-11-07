@@ -446,6 +446,28 @@ pub(super) fn message(message: &Message) -> String {
             format!("{count} {noun}")
         }
         Message::SelectedEdge { number } => format!("Грань {number}"),
+        Message::SelectedPiece {
+            name,
+            shapes,
+            holes,
+        } => {
+            let noun = plural(*shapes, "фігура", "фігури", "фігур");
+            match holes {
+                0 => format!("Обрано: {name} ({shapes} {noun})"),
+                _ => {
+                    let hole = plural(*holes, "отвір", "отвори", "отворів");
+                    format!("Обрано: {name} ({shapes} {noun} · {holes} {hole} шва)")
+                }
+            }
+        }
+        Message::SelectedPieces { count } => {
+            let noun = plural(*count, "деталь", "деталі", "деталей");
+            format!("Обрано: {count} {noun}")
+        }
+        Message::SelectedShapes { name, count } => {
+            let noun = plural(*count, "фігуру", "фігури", "фігур");
+            format!("Обрано: {count} {noun} в «{name}»")
+        }
         Message::SelectedVertex { number } => format!("Вершина {number}"),
         Message::PieceMaterial { name } => format!("Матеріал деталі «{name}»"),
         Message::DefaultPieceName { id } => format!("Деталь {id}"),

@@ -356,6 +356,21 @@ pub enum Message {
     SelectedEdge {
         number: usize,
     },
+    /// The selected piece in the status bar: its shapes, base included, and stitch holes.
+    SelectedPiece {
+        name: String,
+        shapes: usize,
+        holes: usize,
+    },
+    /// Several selected pieces in the status bar.
+    SelectedPieces {
+        count: usize,
+    },
+    /// Several selected shapes of one piece in the status bar.
+    SelectedShapes {
+        name: String,
+        count: usize,
+    },
     SelectedVertex {
         number: usize,
     },
@@ -552,6 +567,27 @@ mod tests {
         let en = |count| Language::English.message(&Message::PieceCount { count });
         assert_eq!(en(1), "1 piece");
         assert_eq!(en(3), "3 pieces");
+    }
+
+    #[test]
+    fn selected_piece_lists_its_shapes_and_holes() {
+        let piece = |shapes, holes| Message::SelectedPiece {
+            name: "Wallet".to_owned(),
+            shapes,
+            holes,
+        };
+        let en = |message| Language::English.message(&message);
+        assert_eq!(en(piece(1, 0)), "Selected: Wallet (1 shape)");
+        assert_eq!(
+            en(piece(2, 48)),
+            "Selected: Wallet (2 shapes · 48 stitch holes)"
+        );
+        let uk = |message| Language::Ukrainian.message(&message);
+        assert_eq!(uk(piece(1, 0)), "Обрано: Wallet (1 фігура)");
+        assert_eq!(
+            uk(piece(2, 48)),
+            "Обрано: Wallet (2 фігури · 48 отворів шва)"
+        );
     }
 
     #[test]
