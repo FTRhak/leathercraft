@@ -441,6 +441,10 @@ pub(super) fn message(message: &Message) -> String {
             let noun = plural(*count, "точка", "точки", "точок");
             format!("{count} {noun}")
         }
+        Message::PieceCount { count } => {
+            let noun = plural(*count, "деталь", "деталі", "деталей");
+            format!("{count} {noun}")
+        }
         Message::SelectedEdge { number } => format!("Грань {number}"),
         Message::SelectedVertex { number } => format!("Вершина {number}"),
         Message::PieceMaterial { name } => format!("Матеріал деталі «{name}»"),

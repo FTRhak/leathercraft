@@ -13,6 +13,7 @@ mod dock;
 mod dropdown;
 mod group_button;
 mod input;
+mod layout;
 mod list;
 mod properties;
 mod status;
@@ -34,9 +35,10 @@ pub(crate) use align_button::{AlignButtonColors, AlignButtonPaint};
 pub(crate) use button::{ButtonColors, ButtonPaint};
 pub(crate) use checkbox::{CheckboxColors, CheckboxPaint};
 pub(crate) use dock::{DockColors, DockTabPaint};
-pub(crate) use dropdown::{DropdownColors, FieldPaint};
+pub(crate) use dropdown::{DropdownColors, FieldPaint, FieldTone};
 pub(crate) use group_button::{GroupButtonColors, SegmentPaint};
 pub(crate) use input::{InputColors, InputPaint};
+pub(crate) use layout::LayoutColors;
 pub(crate) use list::{ListColors, ListItemPaint};
 pub(crate) use properties::PropertiesColors;
 pub(crate) use tabs::{TabColors, TabPaint};
@@ -76,6 +78,7 @@ pub(crate) struct Palette {
     pub(crate) checkbox: CheckboxColors,
     pub(crate) group_button: GroupButtonColors,
     pub(crate) list: ListColors,
+    pub(crate) layout: LayoutColors,
     pub(crate) properties: PropertiesColors,
     pub(crate) title_bar: TitleBarColors,
     pub(crate) toolbar: ToolbarColors,
@@ -118,6 +121,7 @@ impl Palette {
         checkbox: CheckboxColors::DARK,
         group_button: GroupButtonColors::DARK,
         list: ListColors::DARK,
+        layout: LayoutColors::DARK,
         properties: PropertiesColors::DARK,
         title_bar: TitleBarColors::DARK,
         toolbar: ToolbarColors::DARK,
@@ -145,6 +149,7 @@ impl Palette {
         checkbox: CheckboxColors::LIGHT,
         group_button: GroupButtonColors::LIGHT,
         list: ListColors::LIGHT,
+        layout: LayoutColors::LIGHT,
         properties: PropertiesColors::LIGHT,
         title_bar: TitleBarColors::LIGHT,
         toolbar: ToolbarColors::LIGHT,

@@ -13,7 +13,9 @@
 //! ```
 //!
 //! Both the field and its items take an optional leading slot painted before the text, such as
-//! a color swatch. Disable the dropdown the egui way, with `ui.add_enabled_ui(false, ..)`
+//! a color swatch. [`Dropdown::compact`] draws a smaller field for rows of a list, and
+//! [`Dropdown::tone`] tints its text, caret and border with a palette tone, such as the color of
+//! a boolean operation. Disable the dropdown the egui way, with `ui.add_enabled_ui(false, ..)`
 //! around it; an item is disabled with `ui.add_enabled(false, DropdownItem::new(..))`.
 
 mod style;
@@ -21,7 +23,7 @@ mod style;
 use bevy_egui::egui;
 use style::{DropdownState, paint};
 
-use crate::ui_components::palette::Palette;
+use crate::ui_components::palette::{FieldTone, Palette};
 
 const HEIGHT: f32 = 28.0;
 const PADDING: egui::Vec2 = egui::vec2(10.0, 5.0);
@@ -31,6 +33,12 @@ const GAP: f32 = 8.0;
 const CARET_SIZE: egui::Vec2 = egui::vec2(11.0, 6.0);
 const CARET_STROKE: f32 = 1.5;
 const FOCUS_STROKE: f32 = 1.0;
+/// The compact field, for rows of a list such as the Layout tree.
+const COMPACT_HEIGHT: f32 = 22.0;
+const COMPACT_PADDING: egui::Vec2 = egui::vec2(6.0, 2.0);
+const COMPACT_CORNER_RADIUS: u8 = 4;
+const COMPACT_CARET_SIZE: egui::Vec2 = egui::vec2(10.0, 5.0);
+const COMPACT_TEXT_SIZE: f32 = 10.0;
 /// Between the field and its open list.
 const MENU_GAP: f32 = 2.0;
 const MENU_PADDING: f32 = 4.0;
@@ -73,7 +81,12 @@ pub struct Dropdown<'a> {
     width: Option<f32>,
     max_height: f32,
     leading: Option<Leading<'a>>,
+    compact: bool,
+    tone: Option<ToneFn>,
 }
+
+/// Picks the tone of a dropdown from the palette of the current theme.
+pub type ToneFn = fn(&'static Palette) -> &'static FieldTone;
 
 impl<'a> Dropdown<'a> {
     /// A dropdown showing `selected_text`; `id_salt` keeps its list open across frames, so it
@@ -85,7 +98,22 @@ impl<'a> Dropdown<'a> {
             width: None,
             max_height: MENU_MAX_HEIGHT,
             leading: None,
+            compact: false,
+            tone: None,
         }
+    }
+
+    /// A smaller field, 22 px tall with 10 px text, for the rows of a list.
+    pub fn compact(mut self, compact: bool) -> Self {
+        self.compact = compact;
+        self
+    }
+
+    /// Tints the text, the caret and the border with a tone of the palette, picked anew each
+    /// frame so that it follows the theme. The focus and disabled borders stay as they are.
+    pub fn tone(mut self, tone: ToneFn) -> Self {
+        self.tone = Some(tone);
+        self
     }
 
     /// The width of the field and of its list; egui's `combo_width` by default. A text that
@@ -128,20 +156,37 @@ impl<'a> Dropdown<'a> {
             width,
             max_height,
             leading,
+            compact,
+            tone,
         } = self;
+        let (field_height, padding, corner_radius, caret_size) = if compact {
+            (
+                COMPACT_HEIGHT,
+                COMPACT_PADDING,
+                COMPACT_CORNER_RADIUS,
+                COMPACT_CARET_SIZE,
+            )
+        } else {
+            (HEIGHT, PADDING, CORNER_RADIUS, CARET_SIZE)
+        };
+        let font = if compact {
+            egui::FontSelection::FontId(egui::FontId::proportional(COMPACT_TEXT_SIZE))
+        } else {
+            egui::FontSelection::Style(egui::TextStyle::Button)
+        };
         let id = ui.make_persistent_id(id_salt);
         let popup_id = id.with("popup");
         let width = width.unwrap_or_else(|| ui.spacing().combo_width);
 
         let leading_width = leading.as_ref().map_or(0.0, Leading::width);
-        let text_width = width - 2.0 * PADDING.x - leading_width - GAP - CARET_SIZE.x;
+        let text_width = width - 2.0 * padding.x - leading_width - GAP - caret_size.x;
         let galley = text.into_galley(
             ui,
             Some(egui::TextWrapMode::Truncate),
             text_width.max(0.0),
-            egui::TextStyle::Button,
+            font,
         );
-        let height = HEIGHT.max(galley.size().y + 2.0 * PADDING.y);
+        let height = field_height.max(galley.size().y + 2.0 * padding.y);
         let (_, rect) = ui.allocate_space(egui::vec2(width, height));
         let response = ui.interact(rect, id, egui::Sense::click());
         response.widget_info(|| {
@@ -158,30 +203,43 @@ impl<'a> Dropdown<'a> {
             let hovered = response.hovered() || response.is_pointer_button_down_on();
             let state = DropdownState::new(ui.is_enabled(), open || response.has_focus(), hovered);
             let style = paint(colors, state);
+            let (mut text_color, mut caret_color, mut stroke) =
+                (style.text, style.caret, style.stroke);
+            if let Some(tone) = tone.map(|tone| tone(palette))
+                && state != DropdownState::Disabled
+            {
+                text_color = tone.text;
+                caret_color = tone.text;
+                stroke = match state {
+                    DropdownState::Default => tone.stroke,
+                    DropdownState::Hover => tone.hover_stroke,
+                    _ => style.stroke,
+                };
+            }
             let painter = ui.painter();
             painter.rect(
                 rect,
-                CORNER_RADIUS,
+                corner_radius,
                 style.fill,
-                egui::Stroke::new(FOCUS_STROKE, style.stroke),
+                egui::Stroke::new(FOCUS_STROKE, stroke),
                 egui::StrokeKind::Inside,
             );
 
-            let mut x = rect.left() + PADDING.x;
+            let mut x = rect.left() + padding.x;
             if let Some(leading) = leading {
                 x = leading.paint_at(painter, x, rect.center().y);
             }
             let text_pos = egui::pos2(x, rect.center().y - galley.size().y / 2.0);
-            painter.galley(text_pos, galley, style.text);
+            painter.galley(text_pos, galley, text_color);
 
             let caret = egui::Rect::from_min_size(
                 egui::pos2(
-                    rect.right() - PADDING.x - CARET_SIZE.x,
-                    rect.center().y - CARET_SIZE.y / 2.0,
+                    rect.right() - padding.x - caret_size.x,
+                    rect.center().y - caret_size.y / 2.0,
                 ),
-                CARET_SIZE,
+                caret_size,
             );
-            paint_caret(painter, caret, egui::Stroke::new(CARET_STROKE, style.caret));
+            paint_caret(painter, caret, egui::Stroke::new(CARET_STROKE, caret_color));
         }
 
         let menu = &colors.menu;

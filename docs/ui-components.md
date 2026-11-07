@@ -158,6 +158,8 @@ Dropdown::new("units", language.label(units.label()))
 | `.width(w)` | Width of the field and of its list (default `spacing().combo_width`). Text that doesn't fit is cut with an ellipsis. |
 | `.max_height(h)` | How tall the list grows before it scrolls (default 360 px) |
 | `.leading(size, paint)` | Paints something of `size` before the text, such as the swatch of the chosen color |
+| `.compact(true)` | A smaller field (22 px tall, 10 px text, 6 px padding) for rows of a list, such as the Layout panel's operation picker |
+| `.tone(tone_fn)` | Tints the text, caret and border with a `FieldTone` from the palette, picked each frame: `.tone(\|palette\| &palette.layout.union)`. Focus and disabled borders are unchanged. |
 | `.show_ui(ui, add_items)` | Draws the field and, while it is open, the list. It returns `InnerResponse<Option<R>>`, whose `inner` is `None` while the list is closed. |
 
 - A click on an item closes the list.
@@ -307,7 +309,7 @@ list(ui, |ui| {
 - `icon_font_id(size)`: the icon font, for laying a glyph out with text, as the dock tab titles do.
 - `install_icon_font` runs once in `EguiPrimaryContextPass`. Glyphs show from the next frame.
 
-`icon_button` paints with egui's `Visuals` (`interact_selectable`), not with `Palette`, which `docs/design.md` allows. It is the only component that does.
+`icon_button` paints with egui's `Visuals` (`interact_selectable`), not with `Palette`, which `docs/design.md` allows. It is the only component that does. It has no caller at the moment: the Layout panel draws its own row buttons in palette colors (`panels/layout/rows.rs`).
 
 ## Dock
 

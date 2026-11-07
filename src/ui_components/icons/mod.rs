@@ -77,6 +77,8 @@ pub fn icon_font_id(size: f32) -> egui::FontId {
 }
 
 /// A square button with a painted icon; the closure gets the button's rect and stroke.
+// No caller since the Layout panel draws its own row buttons; kept for new tool buttons.
+#[allow(dead_code)]
 pub fn icon_button(
     ui: &mut egui::Ui,
     size: f32,

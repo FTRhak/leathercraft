@@ -43,13 +43,13 @@ Constants are in `icons::glyph`:
 | `UNLOCK` | `U+E116` | Unlocked piece (Layout panel) |
 | `HISTORY` | `U+E121` | History panel tab title, via `TabDecor::title` |
 | `SELECT` | `U+E130` | Select tool (tool bar) |
-| `DRAW` | `U+E132` | Draw tool (tool bar) |
-| `RECTANGLE` | `U+E133` | Rectangle tool (tool bar) |
-| `ELLIPSE` | `U+E134` | Ellipse tool (tool bar) |
+| `DRAW` | `U+E132` | Draw tool (tool bar); that kind of shape (Layout panel rows) |
+| `RECTANGLE` | `U+E133` | Rectangle tool (tool bar); that kind of shape (Layout panel rows) |
+| `ELLIPSE` | `U+E134` | Ellipse tool (tool bar); that kind of shape (Layout panel rows) |
 | `EDGE` | `U+E135` | Edge tool (tool bar) |
-| `STITCH_HOLES` | `U+E136` | Stitch holes tool (tool bar) |
-| `CENTERLINE` | `U+E137` | Centerline tool (tool bar) |
-| `REGULAR_POLYGON` | `U+E138` | Regular polygon tool (tool bar) |
+| `STITCH_HOLES` | `U+E136` | Stitch holes tool (tool bar); that kind of shape (Layout panel rows) |
+| `CENTERLINE` | `U+E137` | Centerline tool (tool bar); that kind of shape (Layout panel rows) |
+| `REGULAR_POLYGON` | `U+E138` | Regular polygon tool (tool bar); that kind of shape (Layout panel rows) |
 | `NEW_PIECE` | `U+E13C` | New piece mode (tool bar mode dropdown) |
 | `SUBTRACT` | `U+E13D` | Subtract operation (tool bar mode dropdown) |
 | `UNION` | `U+E13E` | Union operation (tool bar mode dropdown) |
@@ -178,7 +178,7 @@ Each panel defines its own constants rather than sharing them:
 
 `paint` receives the whole button rect. Painted icons shrink it themselves, typically `rect.shrink(ICON_MARGIN)` (Layout adds 1 more for its small triangles). Glyphs don't need a margin: the 75% font size leaves one.
 
-Non-button icons in a row of icon buttons, such as the Layout panel's expand toggle or the blank space for a piece without children, should allocate the same `ICON_BUTTON_SIZE` square so the row stays aligned.
+Non-button icons in a row of icon buttons should allocate the same square as the buttons so the row stays aligned. The Layout panel doesn't use `icon_button`: its rows have their own framed or quiet buttons in palette colors (`panels/layout/rows.rs`).
 
 ## Checklist for a new icon button
 

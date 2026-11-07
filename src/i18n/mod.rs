@@ -349,6 +349,10 @@ pub enum Message {
     PointCount {
         count: usize,
     },
+    /// The number of pieces, beside the root of the Layout tree.
+    PieceCount {
+        count: usize,
+    },
     SelectedEdge {
         number: usize,
     },
@@ -537,6 +541,17 @@ mod tests {
         assert_eq!(text(11), "11 точок");
         assert_eq!(text(21), "21 точка");
         assert_eq!(text(22), "22 точки");
+    }
+
+    #[test]
+    fn piece_counts_use_the_right_plural_form() {
+        let uk = |count| Language::Ukrainian.message(&Message::PieceCount { count });
+        assert_eq!(uk(1), "1 деталь");
+        assert_eq!(uk(2), "2 деталі");
+        assert_eq!(uk(5), "5 деталей");
+        let en = |count| Language::English.message(&Message::PieceCount { count });
+        assert_eq!(en(1), "1 piece");
+        assert_eq!(en(3), "3 pieces");
     }
 
     #[test]

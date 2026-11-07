@@ -22,6 +22,14 @@ pub(crate) struct FieldPaint {
     pub(crate) caret: Color32,
 }
 
+/// A tint of a dropdown's text, caret and border, set with `Dropdown::tone`.
+pub(crate) struct FieldTone {
+    pub(crate) text: Color32,
+    pub(crate) stroke: Color32,
+    /// The border under the pointer.
+    pub(crate) hover_stroke: Color32,
+}
+
 /// The open list of a dropdown.
 pub(crate) struct MenuColors {
     /// The background of the list; the same as `surface.popup`.

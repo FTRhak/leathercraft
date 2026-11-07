@@ -432,6 +432,8 @@ pub(super) fn message(message: &Message) -> String {
         Message::PiecesDeleted { count } => format!("{count} pieces deleted."),
         Message::PointCount { count: 1 } => "1 point".to_owned(),
         Message::PointCount { count } => format!("{count} points"),
+        Message::PieceCount { count: 1 } => "1 piece".to_owned(),
+        Message::PieceCount { count } => format!("{count} pieces"),
         Message::SelectedEdge { number } => format!("Edge {number}"),
         Message::SelectedVertex { number } => format!("Vertex {number}"),
         Message::PieceMaterial { name } => format!("The material of '{name}'"),
