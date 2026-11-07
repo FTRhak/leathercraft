@@ -6,11 +6,11 @@ The visual source of truth is the Brilliant design: https://brilliant.design/nea
 
 ## The rule
 
-**Every color the app paints comes from `Palette`** (`src/ui_components/palette.rs`). Components, panels and canvas code never write a color literal (`Color32::from_rgb`, `from_gray`, `from_rgba_unmultiplied`, `hex(0x…)`) themselves.
+**Every color the app paints comes from `Palette`** (`src/ui_components/palette/`: `Palette` and the canvas colors in `mod.rs`, each color group in its own file). Components, panels and canvas code never write a color literal (`Color32::from_rgb`, `from_gray`, `from_rgba_unmultiplied`, `hex(0x…)`) themselves.
 
 A new color is first added to `Palette`, with a value for both themes, and then read from there. This keeps the two themes complete and lets one file be compared against the design.
 
-Allowed outside `palette.rs`:
+Allowed outside `palette/`:
 
 | Allowed | Why |
 |---|---|
@@ -34,7 +34,7 @@ Inside a widget, take the painter from the `Ui`: `Palette::of(ui.painter())`. Ca
 
 1. **Name it by role, not by hue:** `selection`, `snap_marker`, `error`, not `orange` or `pink`. The same role may need a different hue in the other theme.
 2. **Add the field** to `Palette`, with a one-line doc comment when the name doesn't say where it is used.
-3. **Give it a value in both `DARK` and `LIGHT`.** The struct is a `const`, so a missing value is a compile error. Take the values from the design; if the design has none yet, pick one and add it to the design too.
+3. **Give it a value in both `DARK` and `LIGHT`**, of `Palette` or of the group's struct in its own file. They are `const`s, so a missing value is a compile error. Take the values from the design; if the design has none yet, pick one and add it to the design too.
 4. **Check contrast** against the background of that theme: lines and markers must stay visible on the canvas, text must stay readable (aim for 4.5:1 for text, 3:1 for strokes).
 5. **Use it** through `Palette::of`. Remove the literal it replaces.
 
@@ -42,7 +42,7 @@ Keep the fields grouped by area, canvas first, then each component.
 
 ## Component colors
 
-A component with several kinds or states (default, hover, pressed, disabled, focused) keeps its colors in the palette as a nested struct, one per component, defined in `palette.rs`:
+A component with several kinds or states (default, hover, pressed, disabled, focused) keeps its colors in the palette as a nested struct, one per component. It is defined in its own file, `palette/<component>.rs`, together with its helper structs and its `DARK` and `LIGHT` values, and re-exported from `palette/mod.rs`:
 
 ```rust
 pub(crate) struct Palette {
