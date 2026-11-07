@@ -84,7 +84,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/align/mod.rs` | 357 | 3,000 | bin | Align panel, laid out as the Brilliant "Alignment Body": rows of `AlignButton`s spread over the width under group titles, the spacing buttons with the Auto `Checkbox` and a `NumberInput` gap, a divider, and the Align To `Dropdown`; `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), align, distribute and spacing icons from font glyphs (`arrange_glyph`), `show_panel` |
 | `src/panels/snap/mod.rs` | 44 | 400 | bin | Snap panel: `show_panel` edits `SnapSettings` (on/off, grid and step, vertices, smart guides, distance in px) with the design-system `Checkbox` |
 | `src/panels/history/mod.rs` | 88 | 750 | bin | History panel: `ListItem` rows of actions with an icon (`action_glyph`), the current one selected, undone ones dimmed and struck through; click to jump |
-| `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
+| `src/panels/material/mod.rs` | 110 | 850 | bin | Material panel (the selected piece's material in a padded scroll area, or a muted "No piece selected"; the card hint names the piece, `Message::PieceMaterial`) and the new-project dialog (title, the form with `Label::DefaultMaterialHint`, a right-to-left footer of primary Create and secondary Cancel `Button`s; Esc closes an open dropdown first) |
+| `src/panels/material/form.rs` | 417 | 3,500 | bin | `material_form`, from the Settings "Default material" page of the Brilliant design: a summary card (40 px color swatch, origin · treatment over a hint, the thickness in an accent chip), then Basic and Physical sections (uppercase headers, a divider) of rows with a name column (40% of the width, at most 132 px) and a full-width `Dropdown`; thickness is a `NumberInput` in mm with its class in a chip; color items have swatches in groups; physical properties show `level` (five bars, `paint_level`) as the leading slot of the field and of each item. Colors from the shared palette groups |
 | `src/panels/settings/mod.rs` | 106 | 850 | bin | Settings window: `SettingsDraft` (with the Hotkeys filter text), `SettingsResult`, `settings_dialog` with Default material, Hotkeys and Appearance tabs in a `tab_bar`, and a right-aligned footer of `Button`s (primary OK, secondary Cancel) |
 | `src/panels/settings/appearance.rs` | 26 | 200 | bin | Appearance tab: `appearance_tab`, the theme as a design-system `GroupButton` |
 | `src/panels/settings/material.rs` | 186 | 1,550 | bin | Default material tab: `material_tab`, its own material form of `Dropdown`s (the color one with swatches as leading slots and grouped items) and a thickness `NumberInput` in mm, with an outline Reset to defaults `Button` |
@@ -304,13 +305,17 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 195 | `show_panel`, which returns the `ProjectEvent` to send and the `Pick` |
 | `history/mod.rs` | 14 | `show_panel`, which returns the `HistoryCommand` to send |
 | | 59 | `action_glyph`: the icon of an entry |
-| `material/mod.rs` | 15-103 | `DialogResult`, `combo`, `swatch`, `color_combo`, `thickness_row` |
-| | 105 | `material_fields`, shared by the dialog and the Material panel |
+| `material/mod.rs` | 29 | `show_panel`: the form on the selected piece, sends `SetPieceMaterial` on a change |
+| | 67 | `new_project_dialog` |
+| `material/form.rs` | 63 | `material_form`, shared by the dialog and the Material panel; returns whether the material changed |
+| | 164-262 | `summary_card`, `section`, `divider`, `row` |
+| | 264-369 | `choice_row` (with optional level bars), `thickness_row`, `color_row` |
+| | 397-417 | `level` (lit bars from the value's place in `ALL`), `paint_level` |
 | | 189 | `show_panel`, which returns the `ProjectEvent` to send |
 | | 214 | `new_project_dialog` |
 | `settings/mod.rs` | 14-44 | `DIALOG_WIDTH`, `SettingsTab`, `SettingsDraft` (edited copy of `Preferences`), `SettingsResult` |
 | | 47 | `settings_dialog`: modal with Default material, Hotkeys and Appearance tabs; OK is disabled while shortcuts conflict |
-| `settings/material.rs` | 16 | `material_tab`: its own form on the draft's default material, independent of `material_fields`, with Reset to defaults |
+| `settings/material.rs` | 16 | `material_tab`: its own form on the draft's default material, independent of `material_form`, with Reset to defaults |
 | | 37-187 | `basic_rows`, `physical_rows`, `combo`, `thickness_row`, `color_row`, `swatch` |
 | `settings/hotkeys.rs` | 8-21 | `HOTKEYS_HEIGHT`, `Capture`, `HotkeyChange` |
 | | 23 | `hotkeys_tab`, `shortcut_button` |
@@ -354,7 +359,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add a language | `i18n/mod.rs` 14-66 | `Language`, `ALL`, `tag`, `from_tag`, `native_name`, and a new catalog file |
 | Add a canvas tool | `panels/tools/mod.rs`, `editor/canvas.rs` 38-93, 152-262, `settings/hotkeys.rs` | `Tool` and its `label`, `hint`, `glyph` (plus a glyph in the icon font) or `mark`, a button in `toolbar_contents`, a dispatch arm in `canvas`, an `Action::Tool…` hotkey; a new primitive also goes in `Shape` (`ring`, `handles`, `with_handle_at`, `has_valid_size`), `shape_label` and `shape_fields` (with its own file in `panels/properties/`); an open one also in `is_open`, `distance_to`, its own drawing and the exports (see `docs/centerline.md` and `docs/stitch-holes.md`). A click-by-click tool shares `EditorState::draft`, owned through `draft_tool` |
 | Add a boolean operation | `model.rs` `BooleanOp`, `boolean.rs` `region` | A `BooleanOp` variant and its `ALL`, its `OverlayRule`, catalog arms, `op_color`, `operation_glyph` and a glyph in the icon font |
-| Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material`, `material_fields` and the Settings form in `panels/settings/material.rs` |
+| Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material`, `material_form` (`panels/material/form.rs`) and the Settings form in `panels/settings/material.rs` |
 | Change the file format | `model.rs` 119-160, 265-278, `shapes/mod.rs` 14-23 and the shape structs, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
 | Change the 3D look or mesh | `preview/mod.rs` 49-123, 159-261 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |

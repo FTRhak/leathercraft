@@ -176,6 +176,9 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Tilt => "Нахил",
         Label::Zoom => "Масштаб",
         Label::NewProjectTitle => "Новий проєкт: типовий матеріал",
+        Label::DefaultMaterialHint => {
+            "Новий проєкт і кожна нова деталь починаються з цього матеріалу."
+        }
         Label::Create => "Створити",
         Label::Cancel => "Скасувати",
         Label::BasicProperties => "Базові характеристики",
@@ -440,6 +443,7 @@ pub(super) fn message(message: &Message) -> String {
         }
         Message::SelectedEdge { number } => format!("Грань {number}"),
         Message::SelectedVertex { number } => format!("Вершина {number}"),
+        Message::PieceMaterial { name } => format!("Матеріал деталі «{name}»"),
         Message::DefaultPieceName { id } => format!("Деталь {id}"),
         Message::PieceNotFound { id } => format!("Деталь {id} не існує."),
         Message::PieceLocked { name } => format!("Деталь «{name}» заблоковано."),

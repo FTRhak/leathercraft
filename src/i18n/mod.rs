@@ -237,6 +237,8 @@ pub enum Label {
     Tilt,
     Zoom,
     NewProjectTitle,
+    /// What the default material is for, under the material card of the new-project dialog.
+    DefaultMaterialHint,
     Create,
     Cancel,
     BasicProperties,
@@ -272,82 +274,230 @@ pub enum Label {
 pub enum Message {
     Ready,
     NewProject,
-    Opened { path: String },
-    Saved { path: String },
-    Exported { path: String },
-    PieceAdded { name: String },
+    Opened {
+        path: String,
+    },
+    Saved {
+        path: String,
+    },
+    Exported {
+        path: String,
+    },
+    PieceAdded {
+        name: String,
+    },
     PieceDeleted,
-    PiecesDeleted { count: usize },
-    ChildAdded { name: String },
+    PiecesDeleted {
+        count: usize,
+    },
+    ChildAdded {
+        name: String,
+    },
     ChildDeleted,
-    ChildrenDeleted { count: usize },
+    ChildrenDeleted {
+        count: usize,
+    },
     SelectPieceForChild,
-    ChildNotFound { name: String },
-    TooManyChildren { name: String, max: usize },
-    InvalidChildId { name: String },
-    InvalidShapeSize { name: String },
-    BaseMustBeClosed { name: String },
-    TooManyDashes { name: String, max: usize },
-    InvalidHoleParameters { name: String },
-    HolesOverlap { name: String },
-    TooManyHoles { name: String, max: usize },
-    StitchHolesRow { count: usize },
-    StitchVertices { count: usize },
-    ThreadHint { band: StitchBand },
-    LeatherOutsideBand { band: StitchBand },
-    ResultEmpty { name: String },
-    ResultSplit { name: String },
-    PointCount { count: usize },
-    SelectedEdge { number: usize },
-    SelectedVertex { number: usize },
-    DefaultPieceName { id: u64 },
-    PieceNotFound { id: u64 },
-    PieceLocked { name: String },
+    ChildNotFound {
+        name: String,
+    },
+    TooManyChildren {
+        name: String,
+        max: usize,
+    },
+    InvalidChildId {
+        name: String,
+    },
+    InvalidShapeSize {
+        name: String,
+    },
+    BaseMustBeClosed {
+        name: String,
+    },
+    TooManyDashes {
+        name: String,
+        max: usize,
+    },
+    InvalidHoleParameters {
+        name: String,
+    },
+    HolesOverlap {
+        name: String,
+    },
+    TooManyHoles {
+        name: String,
+        max: usize,
+    },
+    StitchHolesRow {
+        count: usize,
+    },
+    StitchVertices {
+        count: usize,
+    },
+    ThreadHint {
+        band: StitchBand,
+    },
+    LeatherOutsideBand {
+        band: StitchBand,
+    },
+    ResultEmpty {
+        name: String,
+    },
+    ResultSplit {
+        name: String,
+    },
+    PointCount {
+        count: usize,
+    },
+    SelectedEdge {
+        number: usize,
+    },
+    SelectedVertex {
+        number: usize,
+    },
+    /// Under the material card of the Material panel.
+    PieceMaterial {
+        name: String,
+    },
+    DefaultPieceName {
+        id: u64,
+    },
+    PieceNotFound {
+        id: u64,
+    },
+    PieceLocked {
+        name: String,
+    },
     AlreadyArranged,
     ShapesAlreadyArranged,
-    UnsupportedVersion { found: u32, expected: u32 },
-    TooManyPieces { max: usize },
-    InvalidPieceId { name: String },
-    PieceNameRequired { id: u64 },
-    PointCountOutOfRange { name: String, max: usize },
-    CoordinateOutOfRange { name: String },
-    CoincidentPoints { name: String },
-    ZeroArea { name: String },
-    ThicknessOutOfRange { name: String },
+    UnsupportedVersion {
+        found: u32,
+        expected: u32,
+    },
+    TooManyPieces {
+        max: usize,
+    },
+    InvalidPieceId {
+        name: String,
+    },
+    PieceNameRequired {
+        id: u64,
+    },
+    PointCountOutOfRange {
+        name: String,
+        max: usize,
+    },
+    CoordinateOutOfRange {
+        name: String,
+    },
+    CoincidentPoints {
+        name: String,
+    },
+    ZeroArea {
+        name: String,
+    },
+    ThicknessOutOfRange {
+        name: String,
+    },
     DefaultThicknessOutOfRange,
-    CouldNotEncode { detail: String },
-    CouldNotRead { path: String, detail: String },
-    CouldNotParse { path: String, detail: String },
-    CouldNotWrite { path: String, detail: String },
+    CouldNotEncode {
+        detail: String,
+    },
+    CouldNotRead {
+        path: String,
+        detail: String,
+    },
+    CouldNotParse {
+        path: String,
+        detail: String,
+    },
+    CouldNotWrite {
+        path: String,
+        detail: String,
+    },
     ExportEmpty,
-    Undone { action: Box<Message> },
-    Redone { action: Box<Message> },
-    HistoryRestored { action: Box<Message> },
+    Undone {
+        action: Box<Message>,
+    },
+    Redone {
+        action: Box<Message>,
+    },
+    HistoryRestored {
+        action: Box<Message>,
+    },
     // Entries of the History panel.
     ActionNewProject,
-    ActionOpened { name: String },
+    ActionOpened {
+        name: String,
+    },
     ActionUnits,
-    ActionAddPiece { name: String },
-    ActionRenamePiece { name: String },
-    ActionEditBase { name: String },
-    ActionMovePiece { name: String },
-    ActionMovePieces { count: usize },
-    ActionAlignPieces { count: usize },
-    ActionDistributePieces { count: usize },
-    ActionLockPiece { name: String },
-    ActionUnlockPiece { name: String },
-    ActionMaterial { name: String },
-    ActionRemovePiece { name: String },
-    ActionRemovePieces { count: usize },
-    ActionAddChild { name: String },
-    ActionEditChild { name: String },
-    ActionSetChildOp { name: String },
-    ActionReorderChild { name: String },
-    ActionRemoveChild { name: String },
-    ActionMoveChildren { name: String, count: usize },
-    ActionAlignChildren { name: String, count: usize },
-    ActionDistributeChildren { name: String, count: usize },
-    ActionRemoveChildren { name: String, count: usize },
+    ActionAddPiece {
+        name: String,
+    },
+    ActionRenamePiece {
+        name: String,
+    },
+    ActionEditBase {
+        name: String,
+    },
+    ActionMovePiece {
+        name: String,
+    },
+    ActionMovePieces {
+        count: usize,
+    },
+    ActionAlignPieces {
+        count: usize,
+    },
+    ActionDistributePieces {
+        count: usize,
+    },
+    ActionLockPiece {
+        name: String,
+    },
+    ActionUnlockPiece {
+        name: String,
+    },
+    ActionMaterial {
+        name: String,
+    },
+    ActionRemovePiece {
+        name: String,
+    },
+    ActionRemovePieces {
+        count: usize,
+    },
+    ActionAddChild {
+        name: String,
+    },
+    ActionEditChild {
+        name: String,
+    },
+    ActionSetChildOp {
+        name: String,
+    },
+    ActionReorderChild {
+        name: String,
+    },
+    ActionRemoveChild {
+        name: String,
+    },
+    ActionMoveChildren {
+        name: String,
+        count: usize,
+    },
+    ActionAlignChildren {
+        name: String,
+        count: usize,
+    },
+    ActionDistributeChildren {
+        name: String,
+        count: usize,
+    },
+    ActionRemoveChildren {
+        name: String,
+        count: usize,
+    },
 }
 
 impl fmt::Display for Message {

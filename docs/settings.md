@@ -202,7 +202,7 @@ An `egui::Modal` of fixed width `DIALOG_WIDTH` (420 px), with the title, a row o
 ### Default material tab (`material_tab`)
 
 - Two striped grids, **Basic properties** (origin, treatment, thickness, color, texture) and **Physical properties** (strength, flexibility, water and heat resistance), editing `draft.preferences.default_material`.
-- It has its own form, separate from `panels::material::material_fields`, which edits a piece through events. A new `Material` property has to be added to both.
+- It has its own form, separate from `panels::material::form::material_form`, which edits a piece through events. A new `Material` property has to be added to both.
 - Thickness is a `NumberInput` (step 0.1, two decimals, the `mm` unit) limited to `MIN_THICKNESS_MM..=MAX_THICKNESS_MM`, always in millimeters whatever the display units, with the thickness category next to it. Since the range is enforced, the saved material always passes `has_valid_thickness`.
 - Values that have a description in the catalog show it on hover, both in the list and on the closed combo box.
 - Colors are grouped by `ColorGroup`, each with a swatch.
