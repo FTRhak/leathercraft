@@ -1,9 +1,9 @@
 mod document;
 mod editor;
-mod icons;
 mod panels;
 mod preview;
 mod settings;
+mod ui_components;
 
 use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin};
@@ -11,7 +11,7 @@ use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 use document::{ActiveProject, HistoryMessage, ProjectMessage};
 use editor::{EditorState, ViewMode};
 use leathercraft::model::Project;
-use panels::dock::PanelDock;
+use ui_components::dock::PanelDock;
 use preview::PreviewPlugin;
 
 fn main() {
@@ -40,7 +40,7 @@ fn main() {
         .add_systems(
             EguiPrimaryContextPass,
             (
-                icons::install_icon_font.run_if(run_once),
+                ui_components::icons::install_icon_font.run_if(run_once),
                 settings::apply_theme,
                 // The icon font is bound only from the next pass, so the UI starts one pass later.
                 (editor::editor_ui, document::apply_project_events)

@@ -46,7 +46,7 @@ fn icon_font() -> egui::FontFamily {
 /// Registers the icon font as its own family; run once, it takes effect from the next pass,
 /// so nothing may use the family in the pass that installs it.
 pub fn install_icon_font(mut contexts: EguiContexts) -> Result {
-    let data = egui::FontData::from_static(include_bytes!("../res/leathercrafticons.ttf"));
+    let data = egui::FontData::from_static(include_bytes!("../../res/leathercrafticons.ttf"));
     contexts
         .ctx_mut()?
         .add_font(egui::epaint::text::FontInsert::new(

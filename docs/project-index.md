@@ -36,9 +36,10 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/grid.rs` | 73 | 600 | bin | `draw_grid`: canvas grid and axes, grid steps; `draw_snap_dots`: the snap grid |
 | `src/editor/ui.rs` | 401 | 3,700 | bin | `editor_ui` (menu bar, tool bar, status bar, dock area), `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
 | `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History, Layout and Properties tab titles have icons; the Align tab targets the selected children when there are any, else the selected pieces |
-| `src/icons/mod.rs` | 113 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
+| `src/ui_components/icons/mod.rs` | 113 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
-| `src/panels/dock/mod.rs` | 185 | 1,550 | bin | `PanelTab` (including `Snap`; the tools are a fixed tool bar, not a tab), `PanelDock`: panel arrangement, default layout, saving and restoring it |
+| `src/ui_components/mod.rs` | 2 | 20 | bin | Reusable UI component module declarations |
+| `src/ui_components/dock/mod.rs` | 185 | 1,550 | bin | `PanelTab` (including `Snap`; the tools are a fixed tool bar, not a tab), `PanelDock`: panel arrangement, default layout, saving and restoring it |
 | `src/panels/tools/mod.rs` | 333 | 1,650 | bin | `Tool` (with `Centerline` and `StitchHoles`), `StitchSettings`, `ToolSettings`, `ZoomRequest` (All or Selection), `Tool::needs_piece` (Centerline and Stitch holes are enabled, and reachable by hotkey, only while a piece is selected; otherwise the tool falls back to Select), tool, new-piece and operation icons from font glyphs; `show_toolbar`: the full-width tool bar under the menu bar (drawn by `editor_ui`, not a dock tab), one scrolling line of tool buttons, the new-piece and boolean operation modes as one dropdown (`op_mode_dropdown`), then the Centerline and Stitch holes buttons, then Zoom to fit and Zoom to selection (`paint_fit_icon`, `paint_fit_selection_icon`: painted corner brackets, the second with a square inside and enabled only with a selection; they set `ToolSettings::zoom_request`), then the current tool's settings (regular polygon sides, centerline style, stitch holes) |
 | `src/panels/layout/mod.rs` | 273 | 2,800 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls (none for a centerline); Shift+click toggles a piece or child |
 | `src/panels/align/mod.rs` | 248 | 2,000 | bin | Align panel: `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), align, distribute and spacing icons from font glyphs (`arrange_glyph`), `show_panel` |
@@ -183,14 +184,20 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | 374-388 | Language | `language_control` |
 | 390-401 | File dialog | `project_dialog`, `save_as` |
 
+### `ui_components/`
+
+| File | Lines | Symbols |
+|---|---:|---|
+| `mod.rs` | 1 | Module declarations |
+| `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
+| | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
+| | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
+
 ### `panels/`
 
 | File | Lines | Symbols |
 |---|---:|---|
 | `mod.rs` | 1-8 | Module declarations |
-| `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
-| | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
-| | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
 | `tools/mod.rs` | 8 | Icon button size |
 | | 10-98 | `Tool` (Select, Edge, Draw, Rectangle, Ellipse, RegularPolygon, Centerline, StitchHoles): `ALL`, `label`, `hint`, `shape`, `glyph`, `paint_icon` |
 | | 100 | `operation_glyph`: font glyph of a boolean operation |
@@ -257,7 +264,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Change the 3D look or mesh | `preview/mod.rs` 49-123, 159-261 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
 | Change snapping | `snap.rs`, `editor/canvas.rs` `draw_targets`, `editor/drag.rs` `snap_setup`, `docs/snap.md` | The rules live in `snap_offset`; what snaps to what is chosen by `draw_targets` (drawing tools) and `snap_setup` (drags); settings in `SnapSettings` and the Snap panel |
 | Change align or distribute | `align/mod.rs` `arrange_items`, `align/align_edges.rs`, `align/distribute.rs`, `align/space.rs`, `panels/align/mod.rs` | `arrange_items` measures the items and picks the operation's submodule; it is shared by `offsets` (pieces) and `child_offsets` (children); the panel only builds an `ArrangePieces` or `ArrangeChildren` event |
-| Add a dockable panel | `panels/dock/mod.rs`, `editor/panel_viewer.rs` | A `PanelTab` variant, its `CLOSEABLE` and `label` entries, `default_state`, and arms in `PanelViewer::ui` and `scroll_bars` |
+| Add a dockable panel | `ui_components/dock/mod.rs`, `editor/panel_viewer.rs` | A `PanelTab` variant, its `CLOSEABLE` and `label` entries, `default_state`, and arms in `PanelViewer::ui` and `scroll_bars` |
 | Change how the app is compiled or linked | `Cargo.toml`, `.cargo/config.toml` | See [Build configuration](#build-configuration) |
 | Change system scheduling | `main.rs`, `document.rs` | Keep the ordering rule in `CLAUDE.md` |
 | Add a hotkey or preference | `settings/hotkeys.rs`, `settings/mod.rs`, `editor/ui.rs` `handle_hotkeys` | A hotkey: an `Action` variant with `ALL`, `label`, `default_shortcuts`, and a dispatch arm. A preference: a field of `Preferences`, a raw-JSON section in `Settings` read in `load_preferences` and written in `save_preferences`, and a tab or field in `panels/settings` |

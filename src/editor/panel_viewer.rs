@@ -1,7 +1,7 @@
 use super::{EditorState, ViewMode, canvas, send};
 use crate::document::{HistoryMessage, ProjectMessage};
-use crate::icons::{glyph, icon_text};
-use crate::panels::dock::PanelTab;
+use crate::ui_components::icons::{glyph, icon_text};
+use crate::ui_components::dock::PanelTab;
 use crate::panels::{align, history, layout, material, properties, snap};
 use crate::preview::PreviewSettings;
 use bevy::prelude::*;

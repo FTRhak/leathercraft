@@ -12,7 +12,7 @@ How the app keeps interface state between runs, and how the user edits the defau
 | `src/panels/settings/hotkeys.rs` | Hotkeys tab: `Capture`, `hotkeys_tab`, `capture_keys` |
 | `src/panels/settings/appearance.rs` | Appearance tab: `appearance_tab` (the theme) |
 | `src/editor/ui.rs` | Opening the window (`edit_menu`), applying its result (`editor_ui`), dispatching hotkeys (`handle_hotkeys`), menu shortcuts (`action_button`), language picker (`language_control`) |
-| `src/panels/dock/mod.rs` | `PanelDock::load`, `save_on_release`: the panel layout section |
+| `src/ui_components/dock/mod.rs` | `PanelDock::load`, `save_on_release`: the panel layout section |
 | `src/main.rs` | Loads the language and `Preferences` at startup |
 
 ## For users

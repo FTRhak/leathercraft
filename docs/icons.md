@@ -1,6 +1,6 @@
 # Icons and icon buttons
 
-How the desktop app draws icons and the square buttons that carry them. Everything here lives in the binary crate, in `src/icons/mod.rs`; the library crate never sees icons.
+How the desktop app draws icons and the square buttons that carry them. Everything here lives in the binary crate, in `src/ui_components/icons/mod.rs`; the library crate never sees icons.
 
 ## Two ways to draw an icon
 

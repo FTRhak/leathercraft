@@ -3,7 +3,7 @@ use super::{
     format_length, panel_viewer::PanelViewer, send,
 };
 use crate::document::{ActiveProject, HistoryMessage, ProjectMessage};
-use crate::panels::dock::{PanelDock, PanelTab};
+use crate::ui_components::dock::{PanelDock, PanelTab};
 use crate::panels::material::{self, DialogResult};
 use crate::panels::settings::{SettingsDraft, SettingsResult, settings_dialog};
 use crate::panels::tools;

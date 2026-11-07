@@ -1,4 +1,4 @@
-use crate::icons::{glyph, icon_button, paint_glyph};
+use crate::ui_components::icons::{glyph, icon_button, paint_glyph};
 use bevy_egui::egui;
 use leathercraft::align::{AlignTo, Arrange, Axis, Edge, Spacing};
 use leathercraft::events::ProjectEvent;
