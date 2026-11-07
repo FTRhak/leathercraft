@@ -9,6 +9,7 @@ mod align_button;
 mod borders;
 mod button;
 mod checkbox;
+mod dock;
 mod dropdown;
 mod group_button;
 mod input;
@@ -32,6 +33,7 @@ use text::TextColors;
 pub(crate) use align_button::{AlignButtonColors, AlignButtonPaint};
 pub(crate) use button::{ButtonColors, ButtonPaint};
 pub(crate) use checkbox::{CheckboxColors, CheckboxPaint};
+pub(crate) use dock::{DockColors, DockTabPaint};
 pub(crate) use dropdown::{DropdownColors, FieldPaint};
 pub(crate) use group_button::{GroupButtonColors, SegmentPaint};
 pub(crate) use input::{InputColors, InputPaint};
@@ -68,6 +70,7 @@ pub(crate) struct Palette {
     pub(crate) button: ButtonColors,
     pub(crate) align_button: AlignButtonColors,
     pub(crate) tabs: TabColors,
+    pub(crate) dock: DockColors,
     pub(crate) dropdown: DropdownColors,
     pub(crate) input: InputColors,
     pub(crate) checkbox: CheckboxColors,
@@ -109,6 +112,7 @@ impl Palette {
         button: ButtonColors::DARK,
         align_button: AlignButtonColors::DARK,
         tabs: TabColors::DARK,
+        dock: DockColors::DARK,
         dropdown: DropdownColors::DARK,
         input: InputColors::DARK,
         checkbox: CheckboxColors::DARK,
@@ -135,6 +139,7 @@ impl Palette {
         button: ButtonColors::LIGHT,
         align_button: AlignButtonColors::LIGHT,
         tabs: TabColors::LIGHT,
+        dock: DockColors::LIGHT,
         dropdown: DropdownColors::LIGHT,
         input: InputColors::LIGHT,
         checkbox: CheckboxColors::LIGHT,
@@ -147,7 +152,12 @@ impl Palette {
 
     /// The palette of the current theme, from `visuals.dark_mode`.
     pub(crate) fn of(painter: &egui::Painter) -> &'static Self {
-        if painter.ctx().style().visuals.dark_mode {
+        Self::of_visuals(&painter.ctx().style().visuals)
+    }
+
+    /// The palette of the theme `visuals` belong to, where no painter is at hand.
+    pub(crate) fn of_visuals(visuals: &egui::Visuals) -> &'static Self {
+        if visuals.dark_mode {
             &Self::DARK
         } else {
             &Self::LIGHT

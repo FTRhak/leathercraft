@@ -41,7 +41,7 @@ Constants are in `icons::glyph`:
 | `TRASH` | `U+E110` | Delete piece, delete child (Layout panel) |
 | `LOCK` | `U+E115` | Locked piece (Layout panel) |
 | `UNLOCK` | `U+E116` | Unlocked piece (Layout panel) |
-| `HISTORY` | `U+E121` | History panel tab title, via `icon_text` |
+| `HISTORY` | `U+E121` | History panel tab title, via `TabDecor::title` |
 | `SELECT` | `U+E130` | Select tool (tool bar) |
 | `DRAW` | `U+E132` | Draw tool (tool bar) |
 | `RECTANGLE` | `U+E133` | Rectangle tool (tool bar) |

@@ -2,8 +2,8 @@ use super::{EditorState, ViewMode, canvas, send};
 use crate::document::{HistoryMessage, ProjectMessage};
 use crate::panels::{align, history, layout, material, properties, snap};
 use crate::preview::PreviewSettings;
-use crate::ui_components::dock::PanelTab;
-use crate::ui_components::icons::{glyph, icon_text};
+use crate::ui_components::dock::{PanelTab, TabDecor};
+use crate::ui_components::icons::glyph;
 use bevy::prelude::*;
 use bevy_egui::egui;
 use egui_dock::TabViewer;
@@ -21,8 +21,9 @@ pub(super) struct PanelViewer<'a, 'e, 'h, 's> {
     pub(super) view_mode: ViewMode,
     /// Stays behind `ResMut`, so that the camera only updates when the controls are shown.
     pub(super) settings: &'a mut ResMut<'s, PreviewSettings>,
-    /// Sizes the icons in the tab titles.
+    /// Sizes the tab titles and picks their theme.
     pub(super) style: std::sync::Arc<egui::Style>,
+    pub(super) decor: &'a mut TabDecor,
 }
 
 impl TabViewer for PanelViewer<'_, '_, '_, '_> {
@@ -34,22 +35,19 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
             _ => tab.label(),
         };
         let text = self.state.language.label(label);
-        match tab {
-            // Tab titles are drawn in the button text style.
-            PanelTab::History => {
-                icon_text(&self.style, egui::TextStyle::Button, glyph::HISTORY, text)
-            }
-            PanelTab::Layout => {
-                icon_text(&self.style, egui::TextStyle::Button, glyph::LAYOUT, text)
-            }
-            PanelTab::Properties => icon_text(
-                &self.style,
-                egui::TextStyle::Button,
-                glyph::PROPERTIES,
-                text,
-            ),
-            _ => text.into(),
-        }
+        let glyph = match tab {
+            PanelTab::Properties => Some(glyph::PROPERTIES),
+            PanelTab::Align => Some(glyph::ALIGN_LEFT),
+            PanelTab::Layout => Some(glyph::LAYOUT),
+            PanelTab::History => Some(glyph::HISTORY),
+            // No glyph yet for the canvas, the magnet of Snap or the swatch of Material.
+            PanelTab::Canvas | PanelTab::Snap | PanelTab::Material => None,
+        };
+        self.decor.title(&self.style, *tab, glyph, text)
+    }
+
+    fn on_tab_button(&mut self, tab: &mut PanelTab, response: &egui::Response) {
+        self.decor.decorate(*tab, response);
     }
 
     /// Not derived from the title, which changes with the language and the view mode.

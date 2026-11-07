@@ -304,7 +304,7 @@ list(ui, |ui| {
 
 - `icon_button(ui, size, selected, name, paint)`: a square button. `name` is the translated tooltip and accessibility label. `paint` draws the icon with the stroke it is given, usually `|p, r, s| paint_glyph(p, r, s, glyph::TRASH)`.
 - `paint_glyph(painter, rect, stroke, glyph)`: draws a glyph of the icon font centered in `rect`.
-- `icon_text(style, text_style, glyph, text)`: a glyph followed by text, as one `WidgetText`, for panel tab titles and menu items.
+- `icon_font_id(size)`: the icon font, for laying a glyph out with text, as the dock tab titles do.
 - `install_icon_font` runs once in `EguiPrimaryContextPass`. Glyphs show from the next frame.
 
 `icon_button` paints with egui's `Visuals` (`interact_selectable`), not with `Palette`, which `docs/design.md` allows. It is the only component that does.
@@ -320,6 +320,11 @@ list(ui, |ui| {
 | `reset(language)` | Restores the default layout |
 | `set_language(language)` | After a language change, for the tab context menu strings |
 | `save_on_release(ctx)` | Every frame. It writes only when a pointer is released and the layout changed. |
+
+The look of the dock comes from the Brilliant `DockTab` component and the dock tab strips, in `dock/style.rs`, with the colors of `Palette::dock`:
+
+- `dock_style(style)`: the `egui_dock::Style` of the current theme, built every frame and passed to `DockArea::style`. 32 px strips, square tabs, the panel body with no border (the 1 px separators are the borders), and a close cross that only brightens under the pointer.
+- `TabDecor` (`PanelDock::decor`) adds what that style can't express. Call `begin_frame(&state)` before the dock is shown, build the titles in `TabViewer::title` with `title(style, tab, glyph, text)`, which colors the glyph for the tab's state, and call `decorate(tab, response)` from `TabViewer::on_tab_button`. It paints the 2 px accent line along the top of the open tab and the divider right of an inactive one.
 
 `PanelTab::Canvas` always stays on the main surface; a saved layout without it is discarded. To add a panel, add a `PanelTab` variant with a `label`, list it in `CLOSEABLE`, place it in `default_state`, and draw it in `editor/panel_viewer.rs`.
 

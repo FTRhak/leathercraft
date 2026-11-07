@@ -12,7 +12,7 @@ use crate::panels::settings::{SettingsDraft, SettingsResult, settings_dialog};
 use crate::panels::tools;
 use crate::preview::PreviewSettings;
 use crate::settings::{self, Action, Hotkeys, Preferences};
-use crate::ui_components::dock::{PanelDock, PanelTab};
+use crate::ui_components::dock::{PanelDock, PanelTab, dock_style};
 use crate::ui_components::dropdown::{Dropdown, DropdownItem, dropdown_value};
 use crate::ui_components::title_bar::{self, ModeIcon, ModeSwitch, Slot, WindowLabels};
 use bevy::prelude::*;
@@ -176,7 +176,9 @@ pub fn editor_ui(
     state.cursor = None;
     let bounds = ctx.available_rect();
     // The central panel `show` adds is transparent, so the 3D scene shows through in preview mode.
+    dock.decor.begin_frame(&dock.state);
     DockArea::new(&mut dock.state)
+        .style(dock_style(&ctx.style()))
         .window_bounds(bounds)
         .show_leaf_close_all_buttons(false)
         .show_leaf_collapse_buttons(false)
@@ -191,6 +193,7 @@ pub fn editor_ui(
                 view_mode: *view_mode,
                 settings: &mut settings,
                 style: ctx.style(),
+                decor: &mut dock.decor,
             },
         );
     dock.save_on_release(ctx);

@@ -34,8 +34,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/drag.rs` | 309 | 2,100 | bin | `begin_drag`, `begin_handle_drag`, `snap_setup` (what a drag snaps to), `update_drag` (snapped offset or handle; stops before a stitch line leaves its piece), `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
 | `src/editor/grid.rs` | 73 | 600 | bin | `draw_grid`: canvas grid and axes, grid steps; `draw_snap_dots`: the snap grid |
 | `src/editor/ui.rs` | 401 | 3,700 | bin | `editor_ui` (menu bar, tool bar, status bar, dock area), `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
-| `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History, Layout and Properties tab titles have icons; the Align tab targets the selected children when there are any, else the selected pieces |
-| `src/ui_components/icons/mod.rs` | 113 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
+| `src/editor/panel_viewer.rs` | 192 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the Properties, Align, Layout and History tab titles have icons, built by `TabDecor`, which also decorates each tab button; the Align tab targets the selected children when there are any, else the selected pieces |
+| `src/ui_components/icons/mod.rs` | 103 | 900 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_font_id` (the font for glyphs laid out with text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
 | `src/ui_components/mod.rs` | 16 | 200 | bin | Reusable UI component module declarations (`radio` allows dead code since the theme became a group button) |
 | `src/ui_components/button/mod.rs` | 98 | 800 | bin | `Button`: the design-system text button (`primary`, `secondary`, `outline`), an `egui::Widget` drawn in its default, hover or disabled state (disabled through `ui.add_enabled`), with a focus ring |
@@ -57,8 +57,9 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/ui_components/list/mod.rs` | 249 | 2,000 | bin | `ListItem`: the design-system list row (from the Brilliant `History List`), an `egui::Widget` with an optional icon glyph, a truncated label and an optional trailing text (proportional or monospaced), drawn default, hover, selected, dimmed (faded, optionally struck through) or disabled, with a focus ring; `list` (the rows with their spacing) |
 | `src/ui_components/list/style.rs` | 49 | 350 | bin | `ItemState`, `paint`: picks the `Palette::list` entry for a state |
 | `src/ui_components/input/style.rs` | 44 | 350 | bin | `InputState` (default, hover, focus, accent, disabled), `paint`: picks the `Palette::input` entry for a state |
-| `src/ui_components/dock/mod.rs` | 185 | 1,550 | bin | `PanelTab` (including `Snap`; the tools are a fixed tool bar, not a tab), `PanelDock`: panel arrangement, default layout, saving and restoring it |
-| `src/ui_components/palette/mod.rs` | 156 | 1,000 | bin | `Palette` (`DARK`, `LIGHT`, `of`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge) and one field per color group, each group in its own submodule with its `DARK` and `LIGHT` values; `hex` and `hex_opt` (`0xRRGGBB` to `Color32`); re-exports the component paint types; used by `canvas`, `grid`, `button`, `tabs`, `dropdown`, `input`, `checkbox`, `radio`, `group_button`, `list`, `title_bar`, `tool_button`, `align_button` and the Properties panel |
+| `src/ui_components/dock/mod.rs` | 191 | 1,600 | bin | `PanelTab` (including `Snap`; the tools are a fixed tool bar, not a tab), `PanelDock`: panel arrangement, default layout, saving and restoring it, and the `TabDecor` of its tabs |
+| `src/ui_components/dock/style.rs` | 187 | 1,500 | bin | The dock look from the Brilliant `DockTab` component: `dock_style` (the `egui_dock::Style` of the current theme), `TabDecor` (tab titles with the icon colored by state; the accent line on the open tab and the divider right of inactive ones, painted from `on_tab_button`) |
+| `src/ui_components/palette/mod.rs` | 166 | 1,050 | bin | `Palette` (`DARK`, `LIGHT`, `of` and `of_visuals`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge) and one field per color group, each group in its own submodule with its `DARK` and `LIGHT` values; `hex` and `hex_opt` (`0xRRGGBB` to `Color32`); re-exports the component paint types; used by `canvas`, `grid`, `button`, `tabs`, `dropdown`, `input`, `checkbox`, `radio`, `group_button`, `list`, `title_bar`, `tool_button`, `align_button` and the Properties panel |
 | `src/ui_components/palette/surfaces.rs` | 43 | 250 | bin | `Surfaces`: backgrounds from the canvas to chips |
 | `src/ui_components/palette/borders.rs` | 35 | 200 | bin | `Borders`: divider, panel, control, field and chip lines |
 | `src/ui_components/palette/text.rs` | 43 | 280 | bin | `TextColors`: seven steps of text brightness, including the panel group titles |
@@ -66,6 +67,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/ui_components/palette/status.rs` | 31 | 200 | bin | `StatusColors`: warning and the gizmo axes |
 | `src/ui_components/palette/button.rs` | 76 | 550 | bin | `ButtonColors` (`ButtonStates`, `ButtonPaint`: fill, stroke and text per kind and state, plus the focus ring) |
 | `src/ui_components/palette/align_button.rs` | 44 | 350 | bin | `AlignButtonColors` (`AlignButtonPaint`: fill, stroke and icon per align button state, plus the focus ring; hover, disabled and light values derived) |
+| `src/ui_components/palette/dock.rs` | 74 | 550 | bin | `DockColors` (`DockTabPaint`: fill, text and icon per dock tab state; the strip, its border, the accent line, the close cross, the panel body and the separators; light values derived, the design has a dark board only) |
 | `src/ui_components/palette/tabs.rs` | 60 | 450 | bin | `TabColors` (`TabPaint`: text, icon and underline per tab state, the strip background and border, the focus ring) |
 | `src/ui_components/palette/dropdown.rs` | 83 | 600 | bin | `DropdownColors` (`FieldPaint`: fill, stroke, text and caret per state; `MenuColors`: the open list) |
 | `src/ui_components/palette/input.rs` | 65 | 500 | bin | `InputColors` (`InputPaint`: fill, stroke, text, placeholder, unit and icon per state, including the accent state) |
@@ -279,9 +281,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 41-49 | `paint`: the palette entry of a state |
 | `input/style.rs` | 8-33 | `InputState`, `InputState::new` |
 | | 36-44 | `paint`: the palette entry of a state |
-| `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
-| | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
-| | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
+| `dock/mod.rs` | 15-47 | `PanelTab`: `CLOSEABLE`, `label` |
+| | 49-140 | `PanelDock` (with `decor`): `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
+| | 142-191 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |
+| `dock/style.rs` | 24-75 | `dock_style`, `tab_style` |
+| | 77-187 | `TabDecor`: `begin_frame`, `title`, `decorate` |
 
 ### `panels/`
 

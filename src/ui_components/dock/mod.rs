@@ -1,3 +1,7 @@
+mod style;
+
+pub use style::{TabDecor, dock_style};
+
 use crate::settings;
 use bevy::prelude::*;
 use bevy_egui::egui;
@@ -46,6 +50,8 @@ impl PanelTab {
 #[derive(Resource)]
 pub struct PanelDock {
     pub state: DockState<PanelTab>,
+    /// What the tabs are painted with beyond the `egui_dock` style.
+    pub decor: TabDecor,
     saved: Option<serde_json::Value>,
 }
 
@@ -70,7 +76,11 @@ impl PanelDock {
             None => default_state(),
         };
         state.translations = translations(language);
-        Self { state, saved }
+        Self {
+            state,
+            decor: TabDecor::default(),
+            saved,
+        }
     }
 
     pub fn is_open(&self, tab: PanelTab) -> bool {
