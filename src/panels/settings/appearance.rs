@@ -2,6 +2,7 @@
 
 use super::SettingsDraft;
 use crate::settings::Theme;
+use crate::ui_components::radio::radio_value;
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 
@@ -12,7 +13,8 @@ pub(super) fn appearance_tab(ui: &mut egui::Ui, draft: &mut SettingsDraft, langu
             ui.label(language.label(Label::ThemeField));
             ui.horizontal(|ui| {
                 for theme in Theme::ALL {
-                    ui.radio_value(
+                    radio_value(
+                        ui,
                         &mut draft.preferences.theme,
                         theme,
                         language.label(theme.label()),

@@ -1,6 +1,7 @@
 //! The Snap panel: which kinds of snapping are on, the grid step and the snap distance.
 //! The settings are interface state, saved with the app settings by the caller.
 
+use crate::ui_components::checkbox::Checkbox;
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::snap::{
@@ -8,11 +9,17 @@ use leathercraft::snap::{
 };
 
 pub fn show_panel(ui: &mut egui::Ui, snap: &mut SnapSettings, language: Language) {
-    ui.checkbox(&mut snap.enabled, language.label(Label::SnapEnabled));
+    ui.add(Checkbox::new(
+        &mut snap.enabled,
+        language.label(Label::SnapEnabled),
+    ));
     ui.add_enabled_ui(snap.enabled, |ui| {
         ui.indent("snap options", |ui| {
             ui.horizontal(|ui| {
-                ui.checkbox(&mut snap.grid, language.label(Label::SnapGrid));
+                ui.add(Checkbox::new(
+                    &mut snap.grid,
+                    language.label(Label::SnapGrid),
+                ));
                 ui.add_enabled(
                     snap.grid,
                     egui::DragValue::new(&mut snap.grid_step_mm)
@@ -23,10 +30,16 @@ pub fn show_panel(ui: &mut egui::Ui, snap: &mut SnapSettings, language: Language
                 )
                 .on_hover_text(language.label(Label::SnapGridStep));
             });
-            ui.checkbox(&mut snap.vertices, language.label(Label::SnapVertices))
-                .on_hover_text(language.label(Label::SnapVerticesHint));
-            ui.checkbox(&mut snap.guides, language.label(Label::SnapGuides))
-                .on_hover_text(language.label(Label::SnapGuidesHint));
+            ui.add(Checkbox::new(
+                &mut snap.vertices,
+                language.label(Label::SnapVertices),
+            ))
+            .on_hover_text(language.label(Label::SnapVerticesHint));
+            ui.add(Checkbox::new(
+                &mut snap.guides,
+                language.label(Label::SnapGuides),
+            ))
+            .on_hover_text(language.label(Label::SnapGuidesHint));
             ui.horizontal(|ui| {
                 ui.label(language.label(Label::SnapDistance));
                 ui.add(

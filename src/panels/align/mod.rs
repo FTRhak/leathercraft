@@ -1,3 +1,4 @@
+use crate::ui_components::checkbox::Checkbox;
 use crate::ui_components::icons::{glyph, icon_button, paint_glyph};
 use bevy_egui::egui;
 use leathercraft::align::{AlignTo, Arrange, Axis, Edge, Spacing};
@@ -183,10 +184,10 @@ pub fn show_panel(
     ui.add_enabled_ui(options.reference == Reference::KeyObject, |ui| {
         ui.horizontal(|ui| {
             ui.label(language.label(Label::Spacing));
-            ui.checkbox(
+            ui.add(Checkbox::new(
                 &mut options.spacing_auto,
                 language.label(Label::SpacingAuto),
-            );
+            ));
             let scale = units.from_millimeters(1.0);
             let mut value = options.spacing_mm * scale;
             let field = egui::DragValue::new(&mut value)
