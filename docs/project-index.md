@@ -37,7 +37,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History, Layout and Properties tab titles have icons; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/ui_components/icons/mod.rs` | 113 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
-| `src/ui_components/mod.rs` | 17 | 250 | bin | Reusable UI component module declarations (`input` allows dead code until `TextInput` has a caller, `radio` since the theme became a group button) |
+| `src/ui_components/mod.rs` | 16 | 200 | bin | Reusable UI component module declarations (`radio` allows dead code since the theme became a group button) |
 | `src/ui_components/button/mod.rs` | 98 | 800 | bin | `Button`: the design-system text button (`primary`, `secondary`, `outline`), an `egui::Widget` drawn in its default, hover or disabled state (disabled through `ui.add_enabled`), with a focus ring |
 | `src/ui_components/checkbox/mod.rs` | 178 | 1,450 | bin | `Checkbox`: the design-system checkbox (from the Brilliant `Checkbox`), an `egui::Widget` bound to a `bool` with an optional label and `mixed` (a dash; a click checks it), drawn checked, unchecked or mixed in its default, hover or disabled state, with a focus ring and focus-colored edge; `paint_mark` (check or dash) |
 | `src/ui_components/checkbox/style.rs` | 61 | 450 | bin | `CheckboxValue` (on, off, mixed), `CheckboxState`, `paint`: picks the `Palette::checkbox` entry for a value and state |
@@ -46,28 +46,32 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/ui_components/dropdown/style.rs` | 39 | 300 | bin | `DropdownState`, `paint`: picks the `Palette::dropdown` entry for a state |
 | `src/ui_components/group_button/mod.rs` | 165 | 1,450 | bin | `GroupButton`: the design-system group button (from the Brilliant `Button Group` and `Segment`), an `egui::Widget` bound to a `&mut V` with one joined segment per `option`, drawn default, hover, selected, focus, disabled or disabled-selected, with dividers, a focus ring and rounded outer corners; the response is marked changed when a click picks another option |
 | `src/ui_components/group_button/style.rs` | 55 | 400 | bin | `SegmentState`, `paint`: picks the `Palette::group_button` entry for a state |
+| `src/ui_components/align_button/mod.rs` | 76 | 650 | bin | `AlignButton`: the Align panel button (from the Brilliant `AlignBtn`), an `egui::Widget`: a 32 × 28 px button with a font glyph and its name as tooltip, drawn default, hover or disabled, with a focus ring; `SIZE` |
+| `src/ui_components/align_button/style.rs` | 33 | 250 | bin | `AlignButtonState`, `paint`: picks the `Palette::align_button` entry for a state |
 | `src/ui_components/tool_button/mod.rs` | 183 | 1,500 | bin | `ToolButton`: the tool bar button (from the Brilliant `ToolBtn`), an `egui::Widget`: a 32 px square with a font glyph (`glyph`) or a painted icon (`icon`), or a chip with a colored dot and a label (`chip`); `selected`, `shortcut` (added to the tooltip); drawn idle, hover, active (with a drop shadow) or disabled, with a focus ring |
 | `src/ui_components/tool_button/style.rs` | 37 | 300 | bin | `ToolButtonState`, `paint`: picks the `Palette::toolbar.button` entry for a state |
 | `src/ui_components/input/mod.rs` | 185 | 1,650 | bin | The design-system input fields (from the Brilliant `Number Input` and `Search Field`): re-exports `TextInput`, `NumberInput`, `SearchInput`; shared `Field` frame (allocate, state, paint, click-to-focus), `show_edit` (a frameless `TextEdit` centered in a rect), `escaped` (Esc leaves a field without closing the dialog), painted search, clear and stepper icons |
 | `src/ui_components/input/text.rs` | 71 | 500 | bin | `TextInput`: single-line text field with an optional hint, an `egui::Widget` |
 | `src/ui_components/input/number.rs` | 270 | 2,400 | bin | `NumberInput`: any `Numeric` with range, step, decimals, unit and accent; typed text committed on Enter or focus loss (Esc drops it, a comma reads as a point), stepper clicks and Up/Down keys (Shift for ten steps), always clamped |
-| `src/ui_components/input/search.rs` | 136 | 1,100 | bin | `SearchInput`: text field with a search icon (dim while empty and idle) and a clear button while it has text |
+| `src/ui_components/input/search.rs` | 138 | 1,100 | bin | `SearchInput`: text field with a search icon (dim while empty and idle) and a clear button while it has text |
 | `src/ui_components/list/mod.rs` | 249 | 2,000 | bin | `ListItem`: the design-system list row (from the Brilliant `History List`), an `egui::Widget` with an optional icon glyph, a truncated label and an optional trailing text (proportional or monospaced), drawn default, hover, selected, dimmed (faded, optionally struck through) or disabled, with a focus ring; `list` (the rows with their spacing) |
 | `src/ui_components/list/style.rs` | 49 | 350 | bin | `ItemState`, `paint`: picks the `Palette::list` entry for a state |
 | `src/ui_components/input/style.rs` | 44 | 350 | bin | `InputState` (default, hover, focus, accent, disabled), `paint`: picks the `Palette::input` entry for a state |
 | `src/ui_components/dock/mod.rs` | 185 | 1,550 | bin | `PanelTab` (including `Snap`; the tools are a fixed tool bar, not a tab), `PanelDock`: panel arrangement, default layout, saving and restoring it |
-| `src/ui_components/palette/mod.rs` | 136 | 850 | bin | `Palette` (`DARK`, `LIGHT`, `of`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge) and one field per color group, each group in its own submodule with its `DARK` and `LIGHT` values; `hex` and `hex_opt` (`0xRRGGBB` to `Color32`); re-exports the component paint types; used by `canvas`, `grid`, `button`, `tabs`, `dropdown`, `input`, `checkbox`, `radio`, `group_button`, `list`, `title_bar` and `tool_button` |
+| `src/ui_components/palette/mod.rs` | 156 | 1,000 | bin | `Palette` (`DARK`, `LIGHT`, `of`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge) and one field per color group, each group in its own submodule with its `DARK` and `LIGHT` values; `hex` and `hex_opt` (`0xRRGGBB` to `Color32`); re-exports the component paint types; used by `canvas`, `grid`, `button`, `tabs`, `dropdown`, `input`, `checkbox`, `radio`, `group_button`, `list`, `title_bar`, `tool_button`, `align_button` and the Properties panel |
 | `src/ui_components/palette/surfaces.rs` | 43 | 250 | bin | `Surfaces`: backgrounds from the canvas to chips |
 | `src/ui_components/palette/borders.rs` | 35 | 200 | bin | `Borders`: divider, panel, control, field and chip lines |
-| `src/ui_components/palette/text.rs` | 39 | 250 | bin | `TextColors`: six steps of text brightness |
+| `src/ui_components/palette/text.rs` | 43 | 280 | bin | `TextColors`: seven steps of text brightness, including the panel group titles |
 | `src/ui_components/palette/accent.rs` | 35 | 250 | bin | `AccentColors`: the single accent (base, fill, border, container, selected row) |
 | `src/ui_components/palette/status.rs` | 31 | 200 | bin | `StatusColors`: warning and the gizmo axes |
 | `src/ui_components/palette/button.rs` | 76 | 550 | bin | `ButtonColors` (`ButtonStates`, `ButtonPaint`: fill, stroke and text per kind and state, plus the focus ring) |
+| `src/ui_components/palette/align_button.rs` | 44 | 350 | bin | `AlignButtonColors` (`AlignButtonPaint`: fill, stroke and icon per align button state, plus the focus ring; hover, disabled and light values derived) |
 | `src/ui_components/palette/tabs.rs` | 60 | 450 | bin | `TabColors` (`TabPaint`: text, icon and underline per tab state, the strip background and border, the focus ring) |
 | `src/ui_components/palette/dropdown.rs` | 83 | 600 | bin | `DropdownColors` (`FieldPaint`: fill, stroke, text and caret per state; `MenuColors`: the open list) |
 | `src/ui_components/palette/input.rs` | 65 | 500 | bin | `InputColors` (`InputPaint`: fill, stroke, text, placeholder, unit and icon per state, including the accent state) |
 | `src/ui_components/palette/checkbox.rs` | 72 | 550 | bin | `CheckboxColors` (shared by the checkbox and radio; `CheckboxStates`, `CheckboxPaint`: fill, stroke, mark or dot and label per checked/unchecked value and state, plus the focus ring; light values derived, the design has dark boards only) |
 | `src/ui_components/palette/group_button.rs` | 63 | 450 | bin | `GroupButtonColors` (`SegmentPaint`: fill and text per segment state, plus the border, disabled border and focus ring; light values derived) |
+| `src/ui_components/palette/properties.rs` | 31 | 200 | bin | `PropertiesColors`: Properties panel text (hint box title and text, parameter row names, W/H prefixes) |
 | `src/ui_components/palette/list.rs` | 62 | 450 | bin | `ListColors` (`ListItemPaint`: fill, stroke, icon, text and trailing per row state, plus the focus ring; hover, disabled and light values derived) |
 | `src/ui_components/palette/title_bar.rs` | 153 | 1,050 | bin | `TitleBarColors` (`MenuTitleStates`, `MenuTitlePaint`, `ModeSwitchColors`, `ModePaint`, `WindowButtonColors`: bar, logo, app name, menu titles, mode switch and window buttons; light values derived) |
 | `src/ui_components/palette/toolbar.rs` | 73 | 550 | bin | `ToolbarColors` (bar background, bottom border, dividers; `ToolButtonColors`, `ToolButtonPaint`: fill, stroke and content per tool button state, the active shadow and the focus ring; hover and light values derived) |
@@ -77,7 +81,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/ui_components/tabs/style.rs` | 42 | 300 | bin | `TabState`, `paint`: picks the `Palette::tabs` entry for a state |
 | `src/panels/tools/mod.rs` | 391 | 2,000 | bin | `Tool` (with `Centerline` and `StitchHoles`), `StitchSettings`, `ToolSettings`, `ZoomRequest` (All or Selection), `Tool::needs_piece` (Centerline and Stitch holes are enabled, and reachable by hotkey, only while a piece is selected; otherwise the tool falls back to Select), `Tool::mark` (the canvas color shown as the dot of the Edge, Stitch holes and Centerline chips), `Tool::action` (its hotkey, shown in the tooltip); `show_toolbar`: the full-width "CAD Toolbar" of the design under the title bar (drawn by `editor_ui`, not a dock tab, disabled in the 3D preview), its own panel frame and bottom border from `Palette::toolbar`, one scrolling row of `ToolButton`s split by dividers: Select and Draw, the shape tools, the Edge, Stitch holes and Centerline chips, the new-piece and boolean operation modes as four toggle buttons, then the current tool's settings (regular polygon sides, centerline style, stitch holes), and Zoom to fit and Zoom to selection pushed to the far end (`paint_fit_icon`, `paint_fit_selection_icon`: painted corner brackets, the second with a square inside and enabled only with a selection; they set `ToolSettings::zoom_request`) |
 | `src/panels/layout/mod.rs` | 273 | 2,800 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls (none for a centerline); Shift+click toggles a piece or child |
-| `src/panels/align/mod.rs` | 248 | 2,000 | bin | Align panel: `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), align, distribute and spacing icons from font glyphs (`arrange_glyph`), `show_panel` |
+| `src/panels/align/mod.rs` | 357 | 3,000 | bin | Align panel, laid out as the Brilliant "Alignment Body": rows of `AlignButton`s spread over the width under group titles, the spacing buttons with the Auto `Checkbox` and a `NumberInput` gap, a divider, and the Align To `Dropdown`; `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), align, distribute and spacing icons from font glyphs (`arrange_glyph`), `show_panel` |
 | `src/panels/snap/mod.rs` | 44 | 400 | bin | Snap panel: `show_panel` edits `SnapSettings` (on/off, grid and step, vertices, smart guides, distance in px) with the design-system `Checkbox` |
 | `src/panels/history/mod.rs` | 88 | 750 | bin | History panel: `ListItem` rows of actions with an icon (`action_glyph`), the current one selected, undone ones dimmed and struck through; click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
@@ -85,16 +89,16 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/settings/appearance.rs` | 26 | 200 | bin | Appearance tab: `appearance_tab`, the theme as a design-system `GroupButton` |
 | `src/panels/settings/material.rs` | 186 | 1,550 | bin | Default material tab: `material_tab`, its own material form of `Dropdown`s (the color one with swatches as leading slots and grouped items) and a thickness `NumberInput` in mm, with an outline Reset to defaults `Button` |
 | `src/panels/settings/hotkeys.rs` | 229 | 2,050 | bin | Hotkeys tab: `Capture`, `hotkeys_tab` (a `SearchInput` filtering the list), `matches_filter` (by action name or shortcut text), `shortcut_button`, key capture; an outline Reset to defaults `Button` |
-| `src/panels/properties/mod.rs` | 81 | 650 | bin | Properties panel: `EditorView`, `ViewControls`, `Selection`, view or preview controls (tool and navigation hints), display units, `show_panel`; re-exports `line_style_fields` and `stitch_fields` for the tool bar |
-| `src/panels/properties/piece.rs` | 95 | 800 | bin | Selected piece's name, size or result error, title and fields of its base or child, To Polygon button |
-| `src/panels/properties/shape.rs` | 56 | 500 | bin | `shape_fields`: dispatch to the file of each shape type; the selected vertex's corner radius |
-| `src/panels/properties/fields.rs` | 80 | 600 | bin | Shared inputs: `MIN_SIZE_MM`, `length_field`, `bounded_length_field`, `angle_field`, `center_fields` |
-| `src/panels/properties/polygon.rs` | 38 | 300 | bin | Polygon's point count and the selected edge's length |
+| `src/panels/properties/mod.rs` | 159 | 1,300 | bin | Properties panel, from the design's "Properties Body": `EditorView`, `ViewControls`, `Selection`; hint box (canvas controls: tool and navigation hints) or preview controls, display units dropdown, divider, `show_panel` in a scroll area; re-exports `line_style_fields` and `stitch_fields` for the tool bar |
+| `src/panels/properties/piece.rs` | 164 | 1,350 | bin | Selected piece's section header (with its name), name field, read-only W/H size boxes or result error, title and fields of its base or child, To Polygon button |
+| `src/panels/properties/shape.rs` | 68 | 550 | bin | `shape_fields`: dispatch to the file of each shape type; the selected vertex's corner radius (edge marker, accent field) |
+| `src/panels/properties/fields.rs` | 292 | 2,400 | bin | Shared rows and inputs: `Marker` (dot in a canvas layer color), `param_row`, `FieldStyle` and `labeled` (panel rows or inline for the tool bar), `value_row`, `note`, `section_header`, `divider`, `length_field`, `marked_length_field`, `bounded_length_field`, `angle_field`, `center_fields` (all `NumberInput`s) |
+| `src/panels/properties/polygon.rs` | 48 | 350 | bin | Polygon's point count and the selected edge's length (edge marker, accent field) |
 | `src/panels/properties/rectangle.rs` | 25 | 200 | bin | Rectangle's center, width, height and rotation |
 | `src/panels/properties/ellipse.rs` | 24 | 200 | bin | Ellipse's center, radii and rotation |
-| `src/panels/properties/regular_polygon.rs` | 28 | 250 | bin | Regular polygon's center, radius, sides and rotation |
-| `src/panels/properties/line.rs` | 69 | 700 | bin | Centerline's ends, length, angle and style (`line_style_fields`, shared with the tool bar) |
-| `src/panels/properties/stitch.rs` | 129 | 1,000 | bin | Stitch line's hole type, pitch and size (`stitch_fields`, shared with the tool bar), and its length, hole count, actual pitch and thread hint (`stitch_details`) |
+| `src/panels/properties/regular_polygon.rs` | 34 | 300 | bin | Regular polygon's center, radius, sides and rotation |
+| `src/panels/properties/line.rs` | 86 | 800 | bin | Centerline's ends, length, angle and style (line type dropdown; `line_style_fields` is the inline version for the tool bar) |
+| `src/panels/properties/stitch.rs` | 159 | 1,250 | bin | Stitch line's hole type, pitch and size (`stitch_fields` is the inline version for the tool bar), and its length, hole count, actual pitch and thread hint (`stitch_details`) |
 | `src/preview/mod.rs` | 302 | 2,600 | bin | 3D scene, camera, mesh extrusion from each piece's `punched_region`; `apply_theme` sets the background and ground plane colors for the theme |
 | `src/model.rs` | 594 | 4,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation (a base must be closed; a line's ends and dash count; a stitch line's points, hole parameters, hole count and overlap in `validate_stitch_line`) |
 | `src/boolean.rs` | 290 | 2,500 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes, skipping open lines; `punched_region`: the region with stitch holes cut, for the preview; `stitch_area`, `stray_stitch_lines`: the leather a stitch line must stay on |
@@ -264,7 +268,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `input/number.rs` | 26-131 | `NumberInput`: `new`, `range`, `step`, `decimals`, `unit`, `width`, `accent`, `id_salt`; `value`, `current_text`, `format`, `clamp`, `set` |
 | | 135-154 | `parse`, `arrow_steps` |
 | | 156-270 | `impl egui::Widget for NumberInput`: arrow keys, stepper, unit after the text, select all on focus, commit on focus loss |
-| `input/search.rs` | 19-53 | `SearchInput`: `new`, `hint`, `width`, `id_salt` |
+| `input/search.rs` | 19-55 | `SearchInput`: `new`, `hint`, `width`, `id_salt` |
 | | 55-131 | `impl egui::Widget for SearchInput`: clear button, search icon, text |
 | | 134 | `icon_color` |
 | `list/mod.rs` | 45-116 | `ListItem`: `new`, `icon`, `icon_opt`, `trailing`, `trailing_monospace`, `selected`, `dimmed`, `strikethrough` |
@@ -311,18 +315,22 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `settings/hotkeys.rs` | 8-21 | `HOTKEYS_HEIGHT`, `Capture`, `HotkeyChange` |
 | | 23 | `hotkeys_tab`, `shortcut_button` |
 | | 140 | `capture_keys` (next key press becomes the shortcut, Esc cancels), `normalize` (Ctrl saved as Command) |
-| `properties/mod.rs` | 4-15 | Submodules; re-exports `line_style_fields`, `stitch_fields` |
-| | 24-47 | `EditorView`, `ViewControls` (editor or preview), `Selection` (displayed piece, child, selected edge or vertex, rename buffer) |
-| | 49-77 | `view_controls`, `units_control` |
-| | 80 | `show_panel`, which returns the `ProjectEvent` to send |
-| `properties/piece.rs` | 13 | `selected_piece_details`: name, size or result error, fields of the selected base or child, stitch details, To Polygon button for a primitive |
+| `properties/mod.rs` | 6-17 | Submodules; re-exports `line_style_fields`, `stitch_fields` |
+| | 29-47 | `EditorView`, `ViewControls` (editor or preview), `Selection` (displayed piece, child, selected edge or vertex, rename buffer) |
+| | 51-128 | Layout constants, `paint_info_icon`, `view_controls` (hint box), `units_control` |
+| | 130 | `show_panel`, which returns the `ProjectEvent` to send |
+| `properties/piece.rs` | 15-70 | `size_box`, `size_row`: read-only W/H boxes |
+| | 73 | `selected_piece_details`: header, name, size or result error, fields of the selected base or child, stitch details, To Polygon button for a primitive |
 | `properties/shape.rs` | 16 | `shape_fields`: calls `polygon_fields`, `rectangle_fields`, `ellipse_fields`, `regular_polygon_fields`, `line_fields` or `stitch_line_fields` |
 | | 36 | `corner_radius_field`: the selected vertex's corner radius |
-| `properties/fields.rs` | 6-80 | `MIN_SIZE_MM`, `length_field`, `bounded_length_field`, `angle_field` (degrees shown, radians kept), `center_fields` |
-| `properties/line.rs` | 8 | `line_fields`: ends, length and angle around the start, style |
-| | 35 | `line_style_fields` |
-| `properties/stitch.rs` | 12-30 | `stitch_line_fields`, `stitch_fields` |
-| | 90 | `stitch_details` |
+| `properties/fields.rs` | 12-22 | `MIN_SIZE_MM`, `ROW_GAP`, `FIELD_WIDTH`, sizes |
+| | 25-55 | `Marker` (edge, holes, hole size, centerline) |
+| | 57-157 | `param_row`, `FieldStyle`, `labeled`, `value_row`, `note`, `section_header`, `divider` |
+| | 159-292 | `length_precision`, `length_input`, `length_field`, `marked_length_field`, `bounded_length_field`, `angle_field` (degrees shown, radians kept), `center_fields` |
+| `properties/line.rs` | 12 | `line_fields`: ends, length and angle around the start, style |
+| | 37-48 | `line_style_fields` (inline), `style_fields` |
+| `properties/stitch.rs` | 16-47 | `stitch_line_fields`, `stitch_fields` (inline), `hole_fields` |
+| | 115 | `stitch_details` |
 
 ### `preview/mod.rs`
 

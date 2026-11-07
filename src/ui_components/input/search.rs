@@ -46,6 +46,8 @@ impl<'a> SearchInput<'a> {
     }
 
     /// Keeps the cursor and the focus when fields before this one come and go.
+    // No search field sits in a changing list yet.
+    #[allow(dead_code)]
     pub fn id_salt(mut self, id_salt: impl std::hash::Hash) -> Self {
         self.id_salt = Some(egui::Id::new(id_salt));
         self

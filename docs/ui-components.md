@@ -231,7 +231,7 @@ They share these rules:
 ui.add(TextInput::new(&mut name).hint(language.label(Label::PieceName)));
 ```
 
-`.hint(text)` is shown while the field is empty. It has no caller yet.
+`.hint(text)` is shown while the field is empty. The Properties panel uses it for the piece name.
 
 ### `NumberInput`
 
@@ -252,7 +252,7 @@ ui.add(
 | `.step(s)` | `1.0` | Applied by the stepper and the Up and Down arrow keys; Shift steps 10 times as much |
 | `.decimals(d)` | 2, or 0 for integers | How many decimals are shown, and how the value is rounded |
 | `.unit(text)` | none | Shown after the value, such as "mm" |
-| `.accent(true)` | off | Draws the value in the accent color, for a value that matches a canvas layer. It has no caller yet. |
+| `.accent(true)` | off | Draws the value in the accent color, for a value that matches a canvas layer, such as the selected edge's length in Properties. |
 
 - **Committing:** a typed value is committed on Enter or when the field loses focus. Esc drops it. Focusing the field selects its text, so typing replaces the value. Text that doesn't parse as a number is dropped.
 - **`changed()` caveat:** the bound value only changes on commit, a step or an arrow key. But the response also includes the inner text edit, so `changed()` is true on each keystroke too. Before you send an event, compare the value with its previous value, or react on `lost_focus()`.

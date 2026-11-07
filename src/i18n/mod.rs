@@ -166,6 +166,15 @@ pub enum Label {
     ZoomToFit,
     ZoomToSelection,
     DisplayUnits,
+    /// The title of the hint box at the top of the Properties panel.
+    CanvasControls,
+    /// The section header of the selected piece in the Properties panel.
+    PieceParameters,
+    /// The hint of the piece name field.
+    PieceName,
+    /// One-letter prefixes of the piece's width and height boxes.
+    WidthShort,
+    HeightShort,
     Pieces,
     DeletePiece,
     Layout,

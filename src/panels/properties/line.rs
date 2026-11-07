@@ -1,4 +1,8 @@
-use super::fields::{MIN_SIZE_MM, angle_field, length_field};
+use super::fields::{
+    FIELD_WIDTH, FieldStyle, MIN_SIZE_MM, Marker, angle_field, bounded_length_field, labeled,
+    length_field,
+};
+use crate::ui_components::dropdown::{Dropdown, DropdownItem};
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::model::Units;
@@ -26,14 +30,24 @@ pub(super) fn line_fields(ui: &mut egui::Ui, line: &mut Line, units: Units, lang
     if value != current {
         *line = line.with_angle(value);
     }
-    ui.separator();
-    line_style_fields(ui, &mut line.style, units, language);
+    style_fields(ui, FieldStyle::Rows, &mut line.style, units, language);
+}
+
+/// The type of a line and, for a dashed one, its dash and gap, laid out inline for the tool bar.
+pub(crate) fn line_style_fields(
+    ui: &mut egui::Ui,
+    style: &mut LineStyle,
+    units: Units,
+    language: Language,
+) {
+    style_fields(ui, FieldStyle::Inline, style, units, language);
 }
 
 /// The type of a line and, for a dashed one, its dash and gap in display units. Choosing
 /// another type starts from that type's default lengths.
-pub(crate) fn line_style_fields(
+fn style_fields(
     ui: &mut egui::Ui,
+    layout: FieldStyle,
     style: &mut LineStyle,
     units: Units,
     language: Language,
@@ -49,21 +63,24 @@ pub(crate) fn line_style_fields(
         .iter()
         .find(|(kind, _)| same_kind(kind, style))
         .map_or(Label::LineSolid, |(_, label)| *label);
-    ui.horizontal(|ui| {
-        ui.label(language.label(Label::LineType));
-        egui::ComboBox::from_id_salt("line_style")
-            .selected_text(language.label(current))
+    let name = language.label(Label::LineType);
+    labeled(ui, layout, name, Some(Marker::Centerline), |ui| {
+        Dropdown::new("line_style", language.label(current))
+            .width(FIELD_WIDTH)
             .show_ui(ui, |ui| {
                 for (kind, label) in kinds {
                     let chosen = same_kind(&kind, style);
-                    if ui.selectable_label(chosen, language.label(label)).clicked() && !chosen {
+                    let item = DropdownItem::new(language.label(label)).selected(chosen);
+                    if ui.add(item).clicked() && !chosen {
                         *style = kind;
                     }
                 }
             });
     });
     if let LineStyle::Dashed { dash, gap } | LineStyle::DashDot { dash, gap } = style {
-        length_field(ui, Label::DashLength, dash, MIN_DASH_MM, units, language);
-        length_field(ui, Label::GapLength, gap, MIN_DASH_MM, units, language);
+        let bounds = (MIN_DASH_MM, f64::MAX);
+        for (label, length) in [(Label::DashLength, dash), (Label::GapLength, gap)] {
+            bounded_length_field(ui, layout, label, None, length, bounds, units, language);
+        }
     }
 }

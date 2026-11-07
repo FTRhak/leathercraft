@@ -1,5 +1,5 @@
 use super::ellipse::ellipse_fields;
-use super::fields::length_field;
+use super::fields::{Marker, marked_length_field};
 use super::line::line_fields;
 use super::polygon::polygon_fields;
 use super::rectangle::rectangle_fields;
@@ -43,10 +43,22 @@ fn corner_radius_field(
     if let Some(ShapePart::Vertex(vertex)) = part
         && let Some(current) = shape.corner_radius(vertex)
     {
-        ui.separator();
-        ui.label(language.message(&Message::SelectedVertex { number: vertex + 1 }));
+        let name = format!(
+            "{} · {}",
+            language.message(&Message::SelectedVertex { number: vertex + 1 }),
+            language.label(Label::CornerRadius)
+        );
         let mut value = current;
-        length_field(ui, Label::CornerRadius, &mut value, 0.0, units, language);
+        marked_length_field(
+            ui,
+            &name,
+            Label::CornerRadius,
+            Some(Marker::Edge),
+            &mut value,
+            0.0,
+            units,
+            language,
+        );
         if value != current
             && let Some(rounded) = shape.with_corner_radius(vertex, value)
         {

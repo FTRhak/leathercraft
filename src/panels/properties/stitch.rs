@@ -1,5 +1,9 @@
-use super::fields::bounded_length_field;
+use super::fields::{
+    FIELD_WIDTH, FieldStyle, Marker, bounded_length_field, labeled, note, value_row,
+};
 use crate::editor::format_length;
+use crate::ui_components::dropdown::{Dropdown, DropdownItem};
+use crate::ui_components::palette::Palette;
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::Units;
@@ -15,8 +19,9 @@ pub(super) fn stitch_line_fields(
     units: Units,
     language: Language,
 ) {
-    stitch_fields(
+    hole_fields(
         ui,
+        FieldStyle::Rows,
         &mut line.hole,
         &mut line.pitch,
         &mut line.size,
@@ -25,8 +30,7 @@ pub(super) fn stitch_line_fields(
     );
 }
 
-/// The hole type, the pitch with the usual iron pitches as presets, and the hole size, in
-/// display units. Choosing another type starts from that type's default size.
+/// The stitch fields laid out inline, for the tool bar.
 pub(crate) fn stitch_fields(
     ui: &mut egui::Ui,
     hole: &mut HoleKind,
@@ -35,18 +39,29 @@ pub(crate) fn stitch_fields(
     units: Units,
     language: Language,
 ) {
-    ui.horizontal(|ui| {
-        ui.label(language.label(Label::HoleType));
-        egui::ComboBox::from_id_salt("hole_kind")
-            .selected_text(language.label(Label::HoleKind(*hole)))
+    hole_fields(ui, FieldStyle::Inline, hole, pitch, size, units, language);
+}
+
+/// The hole type, the pitch with the usual iron pitches as presets, and the hole size, in
+/// display units. Choosing another type starts from that type's default size.
+fn hole_fields(
+    ui: &mut egui::Ui,
+    style: FieldStyle,
+    hole: &mut HoleKind,
+    pitch: &mut f64,
+    size: &mut f64,
+    units: Units,
+    language: Language,
+) {
+    labeled(ui, style, language.label(Label::HoleType), None, |ui| {
+        Dropdown::new("hole_kind", language.label(Label::HoleKind(*hole)))
+            .width(FIELD_WIDTH)
             .show_ui(ui, |ui| {
                 for kind in HoleKind::ALL {
                     let chosen = kind == *hole;
-                    if ui
-                        .selectable_label(chosen, language.label(Label::HoleKind(kind)))
-                        .clicked()
-                        && !chosen
-                    {
+                    let item =
+                        DropdownItem::new(language.label(Label::HoleKind(kind))).selected(chosen);
+                    if ui.add(item).clicked() && !chosen {
                         *hole = kind;
                         *size = kind.default_size();
                     }
@@ -55,7 +70,9 @@ pub(crate) fn stitch_fields(
     });
     bounded_length_field(
         ui,
+        style,
         Label::Pitch,
+        Some(Marker::Holes),
         pitch,
         (MIN_PITCH_MM, MAX_PITCH_MM),
         units,
@@ -63,13 +80,19 @@ pub(crate) fn stitch_fields(
     );
     // Wrapped, so that every preset stays reachable in a narrow panel.
     ui.horizontal_wrapped(|ui| {
-        ui.label(format!(
+        let presets = format!(
             "{}, {}",
             language.label(Label::PitchPresets),
             language.unit_symbol(Units::Millimeters)
-        ));
+        );
+        match style {
+            FieldStyle::Rows => note(ui, &presets),
+            FieldStyle::Inline => {
+                ui.label(presets);
+            }
+        }
         for preset in PITCH_PRESETS {
-            let text = preset.to_string();
+            let text = egui::RichText::new(preset.to_string()).monospace();
             if ui.selectable_label(*pitch == preset, text).clicked() {
                 *pitch = preset;
             }
@@ -77,7 +100,9 @@ pub(crate) fn stitch_fields(
     });
     bounded_length_field(
         ui,
+        style,
         Label::HoleSize,
+        Some(Marker::HoleSize),
         size,
         (MIN_HOLE_MM, MAX_HOLE_MM),
         units,
@@ -95,35 +120,40 @@ pub(super) fn stitch_details(
     language: Language,
 ) {
     let length = |millimeters: f64| format_length(language, units, millimeters);
-    ui.separator();
-    ui.label(language.message(&Message::StitchVertices {
-        count: line.points.len(),
-    }));
-    egui::Grid::new("stitch_details").show(ui, |ui| {
-        ui.label(language.label(Label::StitchLength));
-        ui.label(length(line.length()));
-        ui.end_row();
-        ui.label(language.label(Label::HoleCount));
-        ui.label(line.hole_count().to_string());
-        ui.end_row();
-        if let Some((min, max)) = line.actual_pitch() {
-            ui.label(language.label(Label::ActualPitch));
-            // Runs that differ by less than the display precision show one value.
-            let (min, max) = (length(min), length(max));
-            if min == max {
-                ui.label(min);
-            } else {
-                ui.label(format!("{min} – {max}"));
-            }
-            ui.end_row();
-        }
-    });
+    note(
+        ui,
+        &language.message(&Message::StitchVertices {
+            count: line.points.len(),
+        }),
+    );
+    value_row(
+        ui,
+        language.label(Label::StitchLength),
+        length(line.length()),
+    );
+    value_row(
+        ui,
+        language.label(Label::HoleCount),
+        line.hole_count().to_string(),
+    );
+    if let Some((min, max)) = line.actual_pitch() {
+        // Runs that differ by less than the display precision show one value.
+        let (min, max) = (length(min), length(max));
+        let value = if min == max {
+            min
+        } else {
+            format!("{min} – {max}")
+        };
+        value_row(ui, language.label(Label::ActualPitch), value);
+    }
     let band = StitchBand::from_pitch(line.pitch);
-    ui.weak(language.message(&Message::ThreadHint { band }));
+    note(ui, &language.message(&Message::ThreadHint { band }));
     if !band.suits_leather(thickness_mm) {
-        ui.colored_label(
-            ui.visuals().warn_fg_color,
-            language.message(&Message::LeatherOutsideBand { band }),
+        let color = Palette::of(ui.painter()).status.warning;
+        ui.label(
+            egui::RichText::new(language.message(&Message::LeatherOutsideBand { band }))
+                .size(11.0)
+                .color(color),
         );
     }
 }

@@ -5,6 +5,7 @@
 //! `docs/design.md`. Each color group lives in its own submodule, with its dark and light values.
 
 mod accent;
+mod align_button;
 mod borders;
 mod button;
 mod checkbox;
@@ -12,6 +13,7 @@ mod dropdown;
 mod group_button;
 mod input;
 mod list;
+mod properties;
 mod status;
 mod surfaces;
 mod tabs;
@@ -27,12 +29,14 @@ use status::StatusColors;
 use surfaces::Surfaces;
 use text::TextColors;
 
+pub(crate) use align_button::{AlignButtonColors, AlignButtonPaint};
 pub(crate) use button::{ButtonColors, ButtonPaint};
 pub(crate) use checkbox::{CheckboxColors, CheckboxPaint};
 pub(crate) use dropdown::{DropdownColors, FieldPaint};
 pub(crate) use group_button::{GroupButtonColors, SegmentPaint};
 pub(crate) use input::{InputColors, InputPaint};
 pub(crate) use list::{ListColors, ListItemPaint};
+pub(crate) use properties::PropertiesColors;
 pub(crate) use tabs::{TabColors, TabPaint};
 pub(crate) use title_bar::{ModePaint, ModeSwitchColors, TitleBarColors};
 pub(crate) use toolbar::{ToolButtonColors, ToolButtonPaint, ToolbarColors};
@@ -62,12 +66,14 @@ pub(crate) struct Palette {
     pub(crate) accent: AccentColors,
     pub(crate) status: StatusColors,
     pub(crate) button: ButtonColors,
+    pub(crate) align_button: AlignButtonColors,
     pub(crate) tabs: TabColors,
     pub(crate) dropdown: DropdownColors,
     pub(crate) input: InputColors,
     pub(crate) checkbox: CheckboxColors,
     pub(crate) group_button: GroupButtonColors,
     pub(crate) list: ListColors,
+    pub(crate) properties: PropertiesColors,
     pub(crate) title_bar: TitleBarColors,
     pub(crate) toolbar: ToolbarColors,
 }
@@ -101,12 +107,14 @@ impl Palette {
         accent: AccentColors::DARK,
         status: StatusColors::DARK,
         button: ButtonColors::DARK,
+        align_button: AlignButtonColors::DARK,
         tabs: TabColors::DARK,
         dropdown: DropdownColors::DARK,
         input: InputColors::DARK,
         checkbox: CheckboxColors::DARK,
         group_button: GroupButtonColors::DARK,
         list: ListColors::DARK,
+        properties: PropertiesColors::DARK,
         title_bar: TitleBarColors::DARK,
         toolbar: ToolbarColors::DARK,
     };
@@ -125,12 +133,14 @@ impl Palette {
         accent: AccentColors::LIGHT,
         status: StatusColors::LIGHT,
         button: ButtonColors::LIGHT,
+        align_button: AlignButtonColors::LIGHT,
         tabs: TabColors::LIGHT,
         dropdown: DropdownColors::LIGHT,
         input: InputColors::LIGHT,
         checkbox: CheckboxColors::LIGHT,
         group_button: GroupButtonColors::LIGHT,
         list: ListColors::LIGHT,
+        properties: PropertiesColors::LIGHT,
         title_bar: TitleBarColors::LIGHT,
         toolbar: ToolbarColors::LIGHT,
     };

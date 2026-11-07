@@ -1,12 +1,32 @@
+//! The Align panel, from the "Alignment Body" of the Brilliant design: three groups of
+//! `AlignButton`s, the Auto box and the fixed gap of Distribute Spacing, and the Align To choice.
+
+use crate::ui_components::align_button::{self, AlignButton};
 use crate::ui_components::checkbox::Checkbox;
-use crate::ui_components::icons::{glyph, icon_button, paint_glyph};
+use crate::ui_components::dropdown::{Dropdown, DropdownItem, dropdown_value};
+use crate::ui_components::icons::glyph;
+use crate::ui_components::input::NumberInput;
+use crate::ui_components::palette::Palette;
 use bevy_egui::egui;
 use leathercraft::align::{AlignTo, Arrange, Axis, Edge, Spacing};
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::model::Units;
 
-const ICON_BUTTON_SIZE: f32 = 32.0;
+/// Between the panel's edges and its content, as in the design.
+const PANEL_MARGIN: i8 = 12;
+/// Between the groups, the divider and the Align To row.
+const SECTION_GAP: f32 = 10.0;
+/// Between a group's title and its buttons.
+const TITLE_GAP: f32 = 6.0;
+const TITLE_SIZE: f32 = 11.0;
+/// The smallest gap between the buttons of a row, which spread over the panel's width.
+const ROW_GAP: f32 = 4.0;
+const SPACING_ROW_GAP: f32 = 8.0;
+/// Around the Auto checkbox, which sits a little apart from the buttons and the field.
+const CHECKBOX_PADDING: f32 = 4.0;
+const MIN_FIELD_WIDTH: f32 = 80.0;
+const REFERENCE_WIDTH: f32 = 112.0;
 
 /// The Align To choice; the key object itself is the primary selected piece or child.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -108,33 +128,137 @@ fn arrange_glyph(arrange: Arrange) -> char {
     }
 }
 
-/// A row of buttons; returns the one clicked.
+/// Small text in the color of the group titles, as in the design.
+fn title_text(ui: &egui::Ui, text: &str) -> egui::RichText {
+    let color = Palette::of(ui.painter()).text.group_title;
+    egui::RichText::new(text).size(TITLE_SIZE).color(color)
+}
+
+/// One button of `arrange`; returns whether it was clicked.
+fn arrange_button(ui: &mut egui::Ui, arrange: Arrange, enabled: bool, language: Language) -> bool {
+    let button = AlignButton::new(
+        arrange_glyph(arrange),
+        language.label(Label::Arrange(arrange)),
+    );
+    ui.add_enabled(enabled, button).clicked()
+}
+
+/// A titled group: the title above the content.
+fn group<R>(ui: &mut egui::Ui, title: &str, add_contents: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = TITLE_GAP;
+        let text = title_text(ui, title);
+        ui.label(text);
+        add_contents(ui)
+    })
+    .inner
+}
+
+/// A row of buttons spread over the panel's width, as in the design; returns the one clicked.
 fn arrange_row(
     ui: &mut egui::Ui,
     options: &[Arrange],
     enabled: impl Fn(Arrange) -> bool,
     language: Language,
 ) -> Option<Arrange> {
+    let count = options.len() as f32;
+    let gap = ((ui.available_width() - count * align_button::SIZE.x) / (count - 1.0))
+        .floor()
+        .max(ROW_GAP);
     let mut clicked = None;
     ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = egui::vec2(gap, ROW_GAP);
         for &arrange in options {
-            ui.add_enabled_ui(enabled(arrange), |ui| {
-                let response = icon_button(
-                    ui,
-                    ICON_BUTTON_SIZE,
-                    false,
-                    language.label(Label::Arrange(arrange)),
-                    |painter, rect, stroke| {
-                        paint_glyph(painter, rect, stroke, arrange_glyph(arrange))
-                    },
-                );
-                if response.clicked() {
-                    clicked = Some(arrange);
-                }
-            });
+            if arrange_button(ui, arrange, enabled(arrange), language) {
+                clicked = Some(arrange);
+            }
         }
     });
     clicked
+}
+
+/// The spacing buttons, then the Auto box and the fixed gap, which apply only against the key
+/// object.
+fn spacing_row(
+    ui: &mut egui::Ui,
+    units: Units,
+    options: &mut AlignOptions,
+    enabled: impl Fn(Arrange) -> bool,
+    language: Language,
+) -> Option<Arrange> {
+    let mut clicked = None;
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = SPACING_ROW_GAP;
+        for &arrange in &Arrange::SPACE {
+            if arrange_button(ui, arrange, enabled(arrange), language) {
+                clicked = Some(arrange);
+            }
+        }
+        ui.add_enabled_ui(options.reference == Reference::KeyObject, |ui| {
+            ui.spacing_mut().item_spacing.x = CHECKBOX_PADDING;
+            ui.add_space(CHECKBOX_PADDING);
+            ui.add(Checkbox::new(
+                &mut options.spacing_auto,
+                language.label(Label::SpacingAuto),
+            ))
+            .on_hover_text(language.label(Label::Spacing));
+            ui.add_space(CHECKBOX_PADDING);
+            let scale = units.from_millimeters(1.0);
+            let mut value = options.spacing_mm * scale;
+            let (step, decimals) = match units {
+                Units::Millimeters => (1.0, 1),
+                Units::Inches => (0.05, 3),
+            };
+            let field = NumberInput::new(&mut value)
+                .id_salt("align_spacing")
+                .range(0.0..=f64::MAX)
+                .step(step)
+                .decimals(decimals)
+                .unit(language.unit_symbol(units))
+                .width(ui.available_width().max(MIN_FIELD_WIDTH));
+            let response = ui
+                .add_enabled(!options.spacing_auto, field)
+                .on_hover_text(language.label(Label::Spacing));
+            if response.changed() {
+                options.spacing_mm = value / scale;
+            }
+        });
+    });
+    clicked
+}
+
+/// A 1 px line across the panel, between the buttons and the Align To choice.
+fn divider(ui: &mut egui::Ui) {
+    let color = Palette::of(ui.painter()).border.divider;
+    let (rect, _) =
+        ui.allocate_exact_size(egui::vec2(ui.available_width(), 1.0), egui::Sense::hover());
+    ui.painter().rect_filled(rect, 0.0, color);
+}
+
+/// The Align To label and its dropdown, at the right edge of the panel.
+fn reference_row(
+    ui: &mut egui::Ui,
+    options: &mut AlignOptions,
+    children: bool,
+    language: Language,
+) {
+    ui.horizontal(|ui| {
+        let text = title_text(ui, language.label(Label::AlignTo));
+        ui.label(text);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            Dropdown::new("align_to", language.label(options.reference.label()))
+                .width(REFERENCE_WIDTH)
+                .show_ui(ui, |ui| {
+                    for reference in Reference::ALL {
+                        if reference == Reference::Parent && !children {
+                            continue;
+                        }
+                        let item = DropdownItem::new(language.label(reference.label()));
+                        dropdown_value(ui, &mut options.reference, reference, item);
+                    }
+                });
+        });
+    });
 }
 
 /// The Align panel, acting on `targets`.
@@ -174,60 +298,44 @@ pub fn show_panel(
         to.is_some() && targets.ids().len() >= minimum
     };
 
-    ui.strong(language.label(Label::AlignObjects));
-    let mut clicked = arrange_row(ui, &Arrange::ALIGN, enabled, language);
-    ui.strong(language.label(Label::DistributeObjects));
-    clicked = clicked.or(arrange_row(ui, &Arrange::DISTRIBUTE, enabled, language));
-    ui.strong(language.label(Label::DistributeSpacing));
-    clicked = clicked.or(arrange_row(ui, &Arrange::SPACE, enabled, language));
-
-    ui.add_enabled_ui(options.reference == Reference::KeyObject, |ui| {
-        ui.horizontal(|ui| {
-            ui.label(language.label(Label::Spacing));
-            ui.add(Checkbox::new(
-                &mut options.spacing_auto,
-                language.label(Label::SpacingAuto),
-            ));
-            let scale = units.from_millimeters(1.0);
-            let mut value = options.spacing_mm * scale;
-            let field = egui::DragValue::new(&mut value)
-                .speed(0.1 * scale)
-                .max_decimals(3)
-                .range(0.0..=f64::MAX)
-                .suffix(format!(" {}", language.unit_symbol(units)));
-            if ui.add_enabled(!options.spacing_auto, field).changed() {
-                options.spacing_mm = value / scale;
-            }
-        });
-    });
-
-    ui.separator();
-    ui.horizontal(|ui| {
-        ui.label(language.label(Label::AlignTo));
-        egui::ComboBox::from_id_salt("align_to")
-            .selected_text(language.label(options.reference.label()))
-            .show_ui(ui, |ui| {
-                for reference in Reference::ALL {
-                    if reference == Reference::Parent && !children {
-                        continue;
+    let clicked = egui::ScrollArea::vertical()
+        .show(ui, |ui| {
+            egui::Frame::new()
+                .inner_margin(PANEL_MARGIN)
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing.y = SECTION_GAP;
+                    let mut clicked = group(ui, language.label(Label::AlignObjects), |ui| {
+                        arrange_row(ui, &Arrange::ALIGN, enabled, language)
+                    });
+                    clicked =
+                        clicked.or(group(ui, language.label(Label::DistributeObjects), |ui| {
+                            arrange_row(ui, &Arrange::DISTRIBUTE, enabled, language)
+                        }));
+                    clicked =
+                        clicked.or(group(ui, language.label(Label::DistributeSpacing), |ui| {
+                            spacing_row(ui, units, options, enabled, language)
+                        }));
+                    divider(ui);
+                    reference_row(ui, options, children, language);
+                    let hint = match options.reference {
+                        Reference::KeyObject if children => Some(Label::KeyShapeHint),
+                        Reference::KeyObject => Some(Label::KeyObjectHint),
+                        Reference::Parent if children => Some(Label::ParentHint),
+                        _ => None,
+                    };
+                    if let Some(hint) = hint {
+                        let color = Palette::of(ui.painter()).text.muted;
+                        ui.label(
+                            egui::RichText::new(language.label(hint))
+                                .size(TITLE_SIZE)
+                                .color(color),
+                        );
                     }
-                    ui.selectable_value(
-                        &mut options.reference,
-                        reference,
-                        language.label(reference.label()),
-                    );
-                }
-            });
-    });
-    let hint = match options.reference {
-        Reference::KeyObject if children => Some(Label::KeyShapeHint),
-        Reference::KeyObject => Some(Label::KeyObjectHint),
-        Reference::Parent if children => Some(Label::ParentHint),
-        _ => None,
-    };
-    if let Some(hint) = hint {
-        ui.label(egui::RichText::new(language.label(hint)).weak());
-    }
+                    clicked
+                })
+                .inner
+        })
+        .inner;
 
     let arrange = clicked?;
     let to = to?;
