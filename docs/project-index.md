@@ -37,7 +37,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History, Layout and Properties tab titles have icons; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/ui_components/icons/mod.rs` | 113 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
-| `src/ui_components/mod.rs` | 12 | 250 | bin | Reusable UI component module declarations (`input` allows dead code until `TextInput` has a caller, `radio` since the theme became a group button) |
+| `src/ui_components/mod.rs` | 17 | 250 | bin | Reusable UI component module declarations (`input` allows dead code until `TextInput` has a caller, `radio` since the theme became a group button) |
 | `src/ui_components/button/mod.rs` | 98 | 800 | bin | `Button`: the design-system text button (`primary`, `secondary`, `outline`), an `egui::Widget` drawn in its default, hover or disabled state (disabled through `ui.add_enabled`), with a focus ring |
 | `src/ui_components/checkbox/mod.rs` | 178 | 1,450 | bin | `Checkbox`: the design-system checkbox (from the Brilliant `Checkbox`), an `egui::Widget` bound to a `bool` with an optional label and `mixed` (a dash; a click checks it), drawn checked, unchecked or mixed in its default, hover or disabled state, with a focus ring and focus-colored edge; `paint_mark` (check or dash) |
 | `src/ui_components/checkbox/style.rs` | 61 | 450 | bin | `CheckboxValue` (on, off, mixed), `CheckboxState`, `paint`: picks the `Palette::checkbox` entry for a value and state |
@@ -50,9 +50,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/ui_components/input/text.rs` | 71 | 500 | bin | `TextInput`: single-line text field with an optional hint, an `egui::Widget` |
 | `src/ui_components/input/number.rs` | 270 | 2,400 | bin | `NumberInput`: any `Numeric` with range, step, decimals, unit and accent; typed text committed on Enter or focus loss (Esc drops it, a comma reads as a point), stepper clicks and Up/Down keys (Shift for ten steps), always clamped |
 | `src/ui_components/input/search.rs` | 136 | 1,100 | bin | `SearchInput`: text field with a search icon (dim while empty and idle) and a clear button while it has text |
+| `src/ui_components/list/mod.rs` | 249 | 2,000 | bin | `ListItem`: the design-system list row (from the Brilliant `History List`), an `egui::Widget` with an optional icon glyph, a truncated label and an optional trailing text (proportional or monospaced), drawn default, hover, selected, dimmed (faded, optionally struck through) or disabled, with a focus ring; `list` (the rows with their spacing) |
+| `src/ui_components/list/style.rs` | 49 | 350 | bin | `ItemState`, `paint`: picks the `Palette::list` entry for a state |
 | `src/ui_components/input/style.rs` | 44 | 350 | bin | `InputState` (default, hover, focus, accent, disabled), `paint`: picks the `Palette::input` entry for a state |
 | `src/ui_components/dock/mod.rs` | 185 | 1,550 | bin | `PanelTab` (including `Snap`; the tools are a fixed tool bar, not a tab), `PanelDock`: panel arrangement, default layout, saving and restoring it |
-| `src/ui_components/palette/mod.rs` | 136 | 850 | bin | `Palette` (`DARK`, `LIGHT`, `of`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge) and one field per color group, each group in its own submodule with its `DARK` and `LIGHT` values; `hex` and `hex_opt` (`0xRRGGBB` to `Color32`); re-exports the component paint types; used by `canvas`, `grid`, `button`, `tabs`, `dropdown`, `input`, `checkbox`, `radio`, `group_button` and `title_bar` |
+| `src/ui_components/palette/mod.rs` | 136 | 850 | bin | `Palette` (`DARK`, `LIGHT`, `of`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge) and one field per color group, each group in its own submodule with its `DARK` and `LIGHT` values; `hex` and `hex_opt` (`0xRRGGBB` to `Color32`); re-exports the component paint types; used by `canvas`, `grid`, `button`, `tabs`, `dropdown`, `input`, `checkbox`, `radio`, `group_button`, `list` and `title_bar` |
 | `src/ui_components/palette/surfaces.rs` | 43 | 250 | bin | `Surfaces`: backgrounds from the canvas to chips |
 | `src/ui_components/palette/borders.rs` | 35 | 200 | bin | `Borders`: divider, panel, control, field and chip lines |
 | `src/ui_components/palette/text.rs` | 39 | 250 | bin | `TextColors`: six steps of text brightness |
@@ -64,6 +66,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/ui_components/palette/input.rs` | 65 | 500 | bin | `InputColors` (`InputPaint`: fill, stroke, text, placeholder, unit and icon per state, including the accent state) |
 | `src/ui_components/palette/checkbox.rs` | 72 | 550 | bin | `CheckboxColors` (shared by the checkbox and radio; `CheckboxStates`, `CheckboxPaint`: fill, stroke, mark or dot and label per checked/unchecked value and state, plus the focus ring; light values derived, the design has dark boards only) |
 | `src/ui_components/palette/group_button.rs` | 63 | 450 | bin | `GroupButtonColors` (`SegmentPaint`: fill and text per segment state, plus the border, disabled border and focus ring; light values derived) |
+| `src/ui_components/palette/list.rs` | 62 | 450 | bin | `ListColors` (`ListItemPaint`: fill, stroke, icon, text and trailing per row state, plus the focus ring; hover, disabled and light values derived) |
 | `src/ui_components/palette/title_bar.rs` | 153 | 1,050 | bin | `TitleBarColors` (`MenuTitleStates`, `MenuTitlePaint`, `ModeSwitchColors`, `ModePaint`, `WindowButtonColors`: bar, logo, app name, menu titles, mode switch and window buttons; light values derived) |
 | `src/ui_components/radio/mod.rs` | 127 | 1,050 | bin | `Radio`: the design-system radio button (from the Brilliant `Radio`), an `egui::Widget` with an optional label, drawn on (a dot) or off in its default, hover or disabled state, with a focus ring and focus-colored edge; the checkbox sizes and `Palette::checkbox` colors; `radio_value` (the counterpart of `ui.radio_value`); no caller yet |
 | `src/ui_components/radio/style.rs` | 36 | 300 | bin | `RadioState`, `paint`: picks the `Palette::checkbox` entry for a selected or unselected button and state |
@@ -73,7 +76,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/layout/mod.rs` | 273 | 2,800 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls (none for a centerline); Shift+click toggles a piece or child |
 | `src/panels/align/mod.rs` | 248 | 2,000 | bin | Align panel: `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), align, distribute and spacing icons from font glyphs (`arrange_glyph`), `show_panel` |
 | `src/panels/snap/mod.rs` | 44 | 400 | bin | Snap panel: `show_panel` edits `SnapSettings` (on/off, grid and step, vertices, smart guides, distance in px) with the design-system `Checkbox` |
-| `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
+| `src/panels/history/mod.rs` | 88 | 750 | bin | History panel: `ListItem` rows of actions with an icon (`action_glyph`), the current one selected, undone ones dimmed and struck through; click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
 | `src/panels/settings/mod.rs` | 106 | 850 | bin | Settings window: `SettingsDraft` (with the Hotkeys filter text), `SettingsResult`, `settings_dialog` with Default material, Hotkeys and Appearance tabs in a `tab_bar`, and a right-aligned footer of `Button`s (primary OK, secondary Cancel) |
 | `src/panels/settings/appearance.rs` | 26 | 200 | bin | Appearance tab: `appearance_tab`, the theme as a design-system `GroupButton` |
@@ -261,6 +264,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `input/search.rs` | 19-53 | `SearchInput`: `new`, `hint`, `width`, `id_salt` |
 | | 55-131 | `impl egui::Widget for SearchInput`: clear button, search icon, text |
 | | 134 | `icon_color` |
+| `list/mod.rs` | 45-116 | `ListItem`: `new`, `icon`, `icon_opt`, `trailing`, `trailing_monospace`, `selected`, `dimmed`, `strikethrough` |
+| | 118-237 | `impl egui::Widget for ListItem`: trailing and truncated label galleys, state, fill, border, focus ring, icon, strikethrough, trailing text |
+| | 241 | `list`: the rows with their spacing |
+| `list/style.rs` | 8-38 | `ItemState`, `new`, `is_dimmed` |
+| | 41-49 | `paint`: the palette entry of a state |
 | `input/style.rs` | 8-33 | `InputState`, `InputState::new` |
 | | 36-44 | `paint`: the palette entry of a state |
 | `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
@@ -285,7 +293,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | | 60 | `child_row`: delete, reorder, operation picker, select |
 | | 135 | `piece_row` |
 | | 195 | `show_panel`, which returns the `ProjectEvent` to send and the `Pick` |
-| `history/mod.rs` | 6 | `show_panel`, which returns the `HistoryCommand` to send |
+| `history/mod.rs` | 14 | `show_panel`, which returns the `HistoryCommand` to send |
+| | 59 | `action_glyph`: the icon of an entry |
 | `material/mod.rs` | 15-103 | `DialogResult`, `combo`, `swatch`, `color_combo`, `thickness_row` |
 | | 105 | `material_fields`, shared by the dialog and the Material panel |
 | | 189 | `show_panel`, which returns the `ProjectEvent` to send |

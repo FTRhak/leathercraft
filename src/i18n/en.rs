@@ -126,6 +126,8 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::FloatPanel => "Float",
         Label::ResetPanels => "Reset panels",
         Label::History => "History",
+        Label::HistoryCurrent => "Current",
+        Label::HistoryUndone => "Undone",
         Label::Align => "Align",
         Label::AlignObjects => "Align objects",
         Label::DistributeObjects => "Distribute objects",

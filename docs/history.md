@@ -120,9 +120,11 @@ document::apply_project_events
 
 ### History panel
 
-`show_panel(ui, history, language)` draws one selectable row per entry in a vertical scroll area:
+`show_panel(ui, history, language)` draws one design-system `ListItem` per entry (`ui_components::list`, from the Brilliant `History List` board) in a vertical scroll area:
 
-- The current entry is selected; later entries use weak text.
+- Each row starts with an icon chosen from the entry's `Message` by `action_glyph`. A new `Action…` message gets no icon until it has an arm there.
+- The current entry is selected (accent fill and border) and says *Current* at its end. Later entries are dimmed, struck through and say *Undone*.
+- Entries have no time yet: the design shows one at the end of each done row, but `History` doesn't record it.
 - Clicking a row returns `HistoryCommand::GoTo(index)`. Clicking the current row has no effect, because `History::apply` returns `None`.
 - The list scrolls to the current entry only when the position changes, tracked in egui temp data, so the user can scroll freely otherwise.
 - Labels are rendered with `language.message` at draw time, so they follow a language change.

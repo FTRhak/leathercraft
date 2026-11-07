@@ -1,8 +1,15 @@
 use bevy_egui::egui;
 use leathercraft::history::{History, HistoryCommand};
-use leathercraft::i18n::Language;
+use leathercraft::i18n::{Label, Language, Message};
 
-/// Lists the recorded actions; entries after the current one can still be redone and are dimmed.
+use crate::ui_components::icons::glyph;
+use crate::ui_components::list::{ListItem, list};
+
+/// Between the panel's edges and the list, as in the design.
+const PANEL_MARGIN: i8 = 10;
+
+/// Lists the recorded actions: the current one is highlighted, and those after it, which can
+/// still be redone, are dimmed and struck through.
 pub fn show_panel(
     ui: &mut egui::Ui,
     history: &History,
@@ -18,22 +25,64 @@ pub fn show_panel(
         previous != Some(position)
     });
     egui::ScrollArea::vertical().show(ui, |ui| {
-        for (index, action) in history.actions().enumerate() {
-            let mut text = egui::RichText::new(language.message(action));
-            if index > position {
-                text = text.weak();
-            }
-            let row = egui::Button::selectable(index == position, text)
-                .truncate()
-                .min_size(egui::vec2(ui.available_width(), 0.0));
-            let response = ui.add(row);
-            if response.clicked() {
-                command = Some(HistoryCommand::GoTo(index));
-            }
-            if moved && index == position {
-                response.scroll_to_me(None);
-            }
-        }
+        egui::Frame::new()
+            .inner_margin(PANEL_MARGIN)
+            .show(ui, |ui| {
+                list(ui, |ui| {
+                    for (index, action) in history.actions().enumerate() {
+                        let undone = index > position;
+                        let mut item = ListItem::new(language.message(action))
+                            .icon_opt(action_glyph(action))
+                            .selected(index == position)
+                            .dimmed(undone)
+                            .strikethrough(undone);
+                        if index == position {
+                            item = item.trailing(language.label(Label::HistoryCurrent));
+                        } else if undone {
+                            item = item.trailing(language.label(Label::HistoryUndone));
+                        }
+                        let response = ui.add(item);
+                        if response.clicked() {
+                            command = Some(HistoryCommand::GoTo(index));
+                        }
+                        if moved && index == position {
+                            response.scroll_to_me(None);
+                        }
+                    }
+                });
+            });
     });
     command
+}
+
+/// The icon of a history entry, from the icon font.
+fn action_glyph(action: &Message) -> Option<char> {
+    let glyph = match action {
+        Message::ActionNewProject | Message::ActionOpened { .. } => glyph::HISTORY,
+        Message::ActionUnits
+        | Message::ActionRenamePiece { .. }
+        | Message::ActionMaterial { .. } => glyph::PROPERTIES,
+        Message::ActionAddPiece { .. } => glyph::NEW_PIECE,
+        Message::ActionAddChild { .. } => glyph::UNION,
+        Message::ActionEditBase { .. } | Message::ActionEditChild { .. } => glyph::EDGE,
+        Message::ActionMovePiece { .. }
+        | Message::ActionMovePieces { .. }
+        | Message::ActionMoveChildren { .. } => glyph::SELECT,
+        Message::ActionAlignPieces { .. } | Message::ActionAlignChildren { .. } => {
+            glyph::ALIGN_LEFT
+        }
+        Message::ActionDistributePieces { .. } | Message::ActionDistributeChildren { .. } => {
+            glyph::DISTRIBUTE_LEFT
+        }
+        Message::ActionLockPiece { .. } => glyph::LOCK,
+        Message::ActionUnlockPiece { .. } => glyph::UNLOCK,
+        Message::ActionSetChildOp { .. } => glyph::SUBTRACT,
+        Message::ActionReorderChild { .. } => glyph::LAYOUT,
+        Message::ActionRemovePiece { .. }
+        | Message::ActionRemovePieces { .. }
+        | Message::ActionRemoveChild { .. }
+        | Message::ActionRemoveChildren { .. } => glyph::TRASH,
+        _ => return None,
+    };
+    Some(glyph)
 }

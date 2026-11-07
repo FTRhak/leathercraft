@@ -11,6 +11,7 @@ mod checkbox;
 mod dropdown;
 mod group_button;
 mod input;
+mod list;
 mod status;
 mod surfaces;
 mod tabs;
@@ -30,6 +31,7 @@ pub(crate) use checkbox::{CheckboxColors, CheckboxPaint};
 pub(crate) use dropdown::{DropdownColors, FieldPaint};
 pub(crate) use group_button::{GroupButtonColors, SegmentPaint};
 pub(crate) use input::{InputColors, InputPaint};
+pub(crate) use list::{ListColors, ListItemPaint};
 pub(crate) use tabs::{TabColors, TabPaint};
 pub(crate) use title_bar::{ModePaint, ModeSwitchColors, TitleBarColors};
 
@@ -63,6 +65,7 @@ pub(crate) struct Palette {
     pub(crate) input: InputColors,
     pub(crate) checkbox: CheckboxColors,
     pub(crate) group_button: GroupButtonColors,
+    pub(crate) list: ListColors,
     pub(crate) title_bar: TitleBarColors,
 }
 
@@ -100,6 +103,7 @@ impl Palette {
         input: InputColors::DARK,
         checkbox: CheckboxColors::DARK,
         group_button: GroupButtonColors::DARK,
+        list: ListColors::DARK,
         title_bar: TitleBarColors::DARK,
     };
     const LIGHT: Self = Self {
@@ -122,6 +126,7 @@ impl Palette {
         input: InputColors::LIGHT,
         checkbox: CheckboxColors::LIGHT,
         group_button: GroupButtonColors::LIGHT,
+        list: ListColors::LIGHT,
         title_bar: TitleBarColors::LIGHT,
     };
 

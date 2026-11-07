@@ -178,6 +178,10 @@ pub enum Label {
     FloatPanel,
     ResetPanels,
     History,
+    /// Beside the current entry of the History panel.
+    HistoryCurrent,
+    /// Beside an undone entry of the History panel.
+    HistoryUndone,
     Align,
     AlignObjects,
     DistributeObjects,

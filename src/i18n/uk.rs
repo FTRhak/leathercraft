@@ -128,6 +128,8 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::FloatPanel => "Відкріпити",
         Label::ResetPanels => "Скинути панелі",
         Label::History => "Історія",
+        Label::HistoryCurrent => "Поточний",
+        Label::HistoryUndone => "Скасовано",
         Label::Align => "Вирівнювання",
         Label::AlignObjects => "Вирівнювання об’єктів",
         Label::DistributeObjects => "Розподіл об’єктів",

@@ -33,6 +33,7 @@ The `*_value` helpers (`radio_value`, `dropdown_value`, `tab_value`) work like `
 | Free text: a name | `TextInput` |
 | A number with a unit and range | `NumberInput` |
 | Filtering a list | `SearchInput` |
+| Rows to pick from, with an icon and a trailing status, such as the History panel | `list` + `ListItem` |
 | A square tool or toolbar button with a pictogram | `icons::icon_button` |
 | Panel arrangement (docking, tabs, floating) | `dock::PanelDock` (a resource, not a widget) |
 
@@ -267,6 +268,35 @@ ui.add(
 ```
 
 It has a search icon, and a clear button while it has text. `.hint`, `.width` and `.id_salt` work as in `TextInput`. Filtering is up to the caller: read the string each frame.
+
+## List
+
+`list::ListItem`: one full-width row with an optional icon, a label truncated to fit, and an optional trailing text. `list(ui, |ui| ..)` lays the rows out with the design's spacing.
+
+```rust
+use crate::ui_components::list::{ListItem, list};
+
+list(ui, |ui| {
+    for (index, entry) in entries.iter().enumerate() {
+        let item = ListItem::new(language.message(&entry.action))
+            .icon(glyph::NEW_PIECE)
+            .trailing(language.label(Label::HistoryCurrent))
+            .selected(index == current);
+        if ui.add(item).clicked() { .. }
+    }
+});
+```
+
+| Builder | Effect |
+|---|---|
+| `icon(glyph)` / `icon_opt(Option<glyph>)` | A glyph of the icon font before the label |
+| `trailing(text)` / `trailing_monospace(text)` | A 10 px text at the end of the row, such as a status or a time |
+| `selected(bool)` | The current row: accent fill and border |
+| `dimmed(bool)` | A row that no longer applies: icon and text at 45% opacity; ignored on a selected row |
+| `strikethrough(bool)` | Strikes the label through |
+
+- **States:** default, hover, selected, dimmed (with a hover fill under the pointer), disabled, plus a focus ring.
+- The row has no bound value; react to `clicked()`. Rows are 28 px high and 3 px apart.
 
 ## Icons
 

@@ -8,6 +8,7 @@ pub mod icons;
 // as `NumberInput::accent`, have no caller yet.
 #[allow(dead_code, unused_imports)]
 pub mod input;
+pub mod list;
 pub mod palette;
 // No caller since the Settings theme became a group button; kept for future option lists.
 #[allow(dead_code)]
