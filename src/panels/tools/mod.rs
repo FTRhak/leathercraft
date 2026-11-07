@@ -1,11 +1,25 @@
 use crate::panels::properties::{line_style_fields, stitch_fields};
-use crate::ui_components::icons::{glyph, icon_button, icon_text, paint_glyph};
+use crate::settings::{Action, Hotkeys};
+use crate::ui_components::icons::glyph;
+use crate::ui_components::palette::Palette;
+use crate::ui_components::tool_button::ToolButton;
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::model::{BooleanOp, Point, Units};
 use leathercraft::shapes::{DEFAULT_PITCH_MM, HoleKind, LineStyle, REGULAR_POLYGON_SIDES, Shape};
 
-const ICON_BUTTON_SIZE: f32 = 32.0;
+/// The height of the bar, including its margins.
+const HEIGHT: f32 = 44.0;
+const MARGIN: egui::Margin = egui::Margin::symmetric(14, 6);
+/// The height of the buttons, and so of the row inside the margins.
+const ROW_HEIGHT: f32 = 32.0;
+/// Between the groups of tools, on both sides of their dividers.
+const GROUP_GAP: f32 = 8.0;
+/// Between the buttons of one group.
+const BUTTON_GAP: f32 = 4.0;
+const DIVIDER_HEIGHT: f32 = 22.0;
+/// The width of the zoom buttons at the end of the bar.
+const ZOOM_GROUP_WIDTH: f32 = 2.0 * 32.0 + BUTTON_GAP;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Tool {
@@ -21,17 +35,6 @@ pub enum Tool {
 }
 
 impl Tool {
-    const ALL: [Self; 8] = [
-        Self::Select,
-        Self::Edge,
-        Self::Draw,
-        Self::Rectangle,
-        Self::Ellipse,
-        Self::RegularPolygon,
-        Self::Centerline,
-        Self::StitchHoles,
-    ];
-
     fn label(self) -> Label {
         match self {
             Self::Select => Label::Select,
@@ -98,8 +101,22 @@ impl Tool {
         }
     }
 
-    fn paint_icon(self, painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
-        paint_glyph(painter, rect, stroke, self.glyph());
+    /// The color of the mark the tool leaves on the canvas, shown as the dot of its chip, for
+    /// the tools named by their mark rather than an icon.
+    fn mark(self, palette: &Palette) -> Option<egui::Color32> {
+        match self {
+            Self::Edge => Some(palette.edge),
+            Self::StitchHoles => Some(palette.hole),
+            Self::Centerline => Some(palette.centerline),
+            _ => None,
+        }
+    }
+
+    /// The hotkey action that switches to the tool.
+    fn action(self) -> Option<Action> {
+        Action::ALL
+            .into_iter()
+            .find(|action| action.tool() == Some(self))
     }
 }
 
@@ -117,45 +134,6 @@ fn op_mode_glyph(mode: Option<BooleanOp>) -> char {
 
 fn op_mode_label(mode: Option<BooleanOp>) -> Label {
     mode.map_or(Label::NewPieceMode, Label::OperationHint)
-}
-
-/// One button showing the current mode, with a small arrow; a click lists every mode.
-fn op_mode_dropdown(ui: &mut egui::Ui, op_mode: &mut Option<BooleanOp>, language: Language) {
-    let current = *op_mode;
-    let response = icon_button(
-        ui,
-        ICON_BUTTON_SIZE,
-        false,
-        language.label(op_mode_label(current)),
-        |painter, rect, stroke| {
-            paint_glyph(painter, rect, stroke, op_mode_glyph(current));
-            let corner = rect.right_bottom() - egui::vec2(3.0, 3.0);
-            let arrow = vec![
-                corner - egui::vec2(6.0, 3.0),
-                corner - egui::vec2(0.0, 3.0),
-                corner - egui::vec2(3.0, 0.0),
-            ];
-            painter.add(egui::Shape::convex_polygon(
-                arrow,
-                stroke.color,
-                egui::Stroke::NONE,
-            ));
-        },
-    );
-    egui::Popup::menu(&response).show(|ui| {
-        let style = ui.style().clone();
-        for mode in OP_MODES {
-            let text = icon_text(
-                &style,
-                egui::TextStyle::Button,
-                op_mode_glyph(mode),
-                language.label(op_mode_label(mode)),
-            );
-            if ui.selectable_label(*op_mode == mode, text).clicked() {
-                *op_mode = mode;
-            }
-        }
-    });
 }
 
 fn operation_glyph(op: BooleanOp) -> char {
@@ -213,15 +191,14 @@ pub enum ZoomRequest {
 fn paint_fit_selection_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
     paint_fit_icon(painter, rect, stroke);
     let square =
-        egui::Rect::from_center_size(rect.center(), egui::Vec2::splat(rect.width() * 0.18));
+        egui::Rect::from_center_size(rect.center(), egui::Vec2::splat(rect.width() * 0.26));
     painter.rect_filled(square, 1.0, stroke.color);
 }
 
 /// Paints four corner brackets, the icon of Zoom to fit.
 fn paint_fit_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
-    let frame = rect.shrink(rect.width() * 0.25);
+    let frame = rect.shrink(rect.width() * 0.14);
     let arm = frame.width() * 0.35;
-    let stroke = egui::Stroke::new(stroke.width.max(1.5), stroke.color);
     for (corner, dx, dy) in [
         (frame.left_top(), arm, arm),
         (frame.right_top(), -arm, arm),
@@ -239,9 +216,69 @@ fn paint_fit_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Strok
     }
 }
 
-/// The tool bar across the top of the window: tools, then the new-piece and operation modes,
-/// then Zoom to fit and Zoom to selection and the settings of the current tool, all on one line that scrolls when the window is narrow.
-pub fn show_toolbar(ui: &mut egui::Ui, settings: ToolSettings, units: Units, language: Language) {
+/// The short vertical line between two groups of tools.
+/// The buttons of a group are `BUTTON_GAP` apart, and the divider is `GROUP_GAP` from them.
+fn divider(ui: &mut egui::Ui) {
+    ui.add_space(GROUP_GAP - BUTTON_GAP);
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(1.0, DIVIDER_HEIGHT), egui::Sense::hover());
+    ui.add_space(GROUP_GAP - BUTTON_GAP);
+    let color = Palette::of(ui.painter()).toolbar.divider;
+    ui.painter().rect_filled(rect, 0.0, color);
+}
+
+/// The tool bar under the title bar, from the "CAD Toolbar" of the design: the selection and
+/// drawing tools, the shape tools, the tools named by their mark (edge, stitch holes,
+/// centerline), the new-piece and operation modes, and the settings of the current tool; then
+/// Zoom to fit and Zoom to selection at the far end. It scrolls when the window is narrow, and
+/// is disabled rather than hidden when `enabled` is false, so the layout doesn't jump.
+pub fn show_toolbar(
+    ctx: &egui::Context,
+    enabled: bool,
+    settings: ToolSettings,
+    hotkeys: &Hotkeys,
+    units: Units,
+    language: Language,
+) {
+    let colors = &Palette::of(&ctx.layer_painter(egui::LayerId::background())).toolbar;
+    let frame = egui::Frame::new()
+        .fill(colors.background)
+        .inner_margin(MARGIN);
+    egui::TopBottomPanel::top("tool_bar")
+        .exact_height(HEIGHT)
+        .resizable(false)
+        .show_separator_line(false)
+        .frame(frame)
+        .show(ctx, |ui| {
+            let bottom = ui.max_rect().bottom() + f32::from(MARGIN.bottom);
+            ui.add_enabled_ui(enabled, |ui| {
+                egui::ScrollArea::horizontal()
+                    .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+                    .show(ui, |ui| {
+                        // One row of the buttons' height, so that the dividers and the tool
+                        // settings center on the buttons.
+                        let row = egui::vec2(ui.available_width(), ROW_HEIGHT);
+                        let layout = egui::Layout::left_to_right(egui::Align::Center);
+                        ui.allocate_ui_with_layout(row, layout, |ui| {
+                            ui.set_min_height(ROW_HEIGHT);
+                            toolbar_contents(ui, settings, hotkeys, units, language);
+                        });
+                    });
+            });
+            ui.painter().hline(
+                ui.clip_rect().x_range(),
+                bottom - 0.5,
+                egui::Stroke::new(1.0, colors.border),
+            );
+        });
+}
+
+fn toolbar_contents(
+    ui: &mut egui::Ui,
+    settings: ToolSettings,
+    hotkeys: &Hotkeys,
+    units: Units,
+    language: Language,
+) {
     let ToolSettings {
         tool,
         polygon_sides,
@@ -254,80 +291,101 @@ pub fn show_toolbar(ui: &mut egui::Ui, settings: ToolSettings, units: Units, lan
     if tool.needs_piece() && !piece_selected {
         *tool = Tool::Select;
     }
-    egui::ScrollArea::horizontal().show(ui, |ui| {
-        ui.horizontal(|ui| {
-            let mut tool_button = |ui: &mut egui::Ui, option: Tool| {
-                let name = language.label(option.label());
-                let response = icon_button(
-                    ui,
-                    ICON_BUTTON_SIZE,
-                    *tool == option,
-                    name,
-                    |painter, rect, stroke| option.paint_icon(painter, rect, stroke),
-                );
-                if response.clicked() {
-                    *tool = option;
-                }
-            };
-            // Tools that start a piece or combine with it, then the operation mode, then the
-            // tools that only add to the selected piece.
-            for option in Tool::ALL.into_iter().filter(|option| !option.needs_piece()) {
-                tool_button(ui, option);
+    // One row for the whole bar: rows nested in it would start at the default row height and
+    // grow down from there, off the center line.
+    ui.spacing_mut().item_spacing.x = BUTTON_GAP;
+    let palette = Palette::of(ui.painter());
+    let shortcut = |ui: &egui::Ui, action: Option<Action>| {
+        action
+            .and_then(|action| hotkeys.first(action))
+            .map(|shortcut| ui.ctx().format_shortcut(shortcut))
+    };
+    let tool_button = |ui: &mut egui::Ui, tool: &mut Tool, option: Tool| {
+        let name = language.label(option.label());
+        let button = match option.mark(palette) {
+            Some(dot) => ToolButton::chip(dot, name),
+            None => ToolButton::glyph(option.glyph(), name),
+        };
+        let button = button
+            .selected(*tool == option)
+            .shortcut(shortcut(ui, option.action()));
+        let enabled = piece_selected || !option.needs_piece();
+        if ui.add_enabled(enabled, button).clicked() {
+            *tool = option;
+        }
+    };
+
+    {
+        for option in [Tool::Select, Tool::Draw] {
+            tool_button(ui, tool, option);
+        }
+    }
+    divider(ui);
+    {
+        for option in [Tool::Rectangle, Tool::Ellipse, Tool::RegularPolygon] {
+            tool_button(ui, tool, option);
+        }
+    }
+    divider(ui);
+    {
+        for option in [Tool::Edge, Tool::StitchHoles, Tool::Centerline] {
+            tool_button(ui, tool, option);
+        }
+    }
+    divider(ui);
+    {
+        for mode in OP_MODES {
+            let button =
+                ToolButton::glyph(op_mode_glyph(mode), language.label(op_mode_label(mode)))
+                    .selected(*op_mode == mode);
+            if ui.add(button).clicked() {
+                *op_mode = mode;
             }
-            ui.separator();
-            op_mode_dropdown(ui, op_mode, language);
-            ui.separator();
-            ui.add_enabled_ui(piece_selected, |ui| {
-                for option in Tool::ALL.into_iter().filter(|option| option.needs_piece()) {
-                    tool_button(ui, option);
-                }
-            });
-            ui.separator();
-            let fit = icon_button(
+        }
+    }
+    match *tool {
+        Tool::RegularPolygon => {
+            divider(ui);
+            ui.label(language.label(Label::Sides));
+            ui.add(egui::DragValue::new(polygon_sides).range(REGULAR_POLYGON_SIDES));
+        }
+        Tool::Centerline => {
+            divider(ui);
+            line_style_fields(ui, line_style, units, language);
+        }
+        Tool::StitchHoles => {
+            divider(ui);
+            stitch_fields(
                 ui,
-                ICON_BUTTON_SIZE,
-                false,
-                language.label(Label::ZoomToFit),
-                paint_fit_icon,
+                &mut stitch.hole,
+                &mut stitch.pitch,
+                &mut stitch.size,
+                units,
+                language,
             );
-            if fit.clicked() {
-                *zoom_request = Some(ZoomRequest::All);
-            }
-            ui.add_enabled_ui(piece_selected, |ui| {
-                let fit_selection = icon_button(
-                    ui,
-                    ICON_BUTTON_SIZE,
-                    false,
-                    language.label(Label::ZoomToSelection),
-                    paint_fit_selection_icon,
-                );
-                if fit_selection.clicked() {
-                    *zoom_request = Some(ZoomRequest::Selection);
-                }
-            });
-            match *tool {
-                Tool::RegularPolygon => {
-                    ui.separator();
-                    ui.label(language.label(Label::Sides));
-                    ui.add(egui::DragValue::new(polygon_sides).range(REGULAR_POLYGON_SIDES));
-                }
-                Tool::Centerline => {
-                    ui.separator();
-                    line_style_fields(ui, line_style, units, language);
-                }
-                Tool::StitchHoles => {
-                    ui.separator();
-                    stitch_fields(
-                        ui,
-                        &mut stitch.hole,
-                        &mut stitch.pitch,
-                        &mut stitch.size,
-                        units,
-                        language,
-                    );
-                }
-                _ => {}
-            }
-        });
-    });
+        }
+        _ => {}
+    }
+
+    // Pushes the zoom buttons to the far end while there is room; past that they follow the
+    // rest and the bar scrolls.
+    let room = ui.available_width() - ZOOM_GROUP_WIDTH - BUTTON_GAP;
+    if room > 0.0 {
+        ui.add_space(room);
+    } else {
+        divider(ui);
+    }
+    {
+        let fit = ToolButton::icon(paint_fit_icon, language.label(Label::ZoomToFit));
+        if ui.add(fit).clicked() {
+            *zoom_request = Some(ZoomRequest::All);
+        }
+        let fit_selection = ToolButton::icon(
+            paint_fit_selection_icon,
+            language.label(Label::ZoomToSelection),
+        );
+        if ui.add_enabled(piece_selected, fit_selection).clicked() {
+            *zoom_request = Some(ZoomRequest::Selection);
+        }
+    }
 }

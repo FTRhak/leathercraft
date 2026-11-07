@@ -123,21 +123,23 @@ pub fn editor_ui(
         );
     }
 
-    // Disabled rather than hidden in preview mode, so that the layout doesn't jump.
-    egui::TopBottomPanel::top("tool_bar").show(ctx, |ui| {
-        ui.add_enabled_ui(*view_mode == ViewMode::Editor2d, |ui| {
-            let settings = tools::ToolSettings {
-                tool: &mut state.tool,
-                polygon_sides: &mut state.polygon_sides,
-                op_mode: &mut state.op_mode,
-                line_style: &mut state.line_style,
-                stitch: &mut state.stitch,
-                piece_selected: state.selected.is_some(),
-                zoom_request: &mut state.zoom_request,
-            };
-            tools::show_toolbar(ui, settings, project.units, state.language);
-        });
-    });
+    let tool_settings = tools::ToolSettings {
+        tool: &mut state.tool,
+        polygon_sides: &mut state.polygon_sides,
+        op_mode: &mut state.op_mode,
+        line_style: &mut state.line_style,
+        stitch: &mut state.stitch,
+        piece_selected: state.selected.is_some(),
+        zoom_request: &mut state.zoom_request,
+    };
+    tools::show_toolbar(
+        ctx,
+        *view_mode == ViewMode::Editor2d,
+        tool_settings,
+        &preferences.hotkeys,
+        project.units,
+        state.language,
+    );
 
     egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
         ui.horizontal(|ui| {

@@ -15,3 +15,4 @@ pub mod palette;
 pub mod radio;
 pub mod tabs;
 pub mod title_bar;
+pub mod tool_button;
