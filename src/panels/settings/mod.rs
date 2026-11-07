@@ -6,6 +6,7 @@ mod material;
 
 use crate::settings::Preferences;
 use crate::ui_components::button::Button;
+use crate::ui_components::tabs::{Tab, tab_bar, tab_value};
 use appearance::appearance_tab;
 use bevy_egui::egui::{self, Key, Modifiers};
 use hotkeys::{Capture, capture_keys, hotkeys_tab};
@@ -58,24 +59,17 @@ pub fn settings_dialog(
         ui.set_width(DIALOG_WIDTH);
         ui.heading(language.label(Label::SettingsTitle));
         ui.add_space(6.0);
-        ui.horizontal(|ui| {
-            ui.selectable_value(
-                &mut draft.tab,
-                SettingsTab::Material,
-                language.label(Label::DefaultMaterial),
-            );
-            ui.selectable_value(
-                &mut draft.tab,
-                SettingsTab::Hotkeys,
-                language.label(Label::Hotkeys),
-            );
-            ui.selectable_value(
-                &mut draft.tab,
-                SettingsTab::Appearance,
-                language.label(Label::Appearance),
-            );
+        tab_bar(ui, |ui| {
+            let tabs = [
+                (SettingsTab::Material, Label::DefaultMaterial),
+                (SettingsTab::Hotkeys, Label::Hotkeys),
+                (SettingsTab::Appearance, Label::Appearance),
+            ];
+            for (tab, label) in tabs {
+                tab_value(ui, &mut draft.tab, tab, Tab::new(language.label(label)));
+            }
         });
-        ui.separator();
+        ui.add_space(8.0);
         match draft.tab {
             SettingsTab::Material => material_tab(ui, draft, language),
             SettingsTab::Hotkeys => hotkeys_tab(ui, draft, language),
@@ -102,7 +96,7 @@ pub fn settings_dialog(
         })
         .inner
     });
-    // Esc closes an open combo box first, and only then the window.
+    // Esc closes an open dropdown first, and only then the window.
     let escaped = !modal.any_popup_open
         && ctx.input_mut(|input| input.consume_key(Modifiers::NONE, Key::Escape));
     modal.inner.or(escaped.then_some(SettingsResult::Cancel))

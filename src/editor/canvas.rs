@@ -1,10 +1,10 @@
 use super::drag::{begin_drag, begin_handle_drag, finish_drag, update_drag};
 use super::drag_state_struct::ShapeRef;
 use super::grid::draw_grid;
-use crate::ui_components::palette::Palette;
 use super::{EditorState, ShapeDraft, ShapePart, format_length, send};
 use crate::document::ProjectMessage;
 use crate::panels::tools::{Tool, ZoomRequest};
+use crate::ui_components::palette::Palette;
 use bevy::prelude::*;
 use bevy_egui::egui;
 use earcutr::earcut;
@@ -133,7 +133,7 @@ pub(super) fn canvas(
         state.hover_target = Some(snap_draw(project, view, state, view.to_world(position)));
     }
 
-    painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
+    painter.rect_filled(rect, 0.0, Palette::of(&painter).surface.canvas);
     let snap_grid = state.snap.enabled && state.snap.grid;
     draw_grid(
         &painter,
@@ -143,7 +143,7 @@ pub(super) fn canvas(
     );
     draw_pieces(&painter, view, project, state);
     draw_centerlines(&painter, view, project, state);
-    draw_stitch_holes(&painter, ui, response.hover_pos(), view, project, state);
+    draw_stitch_holes(&painter, response.hover_pos(), view, project, state);
     draw_edges(&painter, response.hover_pos(), view, project, state);
     if state.tool == Tool::StitchHoles {
         draw_stitch_draft(&painter, ui, response.hover_pos(), view, project, state);
@@ -892,7 +892,6 @@ fn draw_centerlines(
 /// shown faintly only while its line is selected or under the cursor, so it can be grabbed.
 fn draw_stitch_holes(
     painter: &egui::Painter,
-    ui: &egui::Ui,
     hover: Option<egui::Pos2>,
     view: Viewport,
     project: &Project,
@@ -923,7 +922,7 @@ fn draw_stitch_holes(
                     egui::Stroke::new(CENTERLINE_WIDTH_PX, color.gamma_multiply(0.5)),
                 ));
             }
-            draw_stitch_line(painter, ui, view, line, color);
+            draw_stitch_line(painter, view, line, color);
         }
     }
 }
@@ -932,7 +931,6 @@ fn draw_stitch_holes(
 /// fine to show at this zoom, the path is drawn dotted and faded instead.
 fn draw_stitch_line(
     painter: &egui::Painter,
-    ui: &egui::Ui,
     view: Viewport,
     line: &StitchLine,
     color: egui::Color32,
@@ -947,7 +945,7 @@ fn draw_stitch_line(
         ));
         return;
     }
-    let background = ui.visuals().extreme_bg_color;
+    let background = Palette::of(painter).surface.canvas;
     let stroke = egui::Stroke::new(1.0, color);
     for hole in line.holes() {
         if line.hole == HoleKind::Round {
@@ -1004,7 +1002,7 @@ fn draw_stitch_draft(
         painter.circle_filled(position, 3.0, color);
     }
     if let Some(line) = stitch_line(state, points) {
-        draw_stitch_line(painter, ui, view, &line, color);
+        draw_stitch_line(painter, view, &line, color);
         if let Some(target) = target {
             painter.text(
                 view.to_screen(target) + egui::vec2(10.0, -10.0),

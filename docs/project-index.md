@@ -37,20 +37,24 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/panel_viewer.rs` | 193 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the History, Layout and Properties tab titles have icons; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/ui_components/icons/mod.rs` | 113 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_text` (glyph plus text); shared `icon_button` |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
-| `src/ui_components/mod.rs` | 4 | 30 | bin | Reusable UI component module declarations |
-| `src/ui_components/button/mod.rs` | 96 | 800 | bin | `Button`: the design-system text button (`primary`, `secondary`, `outline`), an `egui::Widget` drawn in its default, hover or disabled state (disabled through `ui.add_enabled`), with a focus ring |
-| `src/ui_components/button/style.rs` | 88 | 900 | bin | `ButtonKind`, `ButtonState`, `ButtonStyle::of`: fill, stroke and text color of each kind and state for the dark and light theme (from the Brilliant `Button` component); `focus_color` |
+| `src/ui_components/mod.rs` | 6 | 40 | bin | Reusable UI component module declarations |
+| `src/ui_components/button/mod.rs` | 98 | 800 | bin | `Button`: the design-system text button (`primary`, `secondary`, `outline`), an `egui::Widget` drawn in its default, hover or disabled state (disabled through `ui.add_enabled`), with a focus ring |
+| `src/ui_components/button/style.rs` | 37 | 300 | bin | `ButtonKind`, `ButtonState`, `paint`: picks the `Palette::button` entry for a kind and state |
+| `src/ui_components/dropdown/mod.rs` | 370 | 3,000 | bin | `Dropdown`: the design-system dropdown (from the Brilliant `Select`), a field with the chosen value, an optional leading slot and a painted caret, drawn default, hover, focus (focused or open) or disabled, opening a themed `egui::Popup` list with `show_ui`; `DropdownItem` (an `egui::Widget` with an optional leading slot, drawn selected, hover or disabled), `dropdown_value` (the item counterpart of `selectable_value`), `group_label` |
+| `src/ui_components/dropdown/style.rs` | 39 | 300 | bin | `DropdownState`, `paint`: picks the `Palette::dropdown` entry for a state |
 | `src/ui_components/dock/mod.rs` | 185 | 1,550 | bin | `PanelTab` (including `Snap`; the tools are a fixed tool bar, not a tab), `PanelDock`: panel arrangement, default layout, saving and restoring it |
-| `src/ui_components/palette.rs` | 46 | 400 | bin | `Palette` (`DARK`, `LIGHT`, `of`: picked from `visuals.dark_mode`): the theme-dependent canvas colors, used by `canvas` and `grid` |
+| `src/ui_components/palette.rs` | 432 | 3,700 | bin | `Palette` (`DARK`, `LIGHT`, `of`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge) and the interface roles `Surfaces` (including the canvas background), `Borders`, `TextColors`, `AccentColors`, `StatusColors`, and the component colors `ButtonColors` (`ButtonStates`, `ButtonPaint`: fill, stroke and text per kind and state, plus the focus ring) and `TabColors` (`TabPaint`: text, icon and underline per tab state, the strip background and border, the focus ring) and `DropdownColors` (`FieldPaint`: fill, stroke, text and caret per state; `MenuColors`: the open list); used by `canvas`, `grid`, `button`, `tabs` and `dropdown` |
+| `src/ui_components/tabs/mod.rs` | 182 | 1,500 | bin | `Tab`: the design-system tab (from the Brilliant `Dialog Tab`), an `egui::Widget` with a label and optional icon glyph, drawn active, inactive, hover, disabled or disabled-active, with an underline and a focus ring; `tab_bar` (the strip), `tab_value` (the tab counterpart of `selectable_value`) |
+| `src/ui_components/tabs/style.rs` | 42 | 300 | bin | `TabState`, `paint`: picks the `Palette::tabs` entry for a state |
 | `src/panels/tools/mod.rs` | 333 | 1,650 | bin | `Tool` (with `Centerline` and `StitchHoles`), `StitchSettings`, `ToolSettings`, `ZoomRequest` (All or Selection), `Tool::needs_piece` (Centerline and Stitch holes are enabled, and reachable by hotkey, only while a piece is selected; otherwise the tool falls back to Select), tool, new-piece and operation icons from font glyphs; `show_toolbar`: the full-width tool bar under the menu bar (drawn by `editor_ui`, not a dock tab), one scrolling line of tool buttons, the new-piece and boolean operation modes as one dropdown (`op_mode_dropdown`), then the Centerline and Stitch holes buttons, then Zoom to fit and Zoom to selection (`paint_fit_icon`, `paint_fit_selection_icon`: painted corner brackets, the second with a square inside and enabled only with a selection; they set `ToolSettings::zoom_request`), then the current tool's settings (regular polygon sides, centerline style, stitch holes) |
 | `src/panels/layout/mod.rs` | 273 | 2,800 | bin | Layout panel: tree of pieces with collapsible children, lock, delete, reorder and operation controls (none for a centerline); Shift+click toggles a piece or child |
 | `src/panels/align/mod.rs` | 248 | 2,000 | bin | Align panel: `Reference` (Align To; `Parent` only for children), `Targets` (pieces or children of one piece), `AlignOptions` (kept in `EditorState::align`), align, distribute and spacing icons from font glyphs (`arrange_glyph`), `show_panel` |
 | `src/panels/snap/mod.rs` | 43 | 400 | bin | Snap panel: `show_panel` edits `SnapSettings` (on/off, grid and step, vertices, smart guides, distance in px) |
 | `src/panels/history/mod.rs` | 39 | 300 | bin | History panel: list of actions, click to jump |
 | `src/panels/material/mod.rs` | 241 | 2,100 | bin | Material form, Material panel, new-project dialog |
-| `src/panels/settings/mod.rs` | 109 | 800 | bin | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` with Default material, Hotkeys and Appearance tabs, and a right-aligned footer of `Button`s (primary OK, secondary Cancel) |
+| `src/panels/settings/mod.rs` | 103 | 800 | bin | Settings window: `SettingsDraft`, `SettingsResult`, `settings_dialog` with Default material, Hotkeys and Appearance tabs in a `tab_bar`, and a right-aligned footer of `Button`s (primary OK, secondary Cancel) |
 | `src/panels/settings/appearance.rs` | 24 | 200 | bin | Appearance tab: `appearance_tab`, the theme radio buttons |
-| `src/panels/settings/material.rs` | 191 | 1,500 | bin | Default material tab: `material_tab`, its own material form with an outline Reset to defaults `Button` |
+| `src/panels/settings/material.rs` | 184 | 1,500 | bin | Default material tab: `material_tab`, its own material form of `Dropdown`s (the color one with swatches as leading slots and grouped items) with an outline Reset to defaults `Button` |
 | `src/panels/settings/hotkeys.rs` | 194 | 1,600 | bin | Hotkeys tab: `Capture`, `hotkeys_tab`, `shortcut_button`, key capture; an outline Reset to defaults `Button` |
 | `src/panels/properties/mod.rs` | 81 | 650 | bin | Properties panel: `EditorView`, `ViewControls`, `Selection`, view or preview controls (tool and navigation hints), display units, `show_panel`; re-exports `line_style_fields` and `stitch_fields` for the tool bar |
 | `src/panels/properties/piece.rs` | 95 | 800 | bin | Selected piece's name, size or result error, title and fields of its base or child, To Polygon button |
@@ -190,12 +194,28 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | File | Lines | Symbols |
 |---|---:|---|
-| `mod.rs` | 1-4 | Module declarations |
-| `button/mod.rs` | 17-46 | `Button`: `new`, `primary`, `secondary`, `outline` |
-| | 48-96 | `impl egui::Widget for Button`: size from the label, state from enabled and hover, paint, focus ring |
+| `mod.rs` | 1-6 | Module declarations |
+| `button/mod.rs` | 19-48 | `Button`: `new`, `primary`, `secondary`, `outline` |
+| | 50-98 | `impl egui::Widget for Button`: size from the label, state from enabled and hover, paint, focus ring |
 | `button/style.rs` | 8-24 | `ButtonKind`, `ButtonState` |
-| | 26-80 | `ButtonStyle`, `ButtonStyle::of` (dark and light tables) |
+| | 26-37 | `paint`: the palette entry of a kind and state |
 | | 82-88 | `focus_color` |
+| `tabs/mod.rs` | 39-67 | `Tab`: `new`, `icon`, `selected` |
+| | 69-137 | `impl egui::Widget for Tab`: size from icon and label, state, icon, label, underline, focus ring |
+| | 141-164 | `tab_bar`: strip background and borders, a left-to-right child `Ui` for the tabs |
+| | 169-182 | `tab_value`: select on click |
+| `tabs/style.rs` | 9-31 | `TabState`, `TabState::new` |
+| | 34-42 | `paint`: the palette entry of a state |
+| `dropdown/mod.rs` | 47-64 | `Leading`: the slot before the text, `paint_at` |
+| | 69-117 | `Dropdown`: `new`, `width`, `max_height`, `leading` |
+| | 118-210 | `Dropdown::show_ui`: field size and truncated text, state, paint, caret, the popup list in a palette frame with a scroll area |
+| | 213-220 | `paint_caret` |
+| | 224-258 | `DropdownItem`: `new`, `selected`, `leading` |
+| | 260-324 | `impl egui::Widget for DropdownItem`: fill for selected or hover, focus ring, leading slot, text |
+| | 328-341 | `dropdown_value`: select on click |
+| | 344-370 | `group_label` |
+| `dropdown/style.rs` | 8-29 | `DropdownState`, `DropdownState::new` |
+| | 32-39 | `paint`: the palette entry of a state |
 | `dock/mod.rs` | 11-32 | `PanelTab`: `CLOSEABLE`, `label` |
 | | 35-121 | `PanelDock`: `load`, `is_open`, `toggle`, `reset`, `set_language`, `save_on_release` |
 | | 123-163 | `window_id`, `is_usable`, `restore_windows`, `default_state`, `translations` |

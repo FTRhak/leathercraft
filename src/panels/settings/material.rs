@@ -2,6 +2,7 @@
 
 use super::SettingsDraft;
 use crate::ui_components::button::Button;
+use crate::ui_components::dropdown::{Dropdown, DropdownItem, dropdown_value, group_label};
 use bevy_egui::egui;
 use leathercraft::i18n::{Label, Language};
 use leathercraft::material::{
@@ -12,7 +13,7 @@ use leathercraft::model::Units;
 
 const COMBO_WIDTH: f32 = 200.0;
 const COMBO_POPUP_HEIGHT: f32 = 360.0;
-const SWATCH_SIZE: f32 = 14.0;
+const SWATCH: egui::Vec2 = egui::Vec2::splat(14.0);
 
 pub(super) fn material_tab(ui: &mut egui::Ui, draft: &mut SettingsDraft, language: Language) {
     let material = &mut draft.preferences.default_material;
@@ -109,7 +110,7 @@ fn physical_rows(ui: &mut egui::Ui, material: &mut Material, language: Language)
     );
 }
 
-/// A labelled combo box over `options`; `hint` describes a value when the catalog has a description.
+/// A labelled dropdown over `options`; `hint` describes a value when the catalog has a description.
 fn combo<T: Copy + PartialEq>(
     ui: &mut egui::Ui,
     language: Language,
@@ -120,13 +121,13 @@ fn combo<T: Copy + PartialEq>(
     hint: impl Fn(T) -> Option<Label>,
 ) {
     ui.label(language.label(field));
-    let response = egui::ComboBox::from_id_salt(language.label(field))
+    let response = Dropdown::new(language.label(field), language.label(name(*value)))
         .width(COMBO_WIDTH)
-        .height(COMBO_POPUP_HEIGHT)
-        .selected_text(language.label(name(*value)))
+        .max_height(COMBO_POPUP_HEIGHT)
         .show_ui(ui, |ui| {
             for &option in options {
-                let item = ui.selectable_value(value, option, language.label(name(option)));
+                let item = DropdownItem::new(language.label(name(option)));
+                let item = dropdown_value(ui, value, option, item);
                 if let Some(text) = hint(option) {
                     item.on_hover_text(language.label(text));
                 }
@@ -158,34 +159,26 @@ fn thickness_row(ui: &mut egui::Ui, language: Language, material: &mut Material)
 fn color_row(ui: &mut egui::Ui, language: Language, value: &mut LeatherColor) {
     let field = language.label(Label::ColorField);
     ui.label(field);
-    ui.horizontal(|ui| {
-        swatch(ui, *value);
-        egui::ComboBox::from_id_salt(field)
-            .width(COMBO_WIDTH - SWATCH_SIZE - ui.spacing().item_spacing.x)
-            .height(COMBO_POPUP_HEIGHT)
-            .selected_text(language.label(Label::Color(*value)))
-            .show_ui(ui, |ui| {
-                for group in ColorGroup::ALL {
-                    ui.weak(language.label(Label::ColorGroup(group)));
-                    for option in LeatherColor::ALL.into_iter().filter(|c| c.group() == group) {
-                        ui.horizontal(|ui| {
-                            swatch(ui, option);
-                            ui.selectable_value(
-                                value,
-                                option,
-                                language.label(Label::Color(option)),
-                            );
-                        });
-                    }
+    let current = *value;
+    Dropdown::new(field, language.label(Label::Color(current)))
+        .width(COMBO_WIDTH)
+        .max_height(COMBO_POPUP_HEIGHT)
+        .leading(SWATCH, move |painter, rect| swatch(painter, rect, current))
+        .show_ui(ui, |ui| {
+            for group in ColorGroup::ALL {
+                group_label(ui, language.label(Label::ColorGroup(group)));
+                for option in LeatherColor::ALL.into_iter().filter(|c| c.group() == group) {
+                    let item = DropdownItem::new(language.label(Label::Color(option)))
+                        .leading(SWATCH, move |painter, rect| swatch(painter, rect, option));
+                    dropdown_value(ui, value, option, item);
                 }
-            });
-    });
+            }
+        });
     ui.end_row();
 }
 
-fn swatch(ui: &mut egui::Ui, color: LeatherColor) {
+/// The color is document data, not a theme color, so it is painted as it is.
+fn swatch(painter: &egui::Painter, rect: egui::Rect, color: LeatherColor) {
     let [red, green, blue] = color.rgb();
-    let (rect, _) = ui.allocate_exact_size(egui::Vec2::splat(SWATCH_SIZE), egui::Sense::hover());
-    ui.painter()
-        .rect_filled(rect, 2.0, egui::Color32::from_rgb(red, green, blue));
+    painter.rect_filled(rect, 2.0, egui::Color32::from_rgb(red, green, blue));
 }

@@ -8,7 +8,9 @@ mod style;
 pub use style::ButtonKind;
 
 use bevy_egui::egui;
-use style::{ButtonState, ButtonStyle, focus_color};
+use style::{ButtonState, paint};
+
+use crate::ui_components::palette::Palette;
 
 const PADDING: egui::Vec2 = egui::vec2(16.0, 6.0);
 const CORNER_RADIUS: u8 = 5;
@@ -70,9 +72,9 @@ impl egui::Widget for Button {
             } else {
                 ButtonState::Default
             };
-            let dark_mode = ui.visuals().dark_mode;
-            let style = ButtonStyle::of(self.kind, state, dark_mode);
             let painter = ui.painter();
+            let colors = &Palette::of(painter).button;
+            let style = paint(colors, self.kind, state);
             painter.rect(
                 rect,
                 CORNER_RADIUS,
@@ -84,7 +86,7 @@ impl egui::Widget for Button {
                 painter.rect_stroke(
                     rect.expand(2.0),
                     CORNER_RADIUS + 2,
-                    egui::Stroke::new(1.0, focus_color(dark_mode)),
+                    egui::Stroke::new(1.0, colors.focus),
                     egui::StrokeKind::Inside,
                 );
             }

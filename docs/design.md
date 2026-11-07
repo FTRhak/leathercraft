@@ -79,7 +79,6 @@ These colors predate the rule and still live outside the palette. Move them in w
 
 | Where | Colors | Target in `Palette` |
 |---|---|---|
-| `ui_components/button/style.rs` | `ButtonStyle::of` tables and `focus_color`, dark and light | `button: ButtonColors` |
 | `editor/canvas.rs` | `SNAP_COLOR`, `SELECTED_COLOR` | `snap_marker`, `selection` |
 | `editor/canvas.rs` `op_color`, `draft_color` | Subtract, union, intersect, and the draft color with no operation | `op_subtract`, `op_union`, `op_intersect`, `draft` |
 | `editor/canvas.rs` piece drawing | Error outline, piece fill | `error`, `piece_fill` |
