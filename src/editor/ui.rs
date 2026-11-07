@@ -1,6 +1,10 @@
 use super::{
-    EditorState, PROJECT_EXTENSION, ViewMode, confirm_discard::confirm_discard, export,
-    format_length, panel_viewer::PanelViewer, send,
+    EditorState, PROJECT_EXTENSION, ViewMode,
+    confirm_discard::confirm_discard,
+    export, format_length,
+    panel_viewer::PanelViewer,
+    send,
+    window_chrome::{self, WindowMaximized},
 };
 use crate::document::{ActiveProject, HistoryMessage, ProjectMessage};
 use crate::panels::material::{self, DialogResult};
@@ -9,8 +13,12 @@ use crate::panels::tools;
 use crate::preview::PreviewSettings;
 use crate::settings::{self, Action, Hotkeys, Preferences};
 use crate::ui_components::dock::{PanelDock, PanelTab};
+use crate::ui_components::dropdown::{Dropdown, DropdownItem, dropdown_value};
+use crate::ui_components::title_bar::{self, ModeIcon, ModeSwitch, Slot, WindowLabels};
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use bevy_egui::{EguiContexts, egui};
+use egui::containers::menu::MenuConfig;
 use egui_dock::DockArea;
 use leathercraft::events::ProjectEvent;
 use leathercraft::exports;
@@ -30,21 +38,32 @@ pub fn editor_ui(
     mut settings: ResMut<PreviewSettings>,
     mut dock: ResMut<PanelDock>,
     mut preferences: ResMut<Preferences>,
+    mut window: Single<&mut Window, With<PrimaryWindow>>,
+    maximized: Res<WindowMaximized>,
+    mut exit: MessageWriter<AppExit>,
 ) -> Result {
     let ctx: &egui::Context = contexts.ctx_mut()?;
     let history = project.history();
     let project: &Project = &project;
     let state = &mut *state;
     let dock = &mut *dock;
+    let maximized = maximized.0;
 
-    egui::TopBottomPanel::top("file_bar").show(ctx, |ui| {
-        ui.horizontal(|ui| {
-            let language = state.language;
-            ui.menu_button(language.label(Label::File), |ui| {
+    let language = state.language;
+    let labels = WindowLabels {
+        minimize: language.label(Label::MinimizeWindow),
+        maximize: language.label(Label::MaximizeWindow),
+        restore: language.label(Label::RestoreWindow),
+        close: language.label(Label::CloseWindow),
+    };
+    let mut window_command = title_bar::show(ctx, maximized, &labels, |ui, slot| match slot {
+        Slot::Left => {
+            let menu = MenuConfig::new;
+            title_bar::menu(ui, "file", language.label(Label::File), menu(), |ui| {
                 file_menu(ui, project, &preferences, &mut events, state);
             });
-            ui.menu_button(language.label(Label::View), |_| {});
-            ui.menu_button(language.label(Label::Edit), |ui| {
+            title_bar::menu(ui, "view", language.label(Label::View), menu(), |_| {});
+            title_bar::menu(ui, "edit", language.label(Label::Edit), menu(), |ui| {
                 edit_menu(
                     ui,
                     project,
@@ -54,29 +73,55 @@ pub fn editor_ui(
                     state,
                 );
             });
+            title_bar::menu(
+                ui,
+                "pattern",
+                language.label(Label::Pattern),
+                menu(),
+                |_| {},
+            );
             // Stays open on a click, so that the toggled state can be seen.
-            egui::containers::menu::MenuButton::new(language.label(Label::Window))
-                .config(
-                    egui::containers::menu::MenuConfig::new()
-                        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside),
-                )
-                .ui(ui, |ui| window_menu(ui, state, dock));
-            ui.separator();
-            ui.selectable_value(
-                &mut *view_mode,
-                ViewMode::Editor2d,
-                language.label(Label::Editor2d),
+            let stays_open = menu().close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+            title_bar::menu(
+                ui,
+                "window",
+                language.label(Label::Window),
+                stays_open,
+                |ui| {
+                    window_menu(ui, state, dock);
+                },
             );
-            ui.selectable_value(
-                &mut *view_mode,
-                ViewMode::Preview3d,
-                language.label(Label::Preview3d),
+        }
+        Slot::Center => {
+            ui.add(
+                ModeSwitch::new(&mut *view_mode)
+                    .option(
+                        ViewMode::Editor2d,
+                        ModeIcon::Flat,
+                        language.label(Label::Editor2d),
+                    )
+                    .option(
+                        ViewMode::Preview3d,
+                        ModeIcon::Solid,
+                        language.label(Label::Preview3d),
+                    ),
             );
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                language_control(ui, state, dock);
-            });
-        });
+        }
+        Slot::Right => language_control(ui, state, dock),
     });
+    if !maximized && window_command.is_none() {
+        window_command = title_bar::resize_handles(ctx);
+    }
+    if let Some(command) = window_command {
+        window_chrome::apply(
+            command,
+            &mut window,
+            maximized,
+            project,
+            state.language,
+            &mut exit,
+        );
+    }
 
     // Disabled rather than hidden in preview mode, so that the layout doesn't jump.
     egui::TopBottomPanel::top("tool_bar").show(ctx, |ui| {
@@ -394,15 +439,23 @@ fn select_all(project: &Project, state: &mut EditorState) {
     }
 }
 
+/// The language dropdown of the title bar, with its caption; laid out right to left.
 fn language_control(ui: &mut egui::Ui, state: &mut EditorState, dock: &mut PanelDock) {
+    const WIDTH: f32 = 110.0;
+    const CAPTION_GAP: f32 = 6.0;
     let mut language = state.language;
-    egui::ComboBox::from_label(language.label(Label::Language))
-        .selected_text(language.native_name())
-        .show_ui(ui, |ui| {
-            for option in Language::ALL {
-                ui.selectable_value(&mut language, option, option.native_name());
-            }
-        });
+    ui.scope(|ui| {
+        ui.spacing_mut().item_spacing.x = CAPTION_GAP;
+        Dropdown::new("language", language.native_name())
+            .width(WIDTH)
+            .show_ui(ui, |ui| {
+                for option in Language::ALL {
+                    let item = DropdownItem::new(option.native_name());
+                    dropdown_value(ui, &mut language, option, item);
+                }
+            });
+        title_bar::caption(ui, state.language.label(Label::Language));
+    });
     if language != state.language {
         state.language = language;
         settings::save_language(language);

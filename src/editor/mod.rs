@@ -7,9 +7,11 @@ mod grid;
 mod panel_viewer;
 mod shape_draft_struct;
 mod ui;
+mod window_chrome;
 
 pub use editor_state_struct::EditorState;
 pub use ui::editor_ui;
+pub use window_chrome::{WindowMaximized, track_maximized};
 
 use crate::document::ProjectMessage;
 use bevy::prelude::*;

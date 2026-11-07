@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use bevy::window::{Window, WindowPlugin};
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 use document::{ActiveProject, HistoryMessage, ProjectMessage};
-use editor::{EditorState, ViewMode};
+use editor::{EditorState, ViewMode, WindowMaximized};
 use leathercraft::model::Project;
 use preview::PreviewPlugin;
 use ui_components::dock::PanelDock;
@@ -25,6 +25,8 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Leathercraft Pattern Studio".to_owned(),
+                // The app draws its own title bar, `ui_components::title_bar`.
+                decorations: false,
                 ..default()
             }),
             ..default()
@@ -37,6 +39,8 @@ fn main() {
         .insert_resource(EditorState::new(language, settings::load_snap()))
         .insert_resource(PanelDock::load(language))
         .init_resource::<ViewMode>()
+        .init_resource::<WindowMaximized>()
+        .add_systems(Update, editor::track_maximized)
         .add_systems(
             EguiPrimaryContextPass,
             (

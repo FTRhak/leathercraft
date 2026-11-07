@@ -74,6 +74,12 @@ pub enum Label {
     View,
     Edit,
     Window,
+    /// The menu of pattern commands in the title bar.
+    Pattern,
+    MinimizeWindow,
+    MaximizeWindow,
+    RestoreWindow,
+    CloseWindow,
     New,
     Open,
     Save,

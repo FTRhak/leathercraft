@@ -13,3 +13,4 @@ pub mod palette;
 #[allow(dead_code)]
 pub mod radio;
 pub mod tabs;
+pub mod title_bar;
