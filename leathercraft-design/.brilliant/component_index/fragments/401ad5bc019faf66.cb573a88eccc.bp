@@ -1,0 +1,4 @@
+      401ad5bc019faf66 fr comp p(207.01,24) s(hug:420,hug:28) f[] "Form Row"
+        1b26aeabd96ae840 al(h,x(sb),y(c),g(12)) mref(1b26aeabd96ae840) p(0,0) s(420,hug:28) min(,28) f[] "Frame 279"
+          3974742049ff72bb t("Мітка",Inter,12,m,align(l),lh(auto,1.25)) mref(3974742049ff72bb) p(0,6.5) s(132,hug:15) f[(40015ff61b55f3b1,#B8BBC6)] "Label"
+          ddecd9873cd22a25 al(h,y(c)) slot mref(ddecd9873cd22a25) p(144,14) s(fill,hug:0) ext(276,) f[] "Control"

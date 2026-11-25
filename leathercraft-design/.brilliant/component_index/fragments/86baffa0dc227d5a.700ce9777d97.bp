@@ -1,0 +1,3 @@
+      86baffa0dc227d5a fr comp p(24,24) s(hug:38.41,hug:20) f[] "Keycap"
+        9e73a3ecf667e7fe al(h,x(c),y(c),pad(2,6)) mref(9e73a3ecf667e7fe) p(0,0) s(hug:38.41,20) min(20,) f[(1d12600e0ca7a600,#23252B)] st[(52960f443d9667bb,#3A3D47,w(1,1,2,1))] rd(4) "Frame 274"
+          7b6c87ca6924e2cd t("Ctrl",JetBrains Mono,11,m,align(l),lh(auto,1.36)) mref(7b6c87ca6924e2cd) p(6,2.5) s(hug:26.41,hug:15) f[(c7e7f4dfe4f626ce,#ECEEF2)] "Key"
