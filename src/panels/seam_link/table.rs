@@ -8,7 +8,6 @@ use leathercraft::model::Units;
 use leathercraft::seams::LinkPairs;
 
 const ROW_HEIGHT: f32 = 28.0;
-const TABLE_HEIGHT: f32 = 230.0;
 const PADDING: f32 = 10.0;
 /// The x of each column after the left padding, from the design.
 const COLUMNS: [f32; 4] = [0.0, 34.0, 80.0, 140.0];
@@ -31,10 +30,19 @@ enum Row {
     },
 }
 
-pub(super) fn pair_table(ui: &mut egui::Ui, pairs: &LinkPairs, units: Units, language: Language) {
+/// The table, `height` tall with its header; the rows scroll.
+pub(super) fn pair_table(
+    ui: &mut egui::Ui,
+    pairs: &LinkPairs,
+    height: f32,
+    units: Units,
+    language: Language,
+) {
     let palette = Palette::of(ui.painter());
     let rows = rows(pairs, units);
-    let width = ui.available_width();
+    // Inside the 1 px border.
+    let width = ui.available_width() - 2.0;
+    let rows_height = (height - ROW_HEIGHT - 2.0).max(ROW_HEIGHT);
     egui::Frame::new()
         .fill(palette.surface.input)
         .stroke(egui::Stroke::new(1.0, palette.border.divider))
@@ -69,8 +77,9 @@ pub(super) fn pair_table(ui: &mut egui::Ui, pairs: &LinkPairs, units: Units, lan
             divider(ui.painter(), rect, palette.border.divider);
 
             egui::ScrollArea::vertical()
-                .max_height(TABLE_HEIGHT)
-                .auto_shrink([false, true])
+                .min_scrolled_height(rows_height)
+                .max_height(rows_height)
+                .auto_shrink([false, false])
                 .show_rows(ui, ROW_HEIGHT, rows.len(), |ui, range| {
                     for row in &rows[range] {
                         let (rect, _) = ui.allocate_exact_size(
@@ -96,7 +105,12 @@ fn rows(pairs: &LinkPairs, units: Units) -> Vec<Row> {
             number: index + 1,
             a: pair.a + 1,
             b: pair.b + 1,
-            delta: format!("{:.*}", decimals, units.from_millimeters(pair.delta_mm)),
+            // `+ 0.0` turns a rounded -0.0 into 0.0.
+            delta: format!(
+                "{:.*}",
+                decimals,
+                round_to(units.from_millimeters(pair.delta_mm), decimals) + 0.0
+            ),
             manual: pair.manual,
         })
         .collect();
@@ -109,6 +123,11 @@ fn rows(pairs: &LinkPairs, units: Units) -> Vec<Row> {
         b: Some(b),
     }));
     rows
+}
+
+fn round_to(value: f64, decimals: usize) -> f64 {
+    let factor = 10f64.powi(decimals as i32);
+    (value * factor).round() / factor
 }
 
 /// Ascending hole indices as 1-based ranges: `[48, 49, 50, 52]` is `49–51` and `53`.

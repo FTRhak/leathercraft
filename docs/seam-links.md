@@ -4,7 +4,7 @@ A seam link says which holes of two stitch lines are sewn together. The user pic
 
 A link is part of the document: it lives in `Project.seam_links` and is saved in `.leathercraft`. Like the holes (`docs/stitch-holes.md`), the pairs are never stored. A link keeps only its parameters (the hole ranges, the direction, the offset and the pairs set by hand), and `SeamLink::pairs` computes the pairs from the current lines, so they follow any edit of a seam. The rules live in the library crate and are tested without Bevy; the dialog and the drawing are in the binary.
 
-The dialog follows the "Stitch Link Dialog — Зв'язати шви" frame (`0f4a53ae18e2d8f3`) of the Brilliant design.
+The dialog follows the "Stitch Link Dialog — Зв'язати шви" frame (`0f4a53ae18e2d8f3`) of the Brilliant design. Its body (schematic, table) fills the space the cards above and the warning and footer below leave, so it stretches with the dialog; the footer's height is measured on the previous frame. egui's default fonts have no `→` or `↔`, so the texts use `·` and `:` where the design has arrows.
 
 | File | Contents |
 |---|---|
@@ -37,12 +37,13 @@ The dialog follows the "Stitch Link Dialog — Зв'язати шви" frame (`0
 | Drop every manual pair | **Reset manual pairs** |
 | Make the counts match | The warning's **Pitch A → …** or **Pitch B → …** button sets that seam's pitch. It is an ordinary edit, with its own History entry; the dialog stays open and shows the new pairs |
 | Save the link | **Link N pairs**, or **Save** when changing a link |
+| Resize the dialog | Drag any of its edges or corners; it stays centered and grows on both sides. The size is kept until the app closes. It opens at the design's 1000 × 700 and never gets smaller than 860 × 600 or larger than the window |
 | See, change or remove links | Select a linked stitch line: Properties lists its links, each with the other seam and its pair count, **Edit** and **Remove**. The canvas draws the pair lines |
 | Fold a flap | Pick the same seam for A and B with ranges that don't share holes, usually with **Reverse** on B |
 
 - Picking another seam on a card takes all of its holes and drops the manual pairs, whose hole numbers belonged to the old seam.
 - On one seam, ranges that share holes are an error: it shows under the cards and the commit button is off.
-- The schematic places each hole at its distance along its seam, lined up at the first automatic pair, so a seam that creeps shows as slanting lines. With more holes than fit (under 6 px apart), it shows every n-th hole, both ends, and every manual or unpaired hole.
+- The schematic places each hole at its distance along its seam, lined up at the first automatic pair, so a seam that creeps shows as slanting lines. When holes would be under 24 px apart it shows every 2nd, 5th, 10th… hole, as in the design, plus both ends, the manual pairs and the unpaired holes that have room. The rows' gap grows with the dialog's height.
 - The table's **Δ** column is how far B's hole is along its range beyond A's hole along its own: how much the seam has crept by that pair. The summary shows the pairs, the unpaired holes, and the difference between the lengths of the two ranges.
 - Deleting a seam or its piece deletes its links in the same edit, so one Undo brings both back.
 - A link whose range runs past its seam's holes, after the seam got shorter, still opens; its range is cut short and Properties shows it in the warning color.

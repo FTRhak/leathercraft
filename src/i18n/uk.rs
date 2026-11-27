@@ -683,17 +683,17 @@ pub(super) fn message(message: &Message) -> String {
                 ),
             }
         }
-        Message::FitPitch { side, pitch } => format!("Крок {side} → {pitch}"),
+        Message::FitPitch { side, pitch } => format!("Крок {side}: {pitch}"),
         Message::LinkPairsButton { count } => {
             let noun = plural(*count, "пару", "пари", "пар");
             format!("Зв’язати {count} {noun}")
         }
-        Message::SeamName { piece, index } => format!("{piece} → Шов {index}"),
+        Message::SeamName { piece, index } => format!("{piece} · Шов {index}"),
         Message::SeamOption {
             piece,
             index,
             holes,
-        } => format!("{piece} → Шов {index} ({holes} отв.)"),
+        } => format!("{piece} · Шов {index} ({holes} отв.)"),
         Message::HoleCountBadge { count } => {
             let noun = plural(*count, "отвір", "отвори", "отворів");
             format!("{count} {noun}")
@@ -706,7 +706,7 @@ pub(super) fn message(message: &Message) -> String {
         Message::FreeIn { side: None } => "Без пари".to_owned(),
         Message::SeamLinkRow { other, pairs } => {
             let noun = plural(*pairs, "пара", "пари", "пар");
-            format!("↔ {other} · {pairs} {noun}")
+            format!("{other} · {pairs} {noun}")
         }
     }
 }

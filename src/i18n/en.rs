@@ -629,22 +629,22 @@ pub(super) fn message(message: &Message) -> String {
                 ),
             }
         }
-        Message::FitPitch { side, pitch } => format!("Pitch {side} → {pitch}"),
+        Message::FitPitch { side, pitch } => format!("Pitch {side}: {pitch}"),
         Message::LinkPairsButton { count } => {
             format!("Link {}", counted(*count, "pair", "pairs"))
         }
-        Message::SeamName { piece, index } => format!("{piece} → Seam {index}"),
+        Message::SeamName { piece, index } => format!("{piece} · Seam {index}"),
         Message::SeamOption {
             piece,
             index,
             holes,
-        } => format!("{piece} → Seam {index} ({holes} holes)"),
+        } => format!("{piece} · Seam {index} ({holes} holes)"),
         Message::HoleCountBadge { count } => counted(*count, "hole", "holes"),
         Message::PairsCount { count } => counted(*count, "pair", "pairs"),
         Message::FreeIn { side: Some(side) } => format!("Unpaired in {side}"),
         Message::FreeIn { side: None } => "Unpaired".to_owned(),
         Message::SeamLinkRow { other, pairs } => {
-            format!("↔ {other} · {}", counted(*pairs, "pair", "pairs"))
+            format!("{other} · {}", counted(*pairs, "pair", "pairs"))
         }
     }
 }

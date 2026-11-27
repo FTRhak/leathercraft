@@ -26,7 +26,16 @@ use leathercraft::seams::{
 use leathercraft::shapes::{Shape, StitchLine};
 use schematic::{Side, schematic};
 
-const DIALOG_WIDTH: f32 = 1000.0;
+/// The design's size, and the smallest size the cards and the body still fit in.
+const DEFAULT_SIZE: egui::Vec2 = egui::vec2(1000.0, 700.0);
+const MIN_SIZE: egui::Vec2 = egui::vec2(860.0, 600.0);
+/// Kept free around the dialog when the window is too small for it.
+const SCREEN_MARGIN: f32 = 20.0;
+/// The width of the strips along the edges that resize the dialog.
+const RESIZE_GRIP: f32 = 6.0;
+/// The warning and the footer, before they are first measured.
+const DEFAULT_BOTTOM_HEIGHT: f32 = 116.0;
+const MIN_BODY_HEIGHT: f32 = 240.0;
 const DIALOG_RADIUS: u8 = 10;
 const EDGE: f32 = 18.0;
 const CARD_GAP: f32 = 12.0;
@@ -34,9 +43,14 @@ const OFFSET_WIDTH: f32 = 110.0;
 const CARD_PADDING: egui::Margin = egui::Margin::symmetric(14, 12);
 const CARD_RADIUS: u8 = 8;
 const CARD_ROW_GAP: f32 = 10.0;
-const SCHEMATIC_WIDTH: f32 = 560.0;
-const SCHEMATIC_HEIGHT: f32 = 292.0;
+/// The schematic's part of the body's width: 560 of 948 in the design.
+const SCHEMATIC_SHARE: f32 = 0.59;
 const BODY_GAP: f32 = 16.0;
+const BODY_PADDING: f32 = 14.0;
+const COLUMN_GAP: f32 = 10.0;
+const TITLE_ROW_HEIGHT: f32 = 16.0;
+/// The summary tiles under the table.
+const SUMMARY_HEIGHT: f32 = 50.0;
 const RANGE_FIELD_WIDTH: f32 = 60.0;
 const OFFSET_FIELD_WIDTH: f32 = 84.0;
 const CHIP_PADDING: egui::Margin = egui::Margin::symmetric(7, 3);
@@ -116,6 +130,7 @@ pub fn seam_name(project: &Project, piece: u64, child: u64, language: Language) 
 }
 
 /// Clicking outside the dialog does nothing, so a stray click cannot lose the pairs set by hand.
+/// Its edges and corners resize it; the size is kept for the session.
 pub fn seam_link_dialog(
     ctx: &egui::Context,
     draft: &mut SeamLinkDraft,
@@ -127,13 +142,19 @@ pub fn seam_link_dialog(
         .fill(palette.surface.panel)
         .stroke(egui::Stroke::new(1.0, palette.border.field))
         .corner_radius(DIALOG_RADIUS);
-    let modal = egui::Modal::new(egui::Id::new("seam_link_dialog"))
-        .frame(frame)
-        .show(ctx, |ui| {
-            ui.set_width(DIALOG_WIDTH);
-            ui.spacing_mut().item_spacing = egui::Vec2::ZERO;
-            dialog_contents(ui, draft, project, language)
-        });
+    let id = egui::Id::new("seam_link_dialog");
+    let size = dialog_size(ctx, id);
+    let modal = egui::Modal::new(id).frame(frame).show(ctx, |ui| {
+        ui.set_width(size.x);
+        ui.set_height(size.y);
+        ui.spacing_mut().item_spacing = egui::Vec2::ZERO;
+        let rect = egui::Rect::from_min_size(ui.max_rect().min, size);
+        let result = ui
+            .scope(|ui| dialog_contents(ui, draft, project, language))
+            .inner;
+        resize_edges(ui, id, rect);
+        result
+    });
     // Esc first drops a hole waiting for its pair, then closes an open dropdown, then the dialog.
     if draft.pending_a.is_some()
         && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
@@ -143,6 +164,138 @@ pub fn seam_link_dialog(
     let escaped = !modal.any_popup_open
         && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
     modal.inner.or(escaped.then_some(SeamLinkResult::Cancel))
+}
+
+/// The dialog's size: the last one the user dragged to, within the screen.
+fn dialog_size(ctx: &egui::Context, id: egui::Id) -> egui::Vec2 {
+    let screen = ctx.content_rect().size() - egui::Vec2::splat(2.0 * SCREEN_MARGIN);
+    let max = screen.max(MIN_SIZE);
+    ctx.data(|data| data.get_temp::<egui::Vec2>(id.with("size")))
+        .unwrap_or(DEFAULT_SIZE)
+        .clamp(MIN_SIZE, max)
+}
+
+/// Drag strips along the dialog's edges and corners. The dialog stays centered, so an edge
+/// grows it on both sides and follows the pointer.
+fn resize_edges(ui: &mut egui::Ui, id: egui::Id, rect: egui::Rect) {
+    use egui::CursorIcon;
+    let grip = RESIZE_GRIP;
+    let (left, right) = (rect.left(), rect.right());
+    let (top, bottom) = (rect.top(), rect.bottom());
+    // (strip, resizes width, resizes height, cursor)
+    let strips = [
+        (
+            egui::Rect::from_min_max(
+                egui::pos2(right - grip, top + grip),
+                egui::pos2(right, bottom - grip),
+            ),
+            true,
+            false,
+            CursorIcon::ResizeHorizontal,
+        ),
+        (
+            egui::Rect::from_min_max(
+                egui::pos2(left, top + grip),
+                egui::pos2(left + grip, bottom - grip),
+            ),
+            true,
+            false,
+            CursorIcon::ResizeHorizontal,
+        ),
+        (
+            egui::Rect::from_min_max(
+                egui::pos2(left + grip, bottom - grip),
+                egui::pos2(right - grip, bottom),
+            ),
+            false,
+            true,
+            CursorIcon::ResizeVertical,
+        ),
+        (
+            egui::Rect::from_min_max(
+                egui::pos2(left + grip, top),
+                egui::pos2(right - grip, top + grip),
+            ),
+            false,
+            true,
+            CursorIcon::ResizeVertical,
+        ),
+        (
+            egui::Rect::from_min_max(
+                egui::pos2(right - 2.0 * grip, bottom - 2.0 * grip),
+                egui::pos2(right, bottom),
+            ),
+            true,
+            true,
+            CursorIcon::ResizeNwSe,
+        ),
+        (
+            egui::Rect::from_min_max(
+                egui::pos2(left, top),
+                egui::pos2(left + 2.0 * grip, top + 2.0 * grip),
+            ),
+            true,
+            true,
+            CursorIcon::ResizeNwSe,
+        ),
+        (
+            egui::Rect::from_min_max(
+                egui::pos2(right - 2.0 * grip, top),
+                egui::pos2(right, top + 2.0 * grip),
+            ),
+            true,
+            true,
+            CursorIcon::ResizeNeSw,
+        ),
+        (
+            egui::Rect::from_min_max(
+                egui::pos2(left, bottom - 2.0 * grip),
+                egui::pos2(left + 2.0 * grip, bottom),
+            ),
+            true,
+            true,
+            CursorIcon::ResizeNeSw,
+        ),
+    ];
+    // The modal is centered on the screen; its own rect lags a frame behind while it grows.
+    let center = ui.ctx().content_rect().center();
+    let mut size = rect.size();
+    for (index, (strip, width, height, cursor)) in strips.into_iter().enumerate() {
+        let response = ui.interact(strip, id.with(("resize", index)), egui::Sense::drag());
+        if response.hovered() || response.dragged() {
+            ui.ctx().set_cursor_icon(cursor);
+        }
+        if response.dragged()
+            && let Some(pointer) = response.interact_pointer_pos()
+        {
+            let reach = (pointer - center).abs() * 2.0;
+            if width {
+                size.x = reach.x;
+            }
+            if height {
+                size.y = reach.y;
+            }
+        }
+    }
+    // The grip in the bottom right corner, as on a window.
+    let color = Palette::of(ui.painter()).text.muted;
+    let corner = rect.right_bottom() - egui::vec2(5.0, 5.0);
+    for step in 1..=3 {
+        let offset = 3.5 * step as f32;
+        ui.painter().line_segment(
+            [
+                corner - egui::vec2(offset, 0.0),
+                corner - egui::vec2(0.0, offset),
+            ],
+            egui::Stroke::new(1.0, color),
+        );
+    }
+    if size != rect.size() {
+        let size = size.max(MIN_SIZE).round();
+        ui.ctx()
+            .data_mut(|data| data.insert_temp(id.with("size"), size));
+        ui.ctx().request_repaint();
+    }
 }
 
 fn dialog_contents(
@@ -158,12 +311,30 @@ fn dialog_contents(
     seam_cards(ui, draft, project, language);
     horizontal_rule(ui);
 
+    // The body takes the height the warning and the footer leave, measured on the last frame.
+    let bottom_id = egui::Id::new("seam_link_dialog_bottom");
+    let bottom = ui
+        .ctx()
+        .data(|data| data.get_temp::<f32>(bottom_id))
+        .unwrap_or(DEFAULT_BOTTOM_HEIGHT);
+    let body_height = (ui.available_height() - bottom).max(MIN_BODY_HEIGHT);
+    let width = ui.available_width();
+
     let pairs = draft.link.pairs(project);
     let range_error = range_error(&draft.link);
-    match &pairs {
-        Ok(pairs) => body(ui, draft, pairs, project.units, language),
-        Err(error) => error_line(ui, &language.message(error)),
-    }
+    ui.allocate_ui_with_layout(
+        egui::vec2(width, body_height),
+        egui::Layout::top_down(egui::Align::Min),
+        |ui| {
+            ui.set_height(body_height);
+            match &pairs {
+                Ok(pairs) => body(ui, draft, pairs, project.units, language),
+                Err(error) => error_line(ui, &language.message(error)),
+            }
+        },
+    );
+
+    let bottom_top = ui.cursor().top();
     if let Some(error) = &range_error {
         error_line(ui, &language.message(error));
     }
@@ -199,6 +370,12 @@ fn dialog_contents(
             result = Some(SeamLinkResult::Commit(event));
         }
         None => {}
+    }
+    let measured = ui.cursor().top() - bottom_top;
+    if (measured - bottom).abs() > 0.5 {
+        ui.ctx()
+            .data_mut(|data| data.insert_temp(bottom_id, measured));
+        ui.ctx().request_repaint();
     }
     result
 }
@@ -337,108 +514,115 @@ fn seam_card(
         .corner_radius(CARD_RADIUS)
         .inner_margin(CARD_PADDING)
         .show(ui, |ui| {
-            ui.set_width(inner_width);
-            ui.spacing_mut().item_spacing = egui::vec2(6.0, CARD_ROW_GAP);
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 8.0;
-                let (letter, title) = match which {
-                    Side::A => ("A", Label::SeamA),
-                    Side::B => ("B", Label::SeamB),
-                };
-                side_badge(ui, letter);
-                ui.label(
-                    egui::RichText::new(language.label(title))
-                        .size(TEXT)
-                        .strong()
-                        .color(palette.text.primary),
-                );
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    chip(ui, &language.message(&Message::HoleCountBadge { count }));
-                });
-            });
-
-            let selected = seam_name(project, side.piece, side.child, language);
-            Dropdown::new(("seam_link_side", which), selected)
-                .width(inner_width)
-                .show_ui(ui, |ui| {
-                    for (piece, child) in stitch_lines(project) {
-                        let Some(line) = stitch_line(project, piece, child) else {
-                            continue;
-                        };
-                        let name = project
-                            .pieces
-                            .iter()
-                            .find(|candidate| candidate.id == piece)
-                            .map(|piece| piece.name.clone())
-                            .unwrap_or_default();
-                        let text = language.message(&Message::SeamOption {
-                            piece: name,
-                            index: stitch_number(project, piece, child).unwrap_or_default(),
-                            holes: line.hole_count(),
-                        });
-                        let chosen = side.piece == piece && side.child == child;
-                        if ui.add(DropdownItem::new(text).selected(chosen)).clicked() && !chosen {
-                            picked = Some(SeamSide::whole(piece, child, line));
-                        }
-                    }
-                });
-
-            if let Some(line) = line {
+            ui.vertical(|ui| {
+                ui.set_width(inner_width);
+                ui.spacing_mut().item_spacing = egui::vec2(6.0, CARD_ROW_GAP);
                 ui.horizontal(|ui| {
-                    let size = format_length(language, units, line.size);
-                    chip(
-                        ui,
-                        &format!("{} · {size}", language.label(Label::HoleKind(line.hole))),
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    let (letter, title) = match which {
+                        Side::A => ("A", Label::SeamA),
+                        Side::B => ("B", Label::SeamB),
+                    };
+                    side_badge(ui, letter);
+                    ui.label(
+                        egui::RichText::new(language.label(title))
+                            .size(TEXT)
+                            .strong()
+                            .color(palette.text.primary),
                     );
-                    chip(
-                        ui,
-                        &format!(
-                            "{} {}",
-                            language.label(Label::Pitch),
-                            format_length(language, units, line.pitch)
-                        ),
-                    );
-                    chip(
-                        ui,
-                        &format!(
-                            "{} {}",
-                            language.label(Label::StitchLength),
-                            format_length(language, units, line.length())
-                        ),
-                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        chip(ui, &language.message(&Message::HoleCountBadge { count }));
+                    });
                 });
-            }
 
-            ui.horizontal(|ui| {
-                let last = count.max(1);
-                caption(ui, language.label(Label::HolesFrom));
-                let mut from = edited.from + 1;
-                ui.add(
-                    NumberInput::new(&mut from)
-                        .range(1..=last)
-                        .width(RANGE_FIELD_WIDTH)
-                        .id_salt(("seam_link_from", which)),
-                );
-                edited.from = from - 1;
-                ui.add_space(4.0);
-                caption(ui, language.label(Label::HolesTo));
-                let mut to = edited.to + 1;
-                // A range that runs past a shortened line keeps its end until it is edited.
-                let to_max = last.max(to);
-                ui.add(
-                    NumberInput::new(&mut to)
-                        .range(1..=to_max)
-                        .width(RANGE_FIELD_WIDTH)
-                        .id_salt(("seam_link_to", which)),
-                );
-                edited.to = to - 1;
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if toggle_button(ui, edited.reversed, language.label(Label::Reverse)).clicked()
-                    {
-                        edited.reversed = !edited.reversed;
-                    }
+                let selected = seam_name(project, side.piece, side.child, language);
+                Dropdown::new(("seam_link_side", which), selected)
+                    .width(inner_width)
+                    .show_ui(ui, |ui| {
+                        for (piece, child) in stitch_lines(project) {
+                            let Some(line) = stitch_line(project, piece, child) else {
+                                continue;
+                            };
+                            let name = project
+                                .pieces
+                                .iter()
+                                .find(|candidate| candidate.id == piece)
+                                .map(|piece| piece.name.clone())
+                                .unwrap_or_default();
+                            let text = language.message(&Message::SeamOption {
+                                piece: name,
+                                index: stitch_number(project, piece, child).unwrap_or_default(),
+                                holes: line.hole_count(),
+                            });
+                            let chosen = side.piece == piece && side.child == child;
+                            if ui.add(DropdownItem::new(text).selected(chosen)).clicked() && !chosen
+                            {
+                                picked = Some(SeamSide::whole(piece, child, line));
+                            }
+                        }
+                    });
+
+                if let Some(line) = line {
+                    ui.horizontal(|ui| {
+                        let size = format_length(language, units, line.size);
+                        chip(
+                            ui,
+                            &format!("{} · {size}", language.label(Label::HoleKind(line.hole))),
+                        );
+                        chip(
+                            ui,
+                            &format!(
+                                "{} {}",
+                                language.label(Label::Pitch),
+                                format_length(language, units, line.pitch)
+                            ),
+                        );
+                        chip(
+                            ui,
+                            &format!(
+                                "{} {}",
+                                language.label(Label::StitchLength),
+                                format_length(language, units, line.length())
+                            ),
+                        );
+                    });
+                }
+
+                // As tall as the fields, so that the captions are centered on them.
+                let row = egui::vec2(ui.available_width(), SMALL_BUTTON_HEIGHT);
+                let centered = egui::Layout::left_to_right(egui::Align::Center);
+                ui.allocate_ui_with_layout(row, centered, |ui| {
+                    let last = count.max(1);
+                    caption(ui, language.label(Label::HolesFrom));
+                    let mut from = edited.from + 1;
+                    ui.add(
+                        NumberInput::new(&mut from)
+                            .range(1..=last)
+                            .width(RANGE_FIELD_WIDTH)
+                            .id_salt(("seam_link_from", which)),
+                    );
+                    edited.from = from - 1;
+                    ui.add_space(4.0);
+                    caption(ui, language.label(Label::HolesTo));
+                    let mut to = edited.to + 1;
+                    // A range that runs past a shortened line keeps its end until it is edited.
+                    let to_max = last.max(to);
+                    ui.add(
+                        NumberInput::new(&mut to)
+                            .range(1..=to_max)
+                            .width(RANGE_FIELD_WIDTH)
+                            .id_salt(("seam_link_to", which)),
+                    );
+                    edited.to = to - 1;
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if toggle_button(ui, edited.reversed, language.label(Label::Reverse))
+                            .clicked()
+                        {
+                            edited.reversed = !edited.reversed;
+                        }
+                    });
                 });
-            });
+            })
         });
 
     let side = match which {
@@ -509,40 +693,54 @@ fn body(
     language: Language,
 ) {
     let palette = Palette::of(ui.painter());
+    let inner = ui.available_size() - egui::vec2(2.0 * EDGE, 2.0 * BODY_PADDING);
+    // The schematic takes the share of the width it has in the design; the pairs the rest.
+    let schematic_width = ((inner.x - BODY_GAP) * SCHEMATIC_SHARE).round();
+    let pairs_width = inner.x - BODY_GAP - schematic_width;
+    let column = |ui: &mut egui::Ui, width: f32, add: &mut dyn FnMut(&mut egui::Ui)| {
+        ui.allocate_ui_with_layout(
+            egui::vec2(width, inner.y),
+            egui::Layout::top_down(egui::Align::Min),
+            |ui| {
+                ui.set_width(width);
+                ui.set_height(inner.y);
+                ui.spacing_mut().item_spacing.y = COLUMN_GAP;
+                add(ui);
+            },
+        );
+    };
     egui::Frame::new()
-        .inner_margin(egui::Margin::symmetric(EDGE as i8, 14))
+        .inner_margin(egui::Margin::symmetric(EDGE as i8, BODY_PADDING as i8))
         .show(ui, |ui| {
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing.x = BODY_GAP;
-                ui.allocate_ui_with_layout(
-                    egui::vec2(SCHEMATIC_WIDTH, 0.0),
-                    egui::Layout::top_down(egui::Align::Min),
-                    |ui| {
-                        ui.set_width(SCHEMATIC_WIDTH);
-                        ui.spacing_mut().item_spacing.y = 10.0;
-                        ui.horizontal(|ui| {
-                            section_title(ui, language.label(Label::LinkSchematic));
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| legend(ui, language),
-                            );
+                column(ui, schematic_width, &mut |ui| {
+                    title_row(ui, |ui| {
+                        section_title(ui, language.label(Label::LinkSchematic));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            legend(ui, language)
                         });
-                        let size = egui::vec2(SCHEMATIC_WIDTH, SCHEMATIC_HEIGHT);
-                        if let Some(click) =
-                            schematic(ui, size, pairs, draft.link.offset, draft.pending_a)
-                        {
-                            apply_click(draft, click);
-                        }
-                        ui.label(
-                            egui::RichText::new(language.label(Label::LinkHint))
-                                .size(LABEL_TEXT)
-                                .color(palette.text.muted),
+                    });
+                    let height = (inner.y - 2.0 * TITLE_ROW_HEIGHT - 2.0 * COLUMN_GAP).max(120.0);
+                    let size = egui::vec2(schematic_width, height);
+                    if let Some(click) =
+                        schematic(ui, size, pairs, draft.link.offset, draft.pending_a)
+                    {
+                        apply_click(draft, click);
+                    }
+                    title_row(ui, |ui| {
+                        ui.add(
+                            egui::Label::new(
+                                egui::RichText::new(language.label(Label::LinkHint))
+                                    .size(LABEL_TEXT)
+                                    .color(palette.text.muted),
+                            )
+                            .truncate(),
                         );
-                    },
-                );
-                ui.vertical(|ui| {
-                    ui.spacing_mut().item_spacing.y = 10.0;
-                    ui.horizontal(|ui| {
+                    });
+                });
+                column(ui, pairs_width, &mut |ui| {
+                    title_row(ui, |ui| {
                         section_title(ui, language.label(Label::HolePairs));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             ui.label(
@@ -554,11 +752,25 @@ fn body(
                             );
                         });
                     });
-                    table::pair_table(ui, pairs, units, language);
+                    let height =
+                        (inner.y - TITLE_ROW_HEIGHT - SUMMARY_HEIGHT - 2.0 * COLUMN_GAP).max(80.0);
+                    table::pair_table(ui, pairs, height, units, language);
                     summary(ui, pairs, units, language);
                 });
             });
         });
+}
+
+/// A row of a fixed height, so that the columns' heights add up.
+fn title_row(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui)) {
+    ui.allocate_ui_with_layout(
+        egui::vec2(ui.available_width(), TITLE_ROW_HEIGHT),
+        egui::Layout::left_to_right(egui::Align::Center),
+        |ui| {
+            ui.set_height(TITLE_ROW_HEIGHT);
+            add(ui);
+        },
+    );
 }
 
 /// A click on a hole of the schematic: A waits for B, B makes the manual pair, Alt removes one.
@@ -625,23 +837,27 @@ fn summary(ui: &mut egui::Ui, pairs: &LinkPairs, units: Units, language: Languag
                 .corner_radius(6)
                 .inner_margin(egui::Margin::symmetric(10, 8))
                 .show(ui, |ui| {
-                    ui.set_width(width - 20.0);
-                    ui.spacing_mut().item_spacing.y = 2.0;
-                    ui.add(
-                        egui::Label::new(
-                            egui::RichText::new(title)
-                                .size(SMALL_TEXT)
-                                .color(palette.text.muted),
-                        )
-                        .truncate(),
-                    );
-                    ui.label(
-                        egui::RichText::new(value)
-                            .monospace()
-                            .size(14.0)
-                            .strong()
-                            .color(color),
-                    );
+                    ui.vertical(|ui| {
+                        // The margins and the 1 px border on each side.
+                        ui.set_width(width - 22.0);
+                        ui.set_height(SUMMARY_HEIGHT - 18.0);
+                        ui.spacing_mut().item_spacing.y = 2.0;
+                        ui.add(
+                            egui::Label::new(
+                                egui::RichText::new(title)
+                                    .size(SMALL_TEXT)
+                                    .color(palette.text.muted),
+                            )
+                            .truncate(),
+                        );
+                        ui.label(
+                            egui::RichText::new(value)
+                                .monospace()
+                                .size(14.0)
+                                .strong()
+                                .color(color),
+                        );
+                    })
                 });
         }
     });

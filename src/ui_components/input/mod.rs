@@ -106,7 +106,9 @@ impl Field {
     }
 }
 
-/// Shows `edit` without a frame, vertically centered in `rect`.
+/// Shows `edit` without a frame, vertically centered in `rect`. The field has already allocated
+/// its space, so the edit goes in a child that leaves the parent's cursor where the field put
+/// it; a scope would move it back to the end of `rect`, under the field's stepper or icon.
 fn show_edit(
     ui: &mut egui::Ui,
     rect: egui::Rect,
@@ -116,13 +118,12 @@ fn show_edit(
         .frame(false)
         .margin(egui::Margin::ZERO)
         .desired_width(rect.width());
-    ui.scope_builder(
+    let mut child = ui.new_child(
         egui::UiBuilder::new()
             .max_rect(rect)
             .layout(egui::Layout::left_to_right(egui::Align::Center)),
-        |ui| edit.show(ui),
-    )
-    .inner
+    );
+    edit.show(&mut child)
 }
 
 /// Whether the field was left with Esc; the key is then consumed, so that a dialog around the

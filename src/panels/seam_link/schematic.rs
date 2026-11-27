@@ -10,10 +10,14 @@ use std::collections::HashSet;
 /// Beside the rows, for the A and B letters and the direction arrows.
 const LEFT_MARGIN: f32 = 32.0;
 const RIGHT_MARGIN: f32 = 28.0;
-const ROW_GAP: f32 = 100.0;
+/// The gap between the rows: 100 px in the design's 292 px tall box, and its share of a taller one.
+const MIN_ROW_GAP: f32 = 100.0;
+const ROW_GAP_SHARE: f32 = 0.34;
 const HOLE_RADIUS: f32 = 5.0;
-/// Holes closer than this are thinned out to every n-th one.
-const MIN_HOLE_SPACING: f32 = 6.0;
+/// Holes closer than this are thinned out to every 2nd, 5th, 10th… one.
+const MIN_HOLE_SPACING: f32 = 24.0;
+/// Shown holes never come closer than this, so that their diamonds don't overlap.
+const MIN_HOLE_GAP: f32 = 2.4 * HOLE_RADIUS;
 const NUMBER_GAP: f32 = 16.0;
 const MIN_NUMBER_SPACING: f32 = 18.0;
 const NUMBER_SIZE: f32 = 10.0;
@@ -101,9 +105,10 @@ pub(super) fn schematic(
 
     let left = rect.left() + LEFT_MARGIN;
     let right = rect.right() - RIGHT_MARGIN;
-    let y_a = rect.center().y - ROW_GAP / 2.0;
-    let y_b = rect.center().y + ROW_GAP / 2.0;
-    let rows = layout_rows(pairs, offset, left, right, (y_a, y_b), pending_a);
+    let row_gap = (rect.height() * ROW_GAP_SHARE).max(MIN_ROW_GAP);
+    let y_a = rect.center().y - row_gap / 2.0;
+    let y_b = rect.center().y + row_gap / 2.0;
+    let (rows, rows_stride) = layout_rows(pairs, offset, left, right, (y_a, y_b), pending_a);
 
     for row in &rows {
         dashed_guide(&painter, left - 8.0, right + 4.0, row.y, paint.guide);
@@ -127,9 +132,9 @@ pub(super) fn schematic(
     }
     let [row_a, row_b] = &rows;
 
-    // The lines go under the holes.
+    // The lines of the holes of A that show, under the holes.
     for pair in &pairs.pairs {
-        if !row_a.shown.contains(&pair.a) && !row_b.shown.contains(&pair.b) {
+        if !row_a.shown.contains(&pair.a) {
             continue;
         }
         let (Some(x_a), Some(x_b)) = (row_a.x_of(pair.a), row_b.x_of(pair.b)) else {
@@ -152,6 +157,7 @@ pub(super) fn schematic(
     let hovered = response
         .hover_pos()
         .and_then(|pointer| hole_under(&rows, pointer));
+    let label_step = rows_stride.max(5);
     for row in &rows {
         let mut last_number = f32::NEG_INFINITY;
         let count = row.holes.len();
@@ -173,10 +179,10 @@ pub(super) fn schematic(
             };
             paint_diamond(&painter, egui::pos2(x, row.y), radius, Some(fill), color);
 
-            // The ends, every fifth hole and the holes without a pair are numbered.
+            // The ends, every fifth (or n-th) hole and the holes without a pair are numbered.
             let numbered = position == 0
                 || position + 1 == count
-                || (hole + 1) % 5 == 0
+                || (position + 1) % label_step == 0
                 || state == HoleState::Free;
             if numbered && x - last_number >= MIN_NUMBER_SPACING {
                 last_number = x;
@@ -228,7 +234,7 @@ fn layout_rows(
     right: f32,
     (y_a, y_b): (f32, f32),
     pending_a: Option<usize>,
-) -> [Row; 2] {
+) -> ([Row; 2], usize) {
     let distance = |distances: &[Option<f64>], hole: usize| {
         distances.get(hole).copied().flatten().unwrap_or(0.0)
     };
@@ -273,11 +279,7 @@ fn layout_rows(
     let free_b: HashSet<usize> = pairs.free_b.iter().copied().collect();
     let longest = pairs.sequence_a.len().max(pairs.sequence_b.len()).max(1);
     let spacing = width / longest as f32;
-    let stride = if spacing < MIN_HOLE_SPACING {
-        (MIN_HOLE_SPACING / spacing).ceil() as usize
-    } else {
-        1
-    };
+    let stride = stride(spacing);
 
     let row = |side: Side,
                y: f32,
@@ -298,18 +300,42 @@ fn layout_rows(
             .iter()
             .map(|&hole| (hole, to_x(place(hole)), state(hole)))
             .collect();
-        // Thinned out to every n-th hole, keeping the ends and every hole that stands out.
-        let shown = holes
+        // The ends, manual pairs and the hole waiting for its pair always show; then the
+        // unpaired holes and every n-th hole, where they leave room.
+        let last = holes.len().saturating_sub(1);
+        let must = |position: usize, hole: usize, state: HoleState| {
+            position == 0
+                || position == last
+                || state == HoleState::Manual
+                || (side == Side::A && pending_a == Some(hole))
+        };
+        let mut kept: Vec<(usize, f32)> = holes
+            .iter()
+            .enumerate()
+            .filter(|&(position, &(hole, _, state))| must(position, hole, state))
+            .map(|(_, &(hole, x, _))| (hole, x))
+            .collect();
+        let candidates = holes
             .iter()
             .enumerate()
             .filter(|&(position, &(hole, _, state))| {
-                position % stride == 0
-                    || position + 1 == holes.len()
-                    || state != HoleState::Auto
-                    || (side == Side::A && pending_a == Some(hole))
-            })
-            .map(|(_, &(hole, ..))| hole)
-            .collect();
+                !must(position, hole, state) && state == HoleState::Free
+            });
+        let regular = holes
+            .iter()
+            .enumerate()
+            .filter(|&(position, &(_, _, state))| {
+                state == HoleState::Auto && (position + 1) % stride == 0
+            });
+        // Unpaired holes only need room for their diamonds; every n-th hole keeps its spacing.
+        let candidates = candidates.map(|item| (item, MIN_HOLE_GAP));
+        let regular = regular.map(|item| (item, MIN_HOLE_SPACING * 0.75));
+        for ((_, &(hole, x, _)), gap) in candidates.chain(regular) {
+            if kept.iter().all(|&(_, other)| (other - x).abs() >= gap) {
+                kept.push((hole, x));
+            }
+        }
+        let shown = kept.into_iter().map(|(hole, _)| hole).collect();
         Row {
             side,
             y,
@@ -317,7 +343,7 @@ fn layout_rows(
             shown,
         }
     };
-    [
+    let rows = [
         row(
             Side::A,
             y_a,
@@ -334,7 +360,24 @@ fn layout_rows(
             &manual_b,
             &free_b,
         ),
-    ]
+    ];
+    (rows, stride)
+}
+
+/// Every how many holes one shows when they are `spacing` apart: 1, 2, 5, 10, 20, 50…
+fn stride(spacing: f32) -> usize {
+    let mut stride = 1;
+    for factor in [2, 5, 2].into_iter().cycle() {
+        if spacing * stride as f32 >= MIN_HOLE_SPACING || stride > 100_000 {
+            break;
+        }
+        stride = if factor == 5 {
+            stride / 2 * 5
+        } else {
+            stride * 2
+        };
+    }
+    stride
 }
 
 fn dashed_guide(painter: &egui::Painter, from: f32, to: f32, y: f32, color: egui::Color32) {
