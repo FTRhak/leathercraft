@@ -1,6 +1,7 @@
 use super::drag::{begin_drag, begin_handle_drag, finish_drag, update_drag};
 use super::drag_state_struct::ShapeRef;
 use super::grid::draw_grid;
+use super::ruler;
 use super::{EditorState, ShapeDraft, ShapePart, format_length, send};
 use crate::document::ProjectMessage;
 use crate::panels::snap;
@@ -71,6 +72,14 @@ pub(super) fn canvas(
     let (response, painter) =
         ui.allocate_painter(ui.available_size(), egui::Sense::click_and_drag());
     let rect = response.rect;
+    // The rulers sit above the canvas and catch the pointer, so it doesn't draw or pan under them.
+    for (index, strip) in ruler::strips(rect).into_iter().enumerate() {
+        ui.interact(
+            strip,
+            ui.id().with(("ruler", index)),
+            egui::Sense::click_and_drag(),
+        );
+    }
 
     if let Some(request) = state.zoom_request.take() {
         let bounds = match request {
@@ -156,8 +165,10 @@ pub(super) fn canvas(
     }
     draw_shape_draft(&painter, view, project.units, state);
     draw_snap_feedback(&painter, view, state);
-    show_view_controls(ui, rect, state);
-    snap::show(ui, rect, &mut state.snap, snap_hotkey, state.language);
+    ruler::draw_rulers(&painter, rect, view, project.units, state.cursor);
+    let content = ruler::content_rect(rect);
+    show_view_controls(ui, content, state);
+    snap::show(ui, content, &mut state.snap, snap_hotkey, state.language);
     let pointer_down = ui.input(|input| input.pointer.any_down());
     state.save_snap_when_settled(pointer_down);
 }

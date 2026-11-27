@@ -33,6 +33,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
 | `src/editor/drag.rs` | 309 | 2,100 | bin | `begin_drag`, `begin_handle_drag`, `snap_setup` (what a drag snaps to), `update_drag` (snapped offset or handle; stops before a stitch line leaves its piece), `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
 | `src/editor/grid.rs` | 73 | 600 | bin | `draw_grid`: canvas grid and axes, grid steps; `draw_snap_dots`: the snap grid |
+| `src/editor/ruler.rs` | 215 | 1,900 | bin | The canvas rulers (from the design's "Ruler Top", "Ruler Left" and "Ruler Corner"): `RULER_SIZE` (20 px), `strips` (top and left, which `canvas` covers with interact areas so the pointer doesn't draw under them), `content_rect` (the area the view and snap controls are placed in), `draw_rulers`; numbered ticks every 1, 2 or 5 × 10ⁿ display units (`label_step`, at least 64 px apart), ten ticks between them with every second one longer, numbers in the project's units (`format_label`), the left ones turned to read upwards, the cursor marked in the accent; tests |
 | `src/editor/ui.rs` | 562 | 5,000 | bin | `editor_ui` (menu bar, tool bar, status bar, dock area), `show_status_bar`, `selection_summary`, `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
 | `src/editor/panel_viewer.rs` | 192 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the Properties, Align, Layout and History tab titles have icons, built by `TabDecor`, which also decorates each tab button; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/ui_components/icons/mod.rs` | 105 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_font_id` (the font for glyphs laid out with text); shared `icon_button` (no caller at the moment, `#[allow(dead_code)]`) |
@@ -64,6 +65,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/ui_components/dock/style.rs` | 187 | 1,500 | bin | The dock look from the Brilliant `DockTab` component: `dock_style` (the `egui_dock::Style` of the current theme), `TabDecor` (tab titles with the icon colored by state; the accent line on the open tab and the divider right of inactive ones, painted from `on_tab_button`) |
 | `src/ui_components/palette/mod.rs` | 166 | 1,050 | bin | `Palette` (`DARK`, `LIGHT`, `of` and `of_visuals`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge, `dimension`) and one field per color group, each group in its own submodule with its `DARK` and `LIGHT` values; `hex` and `hex_opt` (`0xRRGGBB` to `Color32`); re-exports the component paint types; `layout` is the Layout panel's group; used by `canvas`, `grid`, `button`, `tabs`, `dropdown`, `input`, `checkbox`, `radio`, `group_button`, `list`, `title_bar`, `status_bar`, `tool_button`, `align_button`, the Properties panel and the Layout panel |
 | `src/ui_components/palette/dimension.rs` | 28 | 250 | bin | `DimensionColors`: the canvas dimension lines (line and ticks, label plate, label text); light values derived |
+| `src/ui_components/palette/ruler.rs` | 36 | 300 | bin | `RulerColors`: the canvas rulers (background, border, ticks, numbers, cursor mark); light values derived |
 | `src/ui_components/palette/surfaces.rs` | 43 | 250 | bin | `Surfaces`: backgrounds from the canvas to chips |
 | `src/ui_components/palette/borders.rs` | 35 | 200 | bin | `Borders`: divider, panel, control, field and chip lines |
 | `src/ui_components/palette/text.rs` | 43 | 280 | bin | `TextColors`: seven steps of text brightness, including the panel group titles |
@@ -394,7 +396,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 144 tests inline in the library crate, plus 4 in the binary (`settings::hotkeys`, run with `cargo test --bin leathercraft`, which compiles Bevy):
+There are 144 tests inline in the library crate, plus 6 in the binary (`settings::hotkeys` and `editor::ruler`, run with `cargo test --bin leathercraft`, which compiles Bevy):
 
 | Module | Tests |
 |---|---:|

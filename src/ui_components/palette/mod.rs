@@ -17,6 +17,7 @@ mod input;
 mod layout;
 mod list;
 mod properties;
+mod ruler;
 mod snap;
 mod status;
 mod status_bar;
@@ -32,6 +33,7 @@ use bevy_egui::egui::{self, Color32};
 use accent::AccentColors;
 use borders::Borders;
 use dimension::DimensionColors;
+use ruler::RulerColors;
 use status::StatusColors;
 use surfaces::Surfaces;
 use text::TextColors;
@@ -73,6 +75,8 @@ pub(crate) struct Palette {
     pub(crate) edge: Color32,
     /// The dimension lines around the selection.
     pub(crate) dimension: DimensionColors,
+    /// The rulers along the top and left edges of the canvas.
+    pub(crate) ruler: RulerColors,
 
     pub(crate) surface: Surfaces,
     pub(crate) border: Borders,
@@ -121,6 +125,7 @@ impl Palette {
         centerline: hex(0x78C3D7),
         edge: hex(0xFAD75A),
         dimension: DimensionColors::DARK,
+        ruler: RulerColors::DARK,
         surface: Surfaces::DARK,
         border: Borders::DARK,
         text: TextColors::DARK,
@@ -153,6 +158,7 @@ impl Palette {
         centerline: hex(0x1E82A5),
         edge: hex(0xC89100),
         dimension: DimensionColors::LIGHT,
+        ruler: RulerColors::LIGHT,
         surface: Surfaces::LIGHT,
         border: Borders::LIGHT,
         text: TextColors::LIGHT,

@@ -5,6 +5,7 @@ mod drag_state_struct;
 mod editor_state_struct;
 mod grid;
 mod panel_viewer;
+mod ruler;
 mod shape_draft_struct;
 mod ui;
 mod window_chrome;
