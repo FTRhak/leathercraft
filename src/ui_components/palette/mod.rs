@@ -23,6 +23,7 @@ mod tabs;
 mod text;
 mod title_bar;
 mod toolbar;
+mod view_controls;
 
 use bevy_egui::egui::{self, Color32};
 
@@ -46,6 +47,7 @@ pub(crate) use status_bar::StatusBarColors;
 pub(crate) use tabs::{TabColors, TabPaint};
 pub(crate) use title_bar::{ModePaint, ModeSwitchColors, TitleBarColors};
 pub(crate) use toolbar::{ToolButtonColors, ToolButtonPaint, ToolbarColors};
+pub(crate) use view_controls::{ViewButtonPaint, ViewControlsColors};
 
 /// The colors of one theme, picked with [`Palette::of`].
 ///
@@ -85,6 +87,7 @@ pub(crate) struct Palette {
     pub(crate) title_bar: TitleBarColors,
     pub(crate) status_bar: StatusBarColors,
     pub(crate) toolbar: ToolbarColors,
+    pub(crate) view_controls: ViewControlsColors,
 }
 
 /// A color written as `0xRRGGBB`.
@@ -129,6 +132,7 @@ impl Palette {
         title_bar: TitleBarColors::DARK,
         status_bar: StatusBarColors::DARK,
         toolbar: ToolbarColors::DARK,
+        view_controls: ViewControlsColors::DARK,
     };
     const LIGHT: Self = Self {
         grid_line: hex(0xE6E8EC),
@@ -158,6 +162,7 @@ impl Palette {
         title_bar: TitleBarColors::LIGHT,
         status_bar: StatusBarColors::LIGHT,
         toolbar: ToolbarColors::LIGHT,
+        view_controls: ViewControlsColors::LIGHT,
     };
 
     /// The palette of the current theme, from `visuals.dark_mode`.

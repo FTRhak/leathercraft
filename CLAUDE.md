@@ -15,7 +15,8 @@ Local Brilliant project `leathercraft-design/` (canvas `main.bl`), open in the B
 ## Commands
 
 ```sh
-cargo run                                   # desktop app (default `desktop` + `dynamic_linking` features)
+cargo run                                   # desktop app (default `desktop` feature, Bevy linked statically)
+cargo dev                                   # same with `dynamic_linking`: faster relinks, blocked by Smart App Control
 cargo release                               # static release build to ship (alias in .cargo/config.toml)
 cargo check --bin leathercraft              # type-check the desktop binary
 cargo test --lib --no-default-features      # core tests, without compiling Bevy
@@ -24,7 +25,7 @@ cargo fmt
 cargo clippy
 ```
 
-In dev builds Bevy is linked dynamically (`bevy_dylib` DLL plus Rust's `std` DLL), so the debug exe only runs through `cargo run`, which puts those DLLs on `PATH`. Builds to ship must use `cargo release`.
+By default Bevy is linked statically, so the exe needs no extra DLLs. `dynamic_linking` is opt-in (`cargo dev`): it builds Bevy into a `bevy_dylib` DLL that loads alongside Rust's `std` DLL, and the exe then only runs through cargo, which puts those DLLs on `PATH`. Windows Smart App Control blocks these unsigned DLLs ("Smart App Control has blocked part of this app"), so use `cargo dev` only where it is off. Builds to ship must use `cargo release`.
 
 All existing tests are inline `#[cfg(test)]` modules in the library crate, so `--no-default-features` covers them.
 

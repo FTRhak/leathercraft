@@ -14,11 +14,12 @@ path = "src/main.rs"
 required-features = ["desktop"]
 
 [features]
-default = ["desktop", "dynamic_linking"]
+default = ["desktop"]
 desktop = ["dep:bevy", "dep:bevy_egui", "dep:dirs", "dep:earcutr", "dep:egui_dock", "dep:rfd", "dep:sys-locale"]
 # Builds Bevy and its dependencies once into a separate `bevy_dylib` library, so
-# a change to our code relinks only the small executable. For development only:
-# a release build omits it (see the `release` alias in `.cargo/config.toml`).
+# a change to our code relinks only the small executable. Opt-in (`cargo dev`,
+# see `.cargo/config.toml`): Windows Smart App Control blocks the unsigned
+# `bevy_dylib` and `std` DLLs this produces, so the default build is static.
 dynamic_linking = ["desktop", "bevy/dynamic_linking"]
 
 [dependencies]

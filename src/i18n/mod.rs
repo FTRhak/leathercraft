@@ -165,6 +165,12 @@ pub enum Label {
     ToggleSnap,
     ZoomToFit,
     ZoomToSelection,
+    /// The label of the Zoom to selection button of the canvas view controls.
+    FitSelection,
+    ZoomIn,
+    ZoomOut,
+    /// The tooltip of the zoom percentage, which sets the actual size when clicked.
+    ZoomActualSize,
     DisplayUnits,
     /// The title of the hint box at the top of the Properties panel.
     CanvasControls,

@@ -5,11 +5,12 @@ use super::{EditorState, ShapeDraft, ShapePart, format_length, send};
 use crate::document::ProjectMessage;
 use crate::panels::tools::{Tool, ZoomRequest};
 use crate::ui_components::palette::Palette;
+use crate::ui_components::view_controls::{self, ViewCommand, ViewControls};
 use bevy::prelude::*;
 use bevy_egui::egui;
 use earcutr::earcut;
 use leathercraft::events::ProjectEvent;
-use leathercraft::i18n::{Language, Message};
+use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{BooleanOp, Bounds, PatternPiece, Point, Project, Units};
 use leathercraft::shapes::{
     Ellipse, HoleKind, Line, Polygon, Rectangle, RegularPolygon, Shape, StitchLine,
@@ -152,6 +153,60 @@ pub(super) fn canvas(
     }
     draw_shape_draft(&painter, view, project.units, state);
     draw_snap_feedback(&painter, view, state);
+    show_view_controls(ui, rect, state);
+}
+
+/// Screen points per mm at the actual size, 100%: egui points are 1/96 inch.
+const ACTUAL_SIZE_ZOOM: f32 = 96.0 / 25.4;
+/// The zoom levels, in percent, that Zoom in and Zoom out step through.
+const ZOOM_LEVELS: [f32; 19] = [
+    2.0, 5.0, 10.0, 15.0, 25.0, 33.0, 50.0, 67.0, 75.0, 100.0, 125.0, 150.0, 200.0, 300.0, 400.0,
+    600.0, 800.0, 1200.0, 1600.0,
+];
+
+/// The zoom panel in the corner of the canvas; its commands take effect on the next frame.
+fn show_view_controls(ui: &mut egui::Ui, rect: egui::Rect, state: &mut EditorState) {
+    let language = state.language;
+    let zoom_percent = state.zoom / ACTUAL_SIZE_ZOOM * 100.0;
+    let controls = ViewControls {
+        zoom_percent,
+        can_fit_selection: state.selected.is_some(),
+        zoom_out: language.label(Label::ZoomOut),
+        zoom_in: language.label(Label::ZoomIn),
+        actual_size: language.label(Label::ZoomActualSize),
+        fit_all: language.label(Label::ZoomToFit),
+        fit_selection: language.label(Label::FitSelection),
+        fit_selection_tooltip: language.label(Label::ZoomToSelection),
+    };
+    let Some(command) = view_controls::show(ui, rect, &controls) else {
+        return;
+    };
+    let percent = match command {
+        ViewCommand::FitAll => {
+            state.zoom_request = Some(ZoomRequest::All);
+            return;
+        }
+        ViewCommand::FitSelection => {
+            state.zoom_request = Some(ZoomRequest::Selection);
+            return;
+        }
+        ViewCommand::ActualSize => 100.0,
+        // The next level past the current zoom, with some slack so a zoom that is already on a
+        // level moves on to the next one.
+        ViewCommand::ZoomIn => ZOOM_LEVELS
+            .into_iter()
+            .find(|level| *level > zoom_percent * 1.01)
+            .unwrap_or(zoom_percent * 1.25),
+        ViewCommand::ZoomOut => ZOOM_LEVELS
+            .into_iter()
+            .rev()
+            .find(|level| *level < zoom_percent * 0.99)
+            .unwrap_or(zoom_percent / 1.25),
+    };
+    let zoom = (percent / 100.0 * ACTUAL_SIZE_ZOOM).clamp(MIN_ZOOM, MAX_ZOOM);
+    // Keeps the world point at the center of the canvas in place.
+    state.pan *= zoom / state.zoom;
+    state.zoom = zoom;
 }
 
 /// What a drawing tool snaps to. A shape that becomes a child of the selected piece snaps only

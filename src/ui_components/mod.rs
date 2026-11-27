@@ -15,3 +15,4 @@ pub mod status_bar;
 pub mod tabs;
 pub mod title_bar;
 pub mod tool_button;
+pub mod view_controls;

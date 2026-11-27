@@ -18,8 +18,6 @@ const GROUP_GAP: f32 = 8.0;
 /// Between the buttons of one group.
 const BUTTON_GAP: f32 = 4.0;
 const DIVIDER_HEIGHT: f32 = 22.0;
-/// The width of the zoom buttons at the end of the bar.
-const ZOOM_GROUP_WIDTH: f32 = 2.0 * 32.0 + BUTTON_GAP;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Tool {
@@ -174,46 +172,16 @@ pub struct ToolSettings<'a> {
     pub stitch: &'a mut StitchSettings,
     /// Whether a piece is selected; the tools that need one are disabled otherwise.
     pub piece_selected: bool,
-    /// Set when a zoom button is clicked.
-    pub zoom_request: &'a mut Option<ZoomRequest>,
 }
 
-/// What the canvas zooms to on its next frame.
+/// What the canvas zooms to on its next frame, asked for by the view controls on the canvas or
+/// by opening a project.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ZoomRequest {
     /// Every piece.
     All,
     /// The selected children, or else the selected pieces.
     Selection,
-}
-
-/// Paints corner brackets around a small filled square, the icon of Zoom to selection.
-fn paint_fit_selection_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
-    paint_fit_icon(painter, rect, stroke);
-    let square =
-        egui::Rect::from_center_size(rect.center(), egui::Vec2::splat(rect.width() * 0.26));
-    painter.rect_filled(square, 1.0, stroke.color);
-}
-
-/// Paints four corner brackets, the icon of Zoom to fit.
-fn paint_fit_icon(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
-    let frame = rect.shrink(rect.width() * 0.14);
-    let arm = frame.width() * 0.35;
-    for (corner, dx, dy) in [
-        (frame.left_top(), arm, arm),
-        (frame.right_top(), -arm, arm),
-        (frame.left_bottom(), arm, -arm),
-        (frame.right_bottom(), -arm, -arm),
-    ] {
-        painter.line(
-            vec![
-                corner + egui::vec2(dx, 0.0),
-                corner,
-                corner + egui::vec2(0.0, dy),
-            ],
-            stroke,
-        );
-    }
 }
 
 /// The short vertical line between two groups of tools.
@@ -228,8 +196,9 @@ fn divider(ui: &mut egui::Ui) {
 
 /// The tool bar under the title bar, from the "CAD Toolbar" of the design: the selection and
 /// drawing tools, the shape tools, the tools named by their mark (edge, stitch holes,
-/// centerline), the new-piece and operation modes, and the settings of the current tool; then
-/// Zoom to fit and Zoom to selection at the far end. It scrolls when the window is narrow, and
+/// centerline), the new-piece and operation modes, and the settings of the current tool. The
+/// zoom buttons are on the canvas, in `ui_components::view_controls`. It scrolls when the window
+/// is narrow, and
 /// is disabled rather than hidden when `enabled` is false, so the layout doesn't jump.
 pub fn show_toolbar(
     ctx: &egui::Context,
@@ -286,7 +255,6 @@ fn toolbar_contents(
         line_style,
         stitch,
         piece_selected,
-        zoom_request,
     } = settings;
     if tool.needs_piece() && !piece_selected {
         *tool = Tool::Select;
@@ -365,27 +333,5 @@ fn toolbar_contents(
             );
         }
         _ => {}
-    }
-
-    // Pushes the zoom buttons to the far end while there is room; past that they follow the
-    // rest and the bar scrolls.
-    let room = ui.available_width() - ZOOM_GROUP_WIDTH - BUTTON_GAP;
-    if room > 0.0 {
-        ui.add_space(room);
-    } else {
-        divider(ui);
-    }
-    {
-        let fit = ToolButton::icon(paint_fit_icon, language.label(Label::ZoomToFit));
-        if ui.add(fit).clicked() {
-            *zoom_request = Some(ZoomRequest::All);
-        }
-        let fit_selection = ToolButton::icon(
-            paint_fit_selection_icon,
-            language.label(Label::ZoomToSelection),
-        );
-        if ui.add_enabled(piece_selected, fit_selection).clicked() {
-            *zoom_request = Some(ZoomRequest::Selection);
-        }
     }
 }

@@ -3,5 +3,8 @@
 linker = "rust-lld.exe"
 
 [alias]
+# Fast-relinking dev run with Bevy as a separate DLL. Only works where Windows
+# Smart App Control is off: it blocks the unsigned `bevy_dylib` and `std` DLLs.
+dev = "run --features dynamic_linking"
 # Self-contained release build: Bevy linked statically, no extra DLLs to ship.
 release = "build --release --no-default-features --features desktop"
