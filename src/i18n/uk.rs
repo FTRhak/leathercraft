@@ -5,6 +5,7 @@ use crate::material::{
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
 };
 use crate::model::{BooleanOp, Units};
+use crate::sewing::{Assembly, MAX_LOCK_HOLES, MAX_OVERLAP_MM, MIN_OVERLAP_MM, StitchMethod};
 use crate::shapes::{HoleKind, MAX_HOLE_MM, MAX_PITCH_MM, MIN_HOLE_MM, MIN_PITCH_MM};
 
 pub(super) fn label(label: Label) -> &'static str {
@@ -235,6 +236,46 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::EditLink => "Змінити",
         Label::RemoveLink => "Видалити",
         Label::SeamLinkStale => "Шов скоротився: частина діапазону без отворів",
+        Label::StitchMethodTitle => "Спосіб зшивання",
+        Label::StitchMethod(method) => match method {
+            StitchMethod::Saddle => "Сідельний",
+            StitchMethod::Running => "Уперед",
+            StitchMethod::Baseball => "Бейсбольний",
+            StitchMethod::Whip => "Через край",
+            StitchMethod::Cross => "Хрестовий",
+        },
+        Label::StitchMethodNote(method) => match method {
+            StitchMethod::Saddle => "2 голки",
+            StitchMethod::Running => "1 голка",
+            StitchMethod::Baseball => "встик",
+            StitchMethod::Whip => "по краю",
+            StitchMethod::Cross => "декор",
+        },
+        Label::StitchMethodHint(method) => match method {
+            StitchMethod::Saddle => "Найміцніший, не розпускається",
+            StitchMethod::Running => "Швидкий, але розпускається від обриву",
+            StitchMethod::Baseball => "Лягає пласко на краї встик",
+            StitchMethod::Whip => "Обвиває край",
+            StitchMethod::Cross => "Хрестики між двома рядами",
+        },
+        Label::AssemblyTitle => "Складання деталей",
+        Label::Assembly(assembly) => match assembly {
+            Assembly::FleshToFlesh => "Виворотами",
+            Assembly::Lapped => "Внакладку",
+            Assembly::Butted => "Встик",
+            Assembly::Turned => "Вивертний",
+            Assembly::Folded => "Зі згином",
+        },
+        Label::AssemblyNote(assembly) => match assembly {
+            Assembly::FleshToFlesh => "краї врівень",
+            Assembly::Lapped => "з напуском",
+            Assembly::Butted => "торці разом",
+            Assembly::Turned => "шов усередині",
+            Assembly::Folded => "одна деталь",
+        },
+        Label::LockHoles => "Закріпка",
+        Label::Overlap => "Напуск",
+        Label::OnTop => "Зверху",
     }
 }
 
@@ -704,6 +745,32 @@ pub(super) fn message(message: &Message) -> String {
         }
         Message::FreeIn { side: Some(side) } => format!("Без пари у {side}"),
         Message::FreeIn { side: None } => "Без пари".to_owned(),
+        Message::LockHolesOutOfRange => {
+            format!("Шов закріплюється щонайбільше на {MAX_LOCK_HOLES} отворів з кожного кінця.")
+        }
+        Message::OverlapOutOfRange => format!(
+            "Напуск шва внакладку має бути від {} до {} мм.",
+            decimal(MIN_OVERLAP_MM),
+            decimal(MAX_OVERLAP_MM)
+        ),
+        Message::AssemblyHint {
+            assembly,
+            top,
+            under,
+        } => match assembly {
+            Assembly::FleshToFlesh => format!("{top} на {under}, краї врівень"),
+            Assembly::Lapped => format!("Край {top} лягає на {under}"),
+            Assembly::Butted => "Краї сходяться в одній площині".to_owned(),
+            Assembly::Turned => format!("Лицем до лиця, {top} на {under}, потім вивернути"),
+            Assembly::Folded => "Деталь згинається на себе".to_owned(),
+        },
+        Message::ThreadEstimate {
+            length,
+            factor_tenths,
+        } => format!(
+            "Нитка ≈ {length} · {} × довжини шва",
+            decimal(f64::from(*factor_tenths) / 10.0)
+        ),
         Message::SeamLinkRow { other, pairs } => {
             let noun = plural(*pairs, "пара", "пари", "пар");
             format!("{other} · {pairs} {noun}")

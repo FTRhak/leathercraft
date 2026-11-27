@@ -8,5 +8,6 @@ pub mod material;
 pub mod model;
 pub mod persistence;
 pub mod seams;
+pub mod sewing;
 pub mod shapes;
 pub mod snap;

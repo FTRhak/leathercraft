@@ -6,6 +6,7 @@
 //! every frame, so that a pitch fitted from the warning shows at once.
 
 mod schematic;
+mod sewing;
 mod table;
 
 use crate::editor::format_length;
@@ -23,12 +24,13 @@ use leathercraft::model::{Project, Units};
 use leathercraft::seams::{
     LinkPairs, ManualPair, SeamLink, SeamSide, stitch_line, stitch_lines, stitch_number,
 };
+use leathercraft::sewing::Sewing;
 use leathercraft::shapes::{Shape, StitchLine};
 use schematic::{Side, schematic};
 
 /// The design's size, and the smallest size the cards and the body still fit in.
-const DEFAULT_SIZE: egui::Vec2 = egui::vec2(1000.0, 700.0);
-const MIN_SIZE: egui::Vec2 = egui::vec2(860.0, 600.0);
+const DEFAULT_SIZE: egui::Vec2 = egui::vec2(1000.0, 812.0);
+const MIN_SIZE: egui::Vec2 = egui::vec2(860.0, 712.0);
 /// Kept free around the dialog when the window is too small for it.
 const SCREEN_MARGIN: f32 = 20.0;
 /// The width of the strips along the edges that resize the dialog.
@@ -102,6 +104,7 @@ impl SeamLinkDraft {
                         b: side,
                         offset: 0,
                         manual: Vec::new(),
+                        sewing: Sewing::default(),
                     },
                     pending_a: None,
                 })
@@ -310,6 +313,9 @@ fn dialog_contents(
     }
     seam_cards(ui, draft, project, language);
     horizontal_rule(ui);
+    let pairs = draft.link.pairs(project);
+    sewing::sewing_cards(ui, draft, project, pairs.as_ref().ok(), language);
+    horizontal_rule(ui);
 
     // The body takes the height the warning and the footer leave, measured on the last frame.
     let bottom_id = egui::Id::new("seam_link_dialog_bottom");
@@ -320,7 +326,6 @@ fn dialog_contents(
     let body_height = (ui.available_height() - bottom).max(MIN_BODY_HEIGHT);
     let width = ui.available_width();
 
-    let pairs = draft.link.pairs(project);
     let range_error = range_error(&draft.link);
     ui.allocate_ui_with_layout(
         egui::vec2(width, body_height),

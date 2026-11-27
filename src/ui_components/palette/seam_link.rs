@@ -32,6 +32,13 @@ pub(crate) struct SeamLinkPaint {
     pub(crate) badge_free: Color32,
     /// Between the rows of the pair table.
     pub(crate) row_divider: Color32,
+    /// The background of the chosen stitch or assembly tile; its border is `link_auto`.
+    pub(crate) tile_selected: Color32,
+    /// The thread on the tiles that aren't chosen.
+    pub(crate) thread_idle: Color32,
+    /// The two pieces in the assembly drawings: A, and B.
+    pub(crate) leather_a: Color32,
+    pub(crate) leather_b: Color32,
 }
 
 impl SeamLinkPaint {
@@ -53,6 +60,10 @@ impl SeamLinkPaint {
         badge_manual: hex(0x3D2E16),
         badge_free: hex(0x3D1C1C),
         row_divider: hex(0x22242A),
+        tile_selected: hex(0x16262C),
+        thread_idle: hex(0xA9ADB8),
+        leather_a: hex(0x8A6A4A),
+        leather_b: hex(0x5E5348),
     };
     pub(super) const LIGHT: Self = Self {
         link_auto: hex(0x1E82A5),
@@ -72,5 +83,9 @@ impl SeamLinkPaint {
         badge_manual: hex(0xFBE2BF),
         badge_free: hex(0xF9D5CF),
         row_divider: hex(0xE6E8EC),
+        tile_selected: hex(0xE8F4F8),
+        thread_idle: hex(0x7A7E88),
+        leather_a: hex(0xB08A62),
+        leather_b: hex(0x8C7F70),
     };
 }

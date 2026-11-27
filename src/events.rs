@@ -1154,6 +1154,15 @@ mod tests {
                 Err(Message::SeamRangesOverlap)
             );
             assert_eq!(project, before);
+
+            let mut too_far = project.seam_links[0].clone();
+            too_far.sewing.assembly = crate::sewing::Assembly::Lapped;
+            too_far.sewing.overlap_mm = 0.0;
+            assert_eq!(
+                project.apply(ProjectEvent::SetSeamLink { link: too_far }),
+                Err(Message::OverlapOutOfRange)
+            );
+            assert_eq!(project, before);
         }
 
         #[test]

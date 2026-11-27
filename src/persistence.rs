@@ -94,12 +94,18 @@ mod tests {
         linked.manual.push(ManualPair { a: 0, b: 2 });
         project.seam_links.push(linked);
 
+        // A link sewn the default way saves without its sewing.
         save_project(&path, &project).unwrap();
-        assert!(
-            fs::read_to_string(&path)
-                .unwrap()
-                .contains("\"seam_links\"")
-        );
+        let saved = fs::read_to_string(&path).unwrap();
+        assert!(saved.contains("\"seam_links\"") && !saved.contains("\"sewing\""));
+        assert_eq!(load_project(&path).unwrap(), project);
+
+        let sewing = &mut project.seam_links[0].sewing;
+        sewing.stitch = crate::sewing::StitchMethod::Baseball;
+        sewing.assembly = crate::sewing::Assembly::Butted;
+        sewing.lock_holes = 3;
+        save_project(&path, &project).unwrap();
+        assert!(fs::read_to_string(&path).unwrap().contains("\"sewing\""));
         assert_eq!(load_project(&path).unwrap(), project);
 
         // A file without links, such as one saved before links existed, has no key and loads.

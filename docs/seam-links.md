@@ -10,11 +10,13 @@ The dialog follows the "Stitch Link Dialog — Зв'язати шви" frame (`0
 |---|---|
 | `src/seams.rs` | `SeamSide`, `ManualPair`, `SeamLink`, `HolePair`, `LinkPairs`; `SeamLink::pairs`, `lines`, `uses_child`, `uses_piece`, `ranges_overlap`, `validate`; `Project::seam_link`, `next_seam_link_id`, `seam_links_of`, `validate_seam_links`; `stitch_line`, `stitch_lines`, `stitch_number`; tests and their fixtures (`two_lines`, `side`, `link`), shared with the other modules' tests |
 | `src/shapes/stitch.rs` | `StitchLine::hole_offsets` (each hole's distance along the path) and `pitch_for_count` (the pitch that gives a hole count) |
+| `src/sewing.rs` | `StitchMethod`, `Assembly`, `OnTop`, `Sewing` (`thread_mm`, `validate`) and their limits, with tests |
 | `src/model.rs` | `Project.seam_links`; `validate` ends with `validate_seam_links` |
 | `src/events.rs` | `AddSeamLink`, `SetSeamLink`, `RemoveSeamLink`, `ProjectChange::SeamLinkAdded`; the cascade in `RemoveChild`, `RemoveChildren`, `RemovePiece` and `RemovePieces` |
 | `src/history.rs` | `describe` arms; `MergeKey::SeamLink` |
 | `src/i18n/` | The labels and messages under [Text](#text) |
 | `src/panels/seam_link/mod.rs` | `SeamLinkDraft`, `OpenLink`, `SeamLinkResult`, `seam_name`, `seam_link_dialog`: the header, seam cards, start offset, warning with the Fit pitch buttons, summary and footer |
+| `src/panels/seam_link/sewing.rs` | `sewing_cards`: the stitch and assembly tiles with their drawings, Lock, the thread estimate, Overlap and On top |
 | `src/panels/seam_link/schematic.rs` | `schematic`: the two seams unrolled into rows of holes, the pair lines, the clicks that set manual pairs |
 | `src/panels/seam_link/table.rs` | `pair_table`: the pairs, then the unpaired holes collapsed into ranges |
 | `src/panels/properties/stitch.rs` | `seam_links_section`: the selected seam's links, with Edit and Remove, and Link seams… |
@@ -36,8 +38,10 @@ The dialog follows the "Stitch Link Dialog — Зв'язати шви" frame (`0
 | Remove a manual pair | Alt+click one of its holes |
 | Drop every manual pair | **Reset manual pairs** |
 | Make the counts match | The warning's **Pitch A → …** or **Pitch B → …** button sets that seam's pitch. It is an ordinary edit, with its own History entry; the dialog stays open and shows the new pairs |
+| Choose the stitch | A tile on the **Stitch** card: Saddle, Running, Baseball, Whip or Cross. **Lock** sets how many holes are sewn back over at each end; the card shows the thread it takes |
+| Choose how the pieces lie | A tile on the **Assembly** card: Flesh sides, Lapped, Butted, Turned or Folded. **Overlap** is on while Lapped; **On top** while the pieces stack (Flesh sides, Lapped, Turned) |
 | Save the link | **Link N pairs**, or **Save** when changing a link |
-| Resize the dialog | Drag any of its edges or corners; it stays centered and grows on both sides. The size is kept until the app closes. It opens at the design's 1000 × 700 and never gets smaller than 860 × 600 or larger than the window |
+| Resize the dialog | Drag any of its edges or corners; it stays centered and grows on both sides. The size is kept until the app closes. It opens at the design's 1000 × 812 and never gets smaller than 860 × 712 or larger than the window |
 | See, change or remove links | Select a linked stitch line: Properties lists its links, each with the other seam and its pair count, **Edit** and **Remove**. The canvas draws the pair lines |
 | Fold a flap | Pick the same seam for A and B with ranges that don't share holes, usually with **Reverse** on B |
 
@@ -73,6 +77,18 @@ pub struct SeamLink {
 }
 ```
 
+```rust
+pub struct Sewing {                // #[serde(default)]: a missing field takes its default
+    pub stitch: StitchMethod,      // Saddle
+    pub lock_holes: u32,           // 2, at most MAX_LOCK_HOLES (10)
+    pub assembly: Assembly,        // FleshToFlesh
+    pub overlap_mm: f64,           // 8, from MIN_OVERLAP_MM (1) to MAX_OVERLAP_MM (100); used while Lapped
+    pub on_top: OnTop,             // A; used while the assembly stacks
+}
+```
+
+`SeamLink.sewing` is `#[serde(default, skip_serializing_if = "Sewing::is_default")]`, so a link sewn the default way saves as before and older links load as a saddle stitch on pieces laid flesh to flesh.
+
 `Project.seam_links` is `#[serde(default, skip_serializing_if = "Vec::is_empty")]`, so a project without links saves without the key and older files load unchanged; `PROJECT_VERSION` stays 2. Link ids are unique within the project and given by `AddSeamLink`, as `max + 1`.
 
 ## Pairing
@@ -97,6 +113,14 @@ pub struct SeamLink {
 
 The dialog asks for the line's count plus the difference between the two ranges, so the holes outside the range keep their number, and moves the range's end by the same difference.
 
+## Sewing
+
+The sewing doesn't change the pairs: it records how the seam is made, for the maker and for later features such as an assembled preview. The overlap is kept while another assembly is chosen, so switching back restores it.
+
+`Sewing::thread_mm(seam, pitch)` estimates the thread: the seam plus `lock_holes` pitches at each end, times the stitch's factor. The factors are rules of thumb, tails included: saddle 4, running 2, baseball 5, whip 3.5, cross 6. The dialog measures the seam along A's range at A's pitch and shows the estimate in the project's units.
+
+The tiles' drawings are painted, on the design's 64 × 24 grid: the stitches from the grain side, the assemblies in cross-section with A lighter than B. They shrink on narrow tiles.
+
 ## Validation
 
 `Project::validate` calls `validate_seam_links`, so `Project::apply` rejects a bad link, and saving or loading checks it:
@@ -108,6 +132,8 @@ The dialog asks for the line's count plus the difference between the two ranges,
 | On one seam, the ranges don't share holes | `SeamRangesOverlap` |
 | No hole is in two manual pairs on the same side | `DuplicateManualPair` |
 | Link ids are unique and not 0 | `DuplicateSeamLink` |
+| At most `MAX_LOCK_HOLES` locked holes | `LockHolesOutOfRange` |
+| The overlap is within `MIN_OVERLAP_MM..=MAX_OVERLAP_MM` | `OverlapOutOfRange` |
 
 A range past the line's holes is **not** an error: otherwise an edit that shortens a seam would be rejected. It is cut when the pairs are computed and reported as `clamped`, the way `ResultEmpty` leaves a valid project flagged in the editor.
 
@@ -125,8 +151,8 @@ A range past the line's holes is **not** an error: otherwise an edit that shorte
 
 | Kind | Entries |
 |---|---|
-| `Label` | `LinkSeams`, `LinkSeamsTitle`, `LinkSeamsSubtitle`, `SeamA`, `SeamB`, `HolesFrom`, `HolesTo`, `Reverse`, `StartOffset`, `HolesShort`, `LinkSchematic`, `HolePairs`, `PairAuto`, `PairManual`, `PairManualLegend`, `PairFree`, `LinkHint`, `ResetManualPairs`, `Pairs`, `LengthDifference`, `SeamLinks`, `EditLink`, `RemoveLink`, `SeamLinkStale` |
-| `Message` | Errors: `SeamNotFound`, `InvalidSeamRange`, `SeamRangesOverlap`, `DuplicateManualPair`, `DuplicateSeamLink`. Dialog: `HoleCountMismatch`, `UnpairedHoles`, `FitPitch` (its pitch is formatted by the caller, since `Message` is `Eq`), `LinkPairsButton`, `SeamName`, `SeamOption`, `HoleCountBadge`, `PairsCount`, `FreeIn`, `SeamLinkRow`. History: `ActionLinkSeams`, `ActionEditSeamLink`, `ActionRemoveSeamLink` |
+| `Label` | `LinkSeams`, `LinkSeamsTitle`, `LinkSeamsSubtitle`, `SeamA`, `SeamB`, `HolesFrom`, `HolesTo`, `Reverse`, `StartOffset`, `HolesShort`, `LinkSchematic`, `HolePairs`, `PairAuto`, `PairManual`, `PairManualLegend`, `PairFree`, `LinkHint`, `ResetManualPairs`, `Pairs`, `LengthDifference`, `SeamLinks`, `EditLink`, `RemoveLink`, `SeamLinkStale`, `StitchMethodTitle`, `StitchMethod`, `StitchMethodNote`, `StitchMethodHint`, `AssemblyTitle`, `Assembly`, `AssemblyNote`, `LockHoles`, `Overlap`, `OnTop` |
+| `Message` | Errors: `SeamNotFound`, `InvalidSeamRange`, `SeamRangesOverlap`, `DuplicateManualPair`, `DuplicateSeamLink`, `LockHolesOutOfRange`, `OverlapOutOfRange`. Dialog: `AssemblyHint`, `ThreadEstimate`, `HoleCountMismatch`, `UnpairedHoles`, `FitPitch` (its pitch is formatted by the caller, since `Message` is `Eq`), `LinkPairsButton`, `SeamName`, `SeamOption`, `HoleCountBadge`, `PairsCount`, `FreeIn`, `SeamLinkRow`. History: `ActionLinkSeams`, `ActionEditSeamLink`, `ActionRemoveSeamLink` |
 
 Ukrainian counts use the catalog's `plural` helper.
 
@@ -143,10 +169,11 @@ The link, reverse, warning, close and reset icons are painted (`docs/icons.md`),
 | Module | Covers |
 |---|---|
 | `shapes::stitch` | `hole_offsets` grow and end at the length; `pitch_for_count` hits the count on one run and on a bent line, and refuses unreachable counts |
+| `sewing` | Missing fields take their defaults; the thread estimate; the limits; which assemblies stack or overlap |
 | `seams` | Equal counts pair every hole with Δ 0; reverse; positive and negative offset; a manual pair replacing one or two automatic pairs; 48 against 52 holes; creep in Δ; clamping after a seam got shorter and for a manual pair outside a range; one seam linked to itself; a missing seam; listing and numbering seams |
 | `model` | Each validation rule, and that a range past the holes is accepted |
-| `events` | Add, set and remove, with their errors; a rejected link leaves the project unchanged; each removal cascades and Undo restores the link; moving a seam keeps its links |
+| `events` | Add, set and remove, with their errors; a rejected link, including one with an overlap out of range, leaves the project unchanged; each removal cascades and Undo restores the link; moving a seam keeps its links |
 | `history` | The entries' text; consecutive `SetSeamLink` merge; Undo restores the merged state |
-| `persistence` | A link round-trips; a project without links saves without the key and loads |
+| `persistence` | A link round-trips, without its sewing while it is the default and with it otherwise; a project without links saves without the key and loads |
 
 `panels::seam_link::table` has a binary test for the hole ranges (`cargo test --bin leathercraft`). The dialog, the schematic and the canvas lines are checked by hand.

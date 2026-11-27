@@ -7,6 +7,7 @@ use crate::material::{
     ThicknessCategory, Treatment, WaterResistance,
 };
 use crate::model::{BooleanOp, Units};
+use crate::sewing::{Assembly, StitchMethod};
 use crate::shapes::{HoleKind, StitchBand};
 use std::error::Error;
 use std::fmt;
@@ -309,6 +310,22 @@ pub enum Label {
     RemoveLink,
     /// A link whose range runs past its line's holes, which were cut short.
     SeamLinkStale,
+    /// The card of the stitch in the Link seams dialog.
+    StitchMethodTitle,
+    StitchMethod(StitchMethod),
+    /// Under a stitch's name on its tile, such as how many needles it takes.
+    StitchMethodNote(StitchMethod),
+    /// Beside the card's title: what the chosen stitch is good for.
+    StitchMethodHint(StitchMethod),
+    /// The card of how the pieces are laid together.
+    AssemblyTitle,
+    Assembly(Assembly),
+    AssemblyNote(Assembly),
+    /// The holes sewn back over at each end of the seam.
+    LockHoles,
+    Overlap,
+    /// Which side lies on top.
+    OnTop,
 }
 
 /// Text with arguments, kept structured so it is rendered in the language current when shown.
@@ -623,6 +640,20 @@ pub enum Message {
     SeamLinkRow {
         other: String,
         pairs: usize,
+    },
+    LockHolesOutOfRange,
+    OverlapOutOfRange,
+    /// Beside the assembly card's title: how the chosen assembly lays the sides, `top` being
+    /// the side on top for those that stack.
+    AssemblyHint {
+        assembly: Assembly,
+        top: char,
+        under: char,
+    },
+    /// The thread a seam takes: its formatted length and the stitch's factor, in tenths.
+    ThreadEstimate {
+        length: String,
+        factor_tenths: u32,
     },
 }
 

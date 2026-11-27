@@ -5,6 +5,7 @@
 
 use crate::i18n::Message;
 use crate::model::Project;
+use crate::sewing::Sewing;
 use crate::shapes::{Shape, StitchLine};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -51,7 +52,7 @@ pub struct ManualPair {
     pub b: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SeamLink {
     pub id: u64,
     pub a: SeamSide,
@@ -63,6 +64,9 @@ pub struct SeamLink {
     /// Pairs set by hand, laid over the automatic ones.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub manual: Vec<ManualPair>,
+    /// The stitch and how the pieces are laid together.
+    #[serde(default, skip_serializing_if = "Sewing::is_default")]
+    pub sewing: Sewing,
 }
 
 /// Two holes sewn together.
@@ -313,6 +317,7 @@ impl SeamLink {
         if self.ranges_overlap() {
             return Err(Message::SeamRangesOverlap);
         }
+        self.sewing.validate()?;
         let mut holes_a = HashSet::with_capacity(self.manual.len());
         let mut holes_b = HashSet::with_capacity(self.manual.len());
         for pair in &self.manual {
@@ -412,6 +417,7 @@ pub(crate) mod tests {
             b,
             offset: 0,
             manual: Vec::new(),
+            sewing: Sewing::default(),
         }
     }
 

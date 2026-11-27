@@ -5,6 +5,7 @@ use crate::material::{
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
 };
 use crate::model::{BooleanOp, Units};
+use crate::sewing::{Assembly, MAX_LOCK_HOLES, MAX_OVERLAP_MM, MIN_OVERLAP_MM, StitchMethod};
 use crate::shapes::{HoleKind, MAX_HOLE_MM, MAX_PITCH_MM, MIN_HOLE_MM, MIN_PITCH_MM};
 
 pub(super) fn label(label: Label) -> &'static str {
@@ -231,6 +232,46 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::EditLink => "Edit",
         Label::RemoveLink => "Remove",
         Label::SeamLinkStale => "The seam got shorter: part of the range has no holes",
+        Label::StitchMethodTitle => "Stitch",
+        Label::StitchMethod(method) => match method {
+            StitchMethod::Saddle => "Saddle",
+            StitchMethod::Running => "Running",
+            StitchMethod::Baseball => "Baseball",
+            StitchMethod::Whip => "Whip",
+            StitchMethod::Cross => "Cross",
+        },
+        Label::StitchMethodNote(method) => match method {
+            StitchMethod::Saddle => "2 needles",
+            StitchMethod::Running => "1 needle",
+            StitchMethod::Baseball => "butted",
+            StitchMethod::Whip => "over the edge",
+            StitchMethod::Cross => "decorative",
+        },
+        Label::StitchMethodHint(method) => match method {
+            StitchMethod::Saddle => "The strongest; it doesn’t unravel",
+            StitchMethod::Running => "Quick, but a break undoes it",
+            StitchMethod::Baseball => "Lies flat across butted edges",
+            StitchMethod::Whip => "Wraps over the edge",
+            StitchMethod::Cross => "Crosses between two rows",
+        },
+        Label::AssemblyTitle => "Assembly",
+        Label::Assembly(assembly) => match assembly {
+            Assembly::FleshToFlesh => "Flesh sides",
+            Assembly::Lapped => "Lapped",
+            Assembly::Butted => "Butted",
+            Assembly::Turned => "Turned",
+            Assembly::Folded => "Folded",
+        },
+        Label::AssemblyNote(assembly) => match assembly {
+            Assembly::FleshToFlesh => "edges flush",
+            Assembly::Lapped => "overlapping",
+            Assembly::Butted => "edge to edge",
+            Assembly::Turned => "seam inside",
+            Assembly::Folded => "one piece",
+        },
+        Label::LockHoles => "Lock",
+        Label::Overlap => "Overlap",
+        Label::OnTop => "On top",
     }
 }
 
@@ -646,6 +687,30 @@ pub(super) fn message(message: &Message) -> String {
         Message::SeamLinkRow { other, pairs } => {
             format!("{other} · {}", counted(*pairs, "pair", "pairs"))
         }
+        Message::LockHolesOutOfRange => {
+            format!("A seam can lock at most {MAX_LOCK_HOLES} holes at each end.")
+        }
+        Message::OverlapOutOfRange => {
+            format!("A lapped seam needs an overlap from {MIN_OVERLAP_MM} to {MAX_OVERLAP_MM} mm.")
+        }
+        Message::AssemblyHint {
+            assembly,
+            top,
+            under,
+        } => match assembly {
+            Assembly::FleshToFlesh => format!("{top} on {under}, edges flush"),
+            Assembly::Lapped => format!("The edge of {top} lies on {under}"),
+            Assembly::Butted => "The edges meet in one plane".to_owned(),
+            Assembly::Turned => format!("Sewn grain to grain, {top} on {under}, then turned"),
+            Assembly::Folded => "The piece folds onto itself".to_owned(),
+        },
+        Message::ThreadEstimate {
+            length,
+            factor_tenths,
+        } => format!(
+            "Thread ≈ {length} · {} × the seam",
+            f64::from(*factor_tenths) / 10.0
+        ),
     }
 }
 

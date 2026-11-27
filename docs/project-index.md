@@ -112,10 +112,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/properties/regular_polygon.rs` | 34 | 300 | bin | Regular polygon's center, radius, sides and rotation |
 | `src/panels/properties/line.rs` | 86 | 800 | bin | Centerline's ends, length, angle and style (line type dropdown; `line_style_fields` is the inline version for the tool bar) |
 | `src/panels/properties/stitch.rs` | 236 | 1,900 | bin | Stitch line's hole type, pitch and size (`stitch_fields` is the inline version for the tool bar), and its length, hole count, actual pitch and thread hint (`stitch_details`); `seam_links_section` (the seam's links with Edit and Remove, a stale one in the warning color, and Link seams…; `LinkAction`) |
-| `src/panels/seam_link/mod.rs` | 1,008 | 9,400 | bin | Link seams dialog (from the design's "Stitch Link Dialog"): `SeamLinkDraft` (the link being edited, `editing` id, `pending_a` hole), `OpenLink` (new from a seam, or edit), `SeamLinkResult` (Commit, FitPitch, Cancel), `seam_name`, `seam_link_dialog` (an `egui::Modal` with its size in egui memory, `dialog_size`, resized from every edge and corner around the screen's center by `resize_edges`; Esc drops a waiting hole, then closes); the body fills the height left by the warning and footer, measured on the previous frame; header, seam cards (seam dropdown, hole type, pitch and length chips, 1-based range `NumberInput`s, Reverse toggle), start offset, body, warning with Fit pitch buttons (`fit_pitch`, `Fit`, which also moves the range's end), summary tiles, footer; `small_button` and its toggle, icon and warning variants |
+| `src/panels/seam_link/mod.rs` | 1,229 | 9,500 | bin | Link seams dialog (from the design's "Stitch Link Dialog"): `SeamLinkDraft` (the link being edited, `editing` id, `pending_a` hole), `OpenLink` (new from a seam, or edit), `SeamLinkResult` (Commit, FitPitch, Cancel), `seam_name`, `seam_link_dialog` (an `egui::Modal` with its size in egui memory, `dialog_size`, resized from every edge and corner around the screen's center by `resize_edges`; Esc drops a waiting hole, then closes); the body fills the height left by the warning and footer, measured on the previous frame; header, seam cards (seam dropdown, hole type, pitch and length chips, 1-based range `NumberInput`s, Reverse toggle), the sewing cards of `sewing`, start offset, body, warning with Fit pitch buttons (`fit_pitch`, `Fit`, which also moves the range's end), summary tiles, footer; `small_button` and its toggle, icon and warning variants |
+| `src/panels/seam_link/sewing.rs` | 539 | 4,300 | bin | `sewing_cards`: the stitch and assembly cards under the seam cards (from the design's "Method" row): a tile per `StitchMethod` and `Assembly` with a drawing on a 64 × 24 grid (`Pen`, `Glyph`, `paint_stitch`, `paint_assembly`), the hint on the chosen tile, Lock holes and the thread estimate, Overlap in display units (`overlap_input`, on while lapped) and On top (`GroupButton`, on for stacked assemblies) |
 | `src/panels/seam_link/schematic.rs` | 368 | 2,900 | bin | `schematic`: both ranges unrolled into rows of diamond holes placed by their distance along the seam, lined up at the first automatic pair, thinned out when under 6 px apart; pair lines, numbers every fifth hole and at the ends, direction arrows; `Side`, `Click` (a hole, with Alt or not), `paint_diamond` |
 | `src/panels/seam_link/table.rs` | 248 | 1,900 | bin | `pair_table`: the header and a `show_rows` scroll area of pairs (#, A, B, Δ in display units, Manual badge), then unpaired holes collapsed into ranges (`ranges`) with an Unpaired badge; test |
-| `src/ui_components/palette/seam_link.rs` | 76 | 700 | bin | `SeamLinkPaint`: auto, manual and unpaired pair colors, hole fills, guide, arrow, A/B badge, warning box, table rows and badges; light values picked |
+| `src/ui_components/palette/seam_link.rs` | 91 | 850 | bin | `SeamLinkPaint`: auto, manual and unpaired pair colors, hole fills, guide, arrow, A/B badge, warning box, table rows and badges, the chosen sewing tile, idle thread and the two leathers of the assembly drawings; light values picked |
 | `src/preview/mod.rs` | 302 | 2,600 | bin | 3D scene, camera, mesh extrusion from each piece's `punched_region`; `apply_theme` sets the background and ground plane colors for the theme |
 | `src/model.rs` | 640 | 4,850 | lib | `Project` (with `seam_links`), `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation (a base must be closed; a line's ends and dash count; a stitch line's points, hole parameters, hole count and overlap in `validate_stitch_line`; then `validate_seam_links`) |
 | `src/boolean.rs` | 290 | 2,500 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes, skipping open lines; `punched_region`: the region with stitch holes cut, for the preview; `stitch_area`, `stray_stitch_lines`: the leather a stitch line must stay on |
@@ -142,7 +143,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/shapes/polygon.rs` | 116 | 850 | lib | `Polygon`, its edges and their lengths |
 | `src/i18n/en.rs` | 638 | 5,400 | lib | English catalog, `counted` helper |
 | `src/history.rs` | 792 | 5,450 | lib | `History`, `HistoryCommand`: snapshots for undo and redo (consecutive changes of one seam link merge) |
-| `src/seams.rs` | 557 | 5,000 | lib | Seam links (`docs/seam-links.md`): `SeamSide` (`whole`, `same_line`), `ManualPair`, `SeamLink` (`lines`, `uses_child`, `uses_piece`, `ranges_overlap`, `pairs`, `validate`), `HolePair`, `LinkPairs` (`count_mismatch`, `manual_count`); `Project::seam_link`, `next_seam_link_id`, `seam_links_of`, `validate_seam_links`; `stitch_line`, `stitch_lines`, `stitch_number`; tests, with fixtures (`two_lines`, `side`, `link`) shared with other modules' tests |
+| `src/sewing.rs` | 215 | 1,700 | lib | How a seam link is sewn (`docs/seam-links.md#sewing`): `StitchMethod` (saddle, running, baseball, whip, cross; `thread_factor_tenths`), `Assembly` (flesh to flesh, lapped, butted, turned, folded; `uses_overlap`, `stacks`), `OnTop`, `Sewing` (lock holes, overlap; `thread_mm`, `validate`), `MAX_LOCK_HOLES`, `MIN_OVERLAP_MM`, `MAX_OVERLAP_MM`; tests |
+| `src/seams.rs` | 563 | 5,050 | lib | Seam links (`docs/seam-links.md`): `SeamSide` (`whole`, `same_line`), `ManualPair`, `SeamLink` (with its `sewing`; `lines`, `uses_child`, `uses_piece`, `ranges_overlap`, `pairs`, `validate`), `HolePair`, `LinkPairs` (`count_mismatch`, `manual_count`); `Project::seam_link`, `next_seam_link_id`, `seam_links_of`, `validate_seam_links`; `stitch_line`, `stitch_lines`, `stitch_number`; tests, with fixtures (`two_lines`, `side`, `link`) shared with other modules' tests |
 | `src/persistence.rs` | 230 | 1,750 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings/mod.rs` | 165 | 1,350 | bin | `settings.json` in the OS config directory: language, panel layout, snap settings (`load_snap`, `save_snap`), and `Preferences` (default material, hotkeys, theme) with `load_preferences`, `save_preferences` |
 | `src/settings/theme.rs` | 45 | 350 | bin | `Theme` (Dark, Light; `ALL`, `label`), `apply_theme`: sets egui's theme when `Preferences::theme` changes |
@@ -401,7 +403,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 169 tests inline in the library crate, plus 7 in the binary (`settings::hotkeys`, `editor::ruler` and `panels::seam_link::table`, run with `cargo test --bin leathercraft`, which compiles Bevy):
+There are 173 tests inline in the library crate, plus 7 in the binary (`settings::hotkeys`, `editor::ruler` and `panels::seam_link::table`, run with `cargo test --bin leathercraft`, which compiles Bevy):
 
 | Module | Tests |
 |---|---:|
@@ -417,6 +419,7 @@ There are 169 tests inline in the library crate, plus 7 in the binary (`settings
 | `exports` | 11 |
 | `persistence` | 8 |
 | `seams` | 10 |
+| `sewing` | 4 |
 
 Apart from shortcut parsing, `document`, `editor`, `preview`, `settings` and `panels` have no tests, so changes there need `cargo check` and a manual run.
 
