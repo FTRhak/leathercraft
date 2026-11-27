@@ -115,7 +115,7 @@ The dialog asks for the line's count plus the difference between the two ranges,
 
 ## Sewing
 
-The sewing doesn't change the pairs: it records how the seam is made, for the maker and for later features such as an assembled preview. The overlap is kept while another assembly is chosen, so switching back restores it.
+The sewing doesn't change the pairs: it records how the seam is made, for the maker and for the sewn 3D preview, which lays the pieces together by the assembly and leaves the stitch's slack in the seam (`docs/sewn-preview.md`). The overlap is kept while another assembly is chosen, so switching back restores it.
 
 `Sewing::thread_mm(seam, pitch)` estimates the thread: the seam plus `lock_holes` pitches at each end, times the stitch's factor. The factors are rules of thumb, tails included: saddle 4, running 2, baseball 5, whip 3.5, cross 6. The dialog measures the seam along A's range at A's pitch and shows the estimate in the project's units.
 

@@ -1,43 +1,70 @@
+//! The 3D preview: the pieces either flat, each extruded on its own (`flat`), or sewn
+//! together along their seam links (`sewn`, `docs/sewn-preview.md`).
+
+mod flat;
+mod sewn;
+
 use crate::document::ActiveProject;
+use crate::editor::ViewMode;
 use crate::settings::{Preferences, Theme};
-use bevy::asset::RenderAssetUsages;
-use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
+use crate::ui_components::button::Button;
+use crate::ui_components::group_button::GroupButton;
 use bevy::prelude::*;
 use bevy_egui::egui;
-use earcutr::earcut;
-use leathercraft::boolean::Region;
 use leathercraft::i18n::{Label, Language};
-use leathercraft::model::{Point, signed_area};
+use sewn::SewnModel;
 
 // Scene units per millimeter; the scene is scaled up, so this is not a meters conversion.
 const MM_TO_SCENE: f64 = 0.01;
 const MIN_DISTANCE: f32 = 1.0;
 const MAX_DISTANCE: f32 = 60.0;
+const DEFAULT_DISTANCE: f32 = 3.2;
 
 pub struct PreviewPlugin;
 
 impl Plugin for PreviewPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PreviewSettings>()
+            .init_resource::<SewnModel>()
             .add_systems(Startup, setup_scene)
-            .add_systems(Update, (rebuild_preview, update_camera, apply_theme));
+            .add_systems(
+                Update,
+                (
+                    (rebuild_preview, step_sewn).chain(),
+                    update_camera,
+                    apply_theme,
+                ),
+            );
     }
 }
+
+#[derive(Component, Clone)]
+struct PreviewPiece;
 
 #[derive(Component)]
 struct PreviewCamera;
 
 #[derive(Component)]
-struct PreviewPiece;
-
-#[derive(Component)]
 struct Ground;
+
+/// What the preview shows.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PreviewMode {
+    /// Each piece flat on the ground, with its holes cut through.
+    Flat,
+    /// The pieces sewn together along their seam links.
+    #[default]
+    Sewn,
+}
 
 #[derive(Resource)]
 pub struct PreviewSettings {
     azimuth: f32,
     elevation: f32,
     distance: f32,
+    mode: PreviewMode,
+    /// Set by Sew again: start the simulation over.
+    resew: bool,
 }
 
 impl Default for PreviewSettings {
@@ -45,7 +72,9 @@ impl Default for PreviewSettings {
         Self {
             azimuth: 0.72,
             elevation: 0.78,
-            distance: 3.2,
+            distance: DEFAULT_DISTANCE,
+            mode: PreviewMode::default(),
+            resew: false,
         }
     }
 }
@@ -111,38 +140,78 @@ fn apply_theme(
     *applied = Some(theme);
 }
 
+/// What the scene was last built from.
+#[derive(Default)]
+struct Built {
+    /// The project changed since.
+    stale: bool,
+    mode: Option<PreviewMode>,
+}
+
+/// Rebuilds the scene when the project or the mode changed, once the preview is shown: the
+/// sewn model is laid out anew each time, which is too slow to do on every edit in 2D.
+#[allow(clippy::too_many_arguments)]
 fn rebuild_preview(
     mut commands: Commands,
     project: Res<ActiveProject>,
+    view_mode: Res<ViewMode>,
     existing: Query<Entity, With<PreviewPiece>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut settings: ResMut<PreviewSettings>,
+    mut sewn: ResMut<SewnModel>,
+    mut built: Local<Built>,
 ) {
-    if !project.is_changed() {
+    if project.is_changed() {
+        built.stale = true;
+    }
+    let mode = settings.mode;
+    let current = !built.stale && built.mode == Some(mode) && !settings.resew;
+    if current || *view_mode != ViewMode::Preview3d {
         return;
     }
+    settings.bypass_change_detection().resew = false;
+    *built = Built {
+        stale: false,
+        mode: Some(mode),
+    };
 
     for entity in &existing {
         commands.entity(entity).despawn();
     }
-
-    let Some(bounds) = project.bounds() else {
-        settings.distance = 3.2;
-        return;
+    sewn.clear();
+    let size_mm = match mode {
+        PreviewMode::Flat => spawn_flat(&project, &mut commands, &mut meshes, &mut materials),
+        PreviewMode::Sewn => sewn.rebuild(
+            &project,
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            PreviewPiece,
+        ),
     };
+    settings.distance = size_mm.map_or(DEFAULT_DISTANCE, |size| {
+        ((size * MM_TO_SCENE) as f32 * 2.7).clamp(MIN_DISTANCE, MAX_DISTANCE)
+    });
+}
+
+/// Spawns each piece flat, centered on the origin; returns the project's size in mm.
+fn spawn_flat(
+    project: &ActiveProject,
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+) -> Option<f64> {
+    let bounds = project.bounds()?;
     // Meshes are built around the origin, which is where the camera orbits.
     let center_x = ((bounds.min_x + bounds.max_x) * 0.5 * MM_TO_SCENE) as f32;
     let center_z = ((bounds.min_y + bounds.max_y) * 0.5 * MM_TO_SCENE) as f32;
-    settings.distance = ((bounds.width().max(bounds.height()) * MM_TO_SCENE) as f32 * 2.7)
-        .clamp(MIN_DISTANCE, MAX_DISTANCE);
-
     for piece in &project.pieces {
         // A piece whose shapes don't combine into one outline is flagged in the editor instead.
         let Ok(region) = piece.punched_region() else {
             continue;
         };
-        match build_piece_mesh(&region, piece.material.thickness_mm, center_x, center_z) {
+        match flat::build_piece_mesh(&region, piece.material.thickness_mm, center_x, center_z) {
             Ok(mesh) => {
                 let [red, green, blue] = piece.material.color.rgb();
                 let leather = materials.add(StandardMaterial {
@@ -160,6 +229,19 @@ fn rebuild_preview(
                 bevy::log::error!("Could not render piece '{}': {error}", piece.name);
             }
         }
+    }
+    Some(bounds.width().max(bounds.height()))
+}
+
+/// Sews the model a frame further while the preview shows it.
+fn step_sewn(
+    view_mode: Res<ViewMode>,
+    settings: Res<PreviewSettings>,
+    mut sewn: ResMut<SewnModel>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
+    if *view_mode == ViewMode::Preview3d && settings.mode == PreviewMode::Sewn {
+        sewn.step(&mut meshes);
     }
 }
 
@@ -183,6 +265,22 @@ fn update_camera(
 }
 
 pub fn show_controls(ui: &mut egui::Ui, settings: &mut PreviewSettings, language: Language) {
+    ui.label(language.label(Label::PreviewShows));
+    ui.horizontal(|ui| {
+        ui.add(
+            GroupButton::new(&mut settings.mode)
+                .option(PreviewMode::Sewn, language.label(Label::PreviewSewn))
+                .option(PreviewMode::Flat, language.label(Label::PreviewFlat)),
+        );
+        if settings.mode == PreviewMode::Sewn
+            && ui
+                .add(Button::outline(language.label(Label::SewAgain)))
+                .on_hover_text(language.label(Label::SewAgainHint))
+                .clicked()
+        {
+            settings.resew = true;
+        }
+    });
     ui.label(language.label(Label::Camera));
     ui.add(
         egui::Slider::new(&mut settings.azimuth, 0.0..=std::f32::consts::TAU)
@@ -195,108 +293,4 @@ pub fn show_controls(ui: &mut egui::Ui, settings: &mut PreviewSettings, language
         egui::Slider::new(&mut settings.distance, MIN_DISTANCE..=MAX_DISTANCE)
             .text(language.label(Label::Zoom)),
     );
-}
-
-fn build_piece_mesh(
-    region: &Region,
-    thickness_mm: f64,
-    center_x: f32,
-    center_z: f32,
-) -> Result<Mesh, String> {
-    let points: Vec<Point> = region.vertices().copied().collect();
-    let thickness = (thickness_mm * MM_TO_SCENE) as f32;
-    let mut flat_points = Vec::with_capacity(points.len() * 2);
-    for point in &points {
-        flat_points.push(point.x * MM_TO_SCENE - f64::from(center_x));
-        flat_points.push(point.y * MM_TO_SCENE - f64::from(center_z));
-    }
-    let triangles = earcut(&flat_points, &region.hole_indices(), 2)
-        .map_err(|error| format!("triangulation failed: {error}"))?;
-
-    let mut positions = Vec::<[f32; 3]>::with_capacity(points.len() * 2 + points.len() * 4);
-    let mut normals = Vec::<[f32; 3]>::with_capacity(points.len() * 2 + points.len() * 4);
-    let mut indices = Vec::<u32>::new();
-    for point in &points {
-        let x = (point.x * MM_TO_SCENE - f64::from(center_x)) as f32;
-        let z = (point.y * MM_TO_SCENE - f64::from(center_z)) as f32;
-        positions.push([x, 0.0, z]);
-        normals.push([0.0, -1.0, 0.0]);
-    }
-    for point in &points {
-        let x = (point.x * MM_TO_SCENE - f64::from(center_x)) as f32;
-        let z = (point.y * MM_TO_SCENE - f64::from(center_z)) as f32;
-        positions.push([x, thickness, z]);
-        normals.push([0.0, 1.0, 0.0]);
-    }
-
-    for triangle in triangles.chunks_exact(3) {
-        let a = triangle[0] as u32;
-        let b = triangle[1] as u32;
-        let c = triangle[2] as u32;
-        let pa = flat_points[triangle[0] * 2..triangle[0] * 2 + 2].to_vec();
-        let pb = flat_points[triangle[1] * 2..triangle[1] * 2 + 2].to_vec();
-        let pc = flat_points[triangle[2] * 2..triangle[2] * 2 + 2].to_vec();
-        let normal_y = (pb[1] - pa[1]) * (pc[0] - pa[0]) - (pb[0] - pa[0]) * (pc[1] - pa[1]);
-        if normal_y >= 0.0 {
-            indices.extend_from_slice(&[a, c, b]);
-            indices.extend_from_slice(&[
-                a + points.len() as u32,
-                b + points.len() as u32,
-                c + points.len() as u32,
-            ]);
-        } else {
-            indices.extend_from_slice(&[a, b, c]);
-            indices.extend_from_slice(&[
-                a + points.len() as u32,
-                c + points.len() as u32,
-                b + points.len() as u32,
-            ]);
-        }
-    }
-
-    // Rings can be wound either way; walls must still face away from the leather,
-    // which for a hole means toward its own center.
-    for (ring_index, ring) in region.rings().enumerate() {
-        let is_hole = ring_index > 0;
-        let outward: f32 = if (signed_area(ring) >= 0.0) != is_hole {
-            1.0
-        } else {
-            -1.0
-        };
-        for index in 0..ring.len() {
-            let next = (index + 1) % ring.len();
-            let a = ring[index];
-            let b = ring[next];
-            let dx = ((b.x - a.x) * MM_TO_SCENE) as f32;
-            let dz = ((b.y - a.y) * MM_TO_SCENE) as f32;
-            let length = dx.hypot(dz).max(f32::EPSILON);
-            let normal = [outward * dz / length, 0.0, -outward * dx / length];
-            let base = positions.len() as u32;
-            let ax = (a.x * MM_TO_SCENE - f64::from(center_x)) as f32;
-            let az = (a.y * MM_TO_SCENE - f64::from(center_z)) as f32;
-            let bx = (b.x * MM_TO_SCENE - f64::from(center_x)) as f32;
-            let bz = (b.y * MM_TO_SCENE - f64::from(center_z)) as f32;
-            positions.extend_from_slice(&[
-                [ax, 0.0, az],
-                [ax, thickness, az],
-                [bx, thickness, bz],
-                [bx, 0.0, bz],
-            ]);
-            normals.extend_from_slice(&[normal; 4]);
-            if outward > 0.0 {
-                indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
-            } else {
-                indices.extend_from_slice(&[base, base + 2, base + 1, base, base + 3, base + 2]);
-            }
-        }
-    }
-
-    let mut mesh = Mesh::new(
-        PrimitiveTopology::TriangleList,
-        RenderAssetUsages::default(),
-    );
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_indices(Indices::U32(indices));
-    Ok(mesh)
 }

@@ -245,6 +245,13 @@ pub enum Label {
     Orbit,
     Tilt,
     Zoom,
+    /// The title above the preview's Sewn / Flat switch.
+    PreviewShows,
+    PreviewSewn,
+    PreviewFlat,
+    /// Starts the sewn preview's simulation over.
+    SewAgain,
+    SewAgainHint,
     NewProjectTitle,
     /// What the default material is for, under the material card of the new-project dialog.
     DefaultMaterialHint,

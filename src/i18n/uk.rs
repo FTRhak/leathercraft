@@ -181,6 +181,11 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Orbit => "Оберт",
         Label::Tilt => "Нахил",
         Label::Zoom => "Масштаб",
+        Label::PreviewShows => "Вигляд",
+        Label::PreviewSewn => "Зшито",
+        Label::PreviewFlat => "Плоско",
+        Label::SewAgain => "Зшити знову",
+        Label::SewAgainHint => "Розкласти деталі й зшити їх заново",
         Label::NewProjectTitle => "Новий проєкт: типовий матеріал",
         Label::DefaultMaterialHint => {
             "Новий проєкт і кожна нова деталь починаються з цього матеріалу."

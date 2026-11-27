@@ -31,7 +31,7 @@ A centerline is an open straight line kept as a child of a piece. It marks the p
 - Dash and gap are in mm, so they scale with the zoom and match the export. If a pattern's period is under 3 px on screen, the line is drawn as a faded solid line.
 - A click within the edge hit radius (6 px) of a line hits it. Clicking a line that lies outside its piece selects that piece, and the next click selects the line. Among the children under the cursor a line wins, since it counts as having no area.
 - Line types are **Solid**, **Dashed** (dash, gap; 5 / 2 mm by default) and **Dash-dot** (dash, gap, 1 mm dot, gap; 10 / 2 mm by default, the default for new lines). Choosing another type starts from its defaults.
-- The 3D preview doesn't show lines.
+- The 3D preview doesn't draw lines. In its sewn mode a centerline is a fold: the piece's mesh has edges along it, and it bends far more easily there than elsewhere (`docs/sewn-preview.md`).
 
 ## The model
 

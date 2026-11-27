@@ -1,5 +1,6 @@
 pub mod align;
 pub mod boolean;
+pub mod drape;
 pub mod events;
 pub mod exports;
 pub mod history;
