@@ -245,6 +245,7 @@ pub enum Label {
     Orbit,
     Tilt,
     Zoom,
+    PreviewNavigationHint,
     /// The title above the preview's Sewn / Flat switch.
     PreviewShows,
     PreviewSewn,

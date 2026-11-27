@@ -35,7 +35,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/editor/grid.rs` | 73 | 600 | bin | `draw_grid`: canvas grid and axes, grid steps; `draw_snap_dots`: the snap grid |
 | `src/editor/ruler.rs` | 215 | 1,900 | bin | The canvas rulers (from the design's "Ruler Top", "Ruler Left" and "Ruler Corner"): `RULER_SIZE` (20 px), `strips` (top and left, which `canvas` covers with interact areas so the pointer doesn't draw under them), `content_rect` (the area the view and snap controls are placed in), `draw_rulers`; numbered ticks every 1, 2 or 5 × 10ⁿ display units (`label_step`, at least 64 px apart), ten ticks between them with every second one longer, numbers in the project's units (`format_label`), the left ones turned to read upwards, the cursor marked in the accent; tests |
 | `src/editor/ui.rs` | 562 | 5,000 | bin | `editor_ui` (menu bar, tool bar, status bar, dock area), `show_status_bar`, `selection_summary`, `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
-| `src/editor/panel_viewer.rs` | 192 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the Properties, Align, Layout and History tab titles have icons, built by `TabDecor`, which also decorates each tab button; the Align tab targets the selected children when there are any, else the selected pieces |
+| `src/editor/panel_viewer.rs` | 199 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the canvas tab draws the 2D canvas, or in the 3D preview passes the mouse to `preview::navigate`; the Properties, Align, Layout and History tab titles have icons, built by `TabDecor`, which also decorates each tab button; the Align tab targets the selected children when there are any, else the selected pieces |
 | `src/ui_components/icons/mod.rs` | 212 | 2,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_font_id` (the font for glyphs laid out with text); painted `paint_link`, `paint_reverse`, `paint_warning`, `paint_close`, `paint_reset` (the Link seams dialog); shared `icon_button` (no caller at the moment, `#[allow(dead_code)]`) |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
 | `src/ui_components/mod.rs` | 17 | 200 | bin | Reusable UI component module declarations (`radio` allows dead code since the theme became a group button) |
@@ -117,7 +117,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/seam_link/schematic.rs` | 368 | 2,900 | bin | `schematic`: both ranges unrolled into rows of diamond holes placed by their distance along the seam, lined up at the first automatic pair, thinned out when under 6 px apart; pair lines, numbers every fifth hole and at the ends, direction arrows; `Side`, `Click` (a hole, with Alt or not), `paint_diamond` |
 | `src/panels/seam_link/table.rs` | 248 | 1,900 | bin | `pair_table`: the header and a `show_rows` scroll area of pairs (#, A, B, Δ in display units, Manual badge), then unpaired holes collapsed into ranges (`ranges`) with an Unpaired badge; test |
 | `src/ui_components/palette/seam_link.rs` | 91 | 850 | bin | `SeamLinkPaint`: auto, manual and unpaired pair colors, hole fills, guide, arrow, A/B badge, warning box, table rows and badges, the chosen sewing tile, idle thread and the two leathers of the assembly drawings; light values picked |
-| `src/preview/mod.rs` | 273 | 2,300 | bin | 3D scene, camera, `PreviewMode` (Sewn by default, Flat), `PreviewSettings`; `rebuild_preview` (on a project or mode change, or Sew again, only while the 3D view is shown), `spawn_flat`, `step_sewn`; `show_controls` (View switch as a `GroupButton`, Sew again, camera sliders); `apply_theme` sets the background and ground plane colors for the theme |
+| `src/preview/mod.rs` | 382 | 3,200 | bin | 3D scene, camera, `PreviewMode` (Sewn by default, Flat), `PreviewSettings` (orbit angles, distance, pan target); `rebuild_preview` (on a project or mode change, or Sew again, only while the 3D view is shown), `spawn_flat`, `step_sewn`; `navigate` (mouse navigation over the canvas tab, called by `PanelViewer`: drag orbits, right or middle drag pans, wheel zooms, double click resets); `show_controls` (View switch as a `GroupButton`, Sew again, camera sliders, navigation hint); `apply_theme` sets the background and ground plane colors for the theme; the ground plane is 5% opaque (`GROUND_OPACITY`) |
 | `src/preview/flat.rs` | 106 | 1,000 | bin | `build_piece_mesh`: the flat mode's extrusion of each piece's `punched_region` |
 | `src/preview/sewn.rs` | 186 | 1,850 | bin | `SewnModel` (the `Drape`, the model center, mesh handles): `rebuild`, `clear`, `step` (one simulation frame, then the meshes replaced); `piece_mesh` (grain and flesh faces offset by half the thickness along vertex normals, walls on boundary edges), `thread_mesh` (a line list, colored per link through vertex colors) |
 | `src/drape/mod.rs` | 806 | 7,550 | lib | The sewn preview (`docs/sewn-preview.md`): `Drape` (`new`: meshes, anchors, self-link shaping, placement, constraints; `step`, `is_settled`, `positions`, `pieces`, `bounds`, `vertex_normals`, `thread_segments`), `DrapedPiece`, `SeamThread`, `ThreadSegment`, `Join`, `join_of`, `slack`, `attach`, `edge_distance`; tests in the second half |
@@ -373,13 +373,15 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 | Lines | Symbols |
 |---:|---|
-| 12-51 | Scene constants, `PreviewPlugin`, `PreviewSettings`, `Ground` |
-| 53-76 | `setup_scene` |
-| 78-112 | `clear_color`, `ground_color`, `apply_theme` (follows `Preferences::theme`) |
-| 114-164 | `rebuild_preview`, which skips pieces without a valid region |
-| 166-183 | `update_camera` |
-| 185-198 | `show_controls` |
-| 200-302 | `build_piece_mesh` (from a `Region`) |
+| 17-33 | Scene and camera constants (distance and tilt limits, orbit, zoom and pan speeds, `GROUND_OPACITY`) |
+| 35-70 | `PreviewPlugin`, `PreviewPiece`, `PreviewCamera`, `Ground`, `PreviewMode` |
+| 72-118 | `PreviewSettings` (azimuth, elevation, distance, pan `target`, `fit_distance`), `reset_view`, `camera_offset` |
+| 120-165 | `setup_scene` (the ground is alpha-blended), `clear_color`, `ground_color` (at `GROUND_OPACITY`) |
+| 167-185 | `apply_theme` (follows `Preferences::theme`) |
+| 187-282 | `Built`, `rebuild_preview` (frames the scene: sets `fit_distance` and recenters the target), `spawn_flat` |
+| 284-301 | `step_sewn`, `update_camera` (looks at `target`) |
+| 303-349 | `navigate`: mouse over the canvas tab orbits (primary drag), pans (secondary or middle drag), zooms (wheel) and resets the view (double click) |
+| 351-382 | `show_controls`, with the navigation hint |
 
 ## Where to look for common tasks
 
@@ -394,7 +396,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material`, `material_form` (`panels/material/form.rs`) and the Settings form in `panels/settings/material.rs` |
 | Change the file format | `model.rs` 119-160, 265-278, `shapes/mod.rs` 14-23 and the shape structs, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
-| Change the 3D look or mesh | `preview/mod.rs` 49-123, 159-261 | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
+| Change the 3D look or mesh | `preview/mod.rs` 120-282, `preview/flat.rs`, `preview/sewn.rs` | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
+| Change 3D camera navigation | `preview/mod.rs` 17-33, 72-118, 295-349 | `navigate` (mouse), `update_camera`, the speed constants |
 | Change snapping | `snap.rs`, `editor/canvas.rs` `draw_targets`, `editor/drag.rs` `snap_setup`, `docs/snap.md` | The rules live in `snap_offset`; what snaps to what is chosen by `draw_targets` (drawing tools) and `snap_setup` (drags); settings in `SnapSettings` and the snap controls on the canvas (`panels::snap`) |
 | Change align or distribute | `align/mod.rs` `arrange_items`, `align/align_edges.rs`, `align/distribute.rs`, `align/space.rs`, `panels/align/mod.rs` | `arrange_items` measures the items and picks the operation's submodule; it is shared by `offsets` (pieces) and `child_offsets` (children); the panel only builds an `ArrangePieces` or `ArrangeChildren` event |
 | Add a dockable panel | `ui_components/dock/mod.rs`, `editor/panel_viewer.rs` | A `PanelTab` variant, its `CLOSEABLE` and `label` entries, `default_state`, and arms in `PanelViewer::ui` and `scroll_bars` |

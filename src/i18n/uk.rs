@@ -184,6 +184,9 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Orbit => "Оберт",
         Label::Tilt => "Нахил",
         Label::Zoom => "Масштаб",
+        Label::PreviewNavigationHint => {
+            "Тягніть, щоб обертати; правою або середньою кнопкою — зсув; коліщатко — масштаб; подвійний клік — скинути вигляд."
+        }
         Label::PreviewShows => "Вигляд",
         Label::PreviewSewn => "Зшито",
         Label::PreviewFlat => "Плоско",

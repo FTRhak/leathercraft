@@ -182,6 +182,9 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::Orbit => "Orbit",
         Label::Tilt => "Tilt",
         Label::Zoom => "Zoom",
+        Label::PreviewNavigationHint => {
+            "Drag to orbit, right or middle drag to pan, scroll to zoom, double-click to reset."
+        }
         Label::PreviewShows => "View",
         Label::PreviewSewn => "Sewn",
         Label::PreviewFlat => "Flat",

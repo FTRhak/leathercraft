@@ -19,6 +19,18 @@ const MM_TO_SCENE: f64 = 0.01;
 const MIN_DISTANCE: f32 = 1.0;
 const MAX_DISTANCE: f32 = 60.0;
 const DEFAULT_DISTANCE: f32 = 3.2;
+const DEFAULT_AZIMUTH: f32 = 0.72;
+const DEFAULT_ELEVATION: f32 = 0.78;
+const MIN_ELEVATION: f32 = 0.12;
+const MAX_ELEVATION: f32 = 1.48;
+/// Radians the camera turns per point the mouse moves.
+const ORBIT_SPEED: f32 = 0.008;
+/// Matches the zoom speed of the 2D canvas.
+const ZOOM_SPEED: f32 = 0.002;
+/// Bevy's default vertical field of view, to pan the scene along with the cursor.
+const FIELD_OF_VIEW: f32 = std::f32::consts::FRAC_PI_4;
+/// The ground plane's opacity.
+const GROUND_OPACITY: f32 = 0.05;
 
 pub struct PreviewPlugin;
 
@@ -62,6 +74,10 @@ pub struct PreviewSettings {
     azimuth: f32,
     elevation: f32,
     distance: f32,
+    /// The point the camera orbits and looks at, moved by panning.
+    target: Vec3,
+    /// The distance that frames the whole scene, which a reset of the view returns to.
+    fit_distance: f32,
     mode: PreviewMode,
     /// Set by Sew again: start the simulation over.
     resew: bool,
@@ -70,12 +86,34 @@ pub struct PreviewSettings {
 impl Default for PreviewSettings {
     fn default() -> Self {
         Self {
-            azimuth: 0.72,
-            elevation: 0.78,
+            azimuth: DEFAULT_AZIMUTH,
+            elevation: DEFAULT_ELEVATION,
             distance: DEFAULT_DISTANCE,
+            target: Vec3::ZERO,
+            fit_distance: DEFAULT_DISTANCE,
             mode: PreviewMode::default(),
             resew: false,
         }
+    }
+}
+
+impl PreviewSettings {
+    /// Turns the camera back to where it starts, framing the whole scene.
+    fn reset_view(&mut self) {
+        self.azimuth = DEFAULT_AZIMUTH;
+        self.elevation = DEFAULT_ELEVATION;
+        self.distance = self.fit_distance;
+        self.target = Vec3::ZERO;
+    }
+
+    /// The camera's position relative to its target.
+    fn camera_offset(&self) -> Vec3 {
+        let horizontal = self.distance * self.elevation.cos();
+        Vec3::new(
+            horizontal * self.azimuth.cos(),
+            self.distance * self.elevation.sin(),
+            horizontal * self.azimuth.sin(),
+        )
     }
 }
 
@@ -98,7 +136,11 @@ fn setup_scene(
     ));
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::default().mesh().size(24.0, 24.0))),
-        MeshMaterial3d(materials.add(ground_color(Theme::default()))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: ground_color(Theme::default()),
+            alpha_mode: AlphaMode::Blend,
+            ..default()
+        })),
         Transform::from_xyz(0.0, -0.02, 0.0),
         Ground,
     ));
@@ -112,11 +154,13 @@ fn clear_color(theme: Theme) -> Color {
     }
 }
 
+/// Nearly see-through, so the ground hints at the floor without hiding the model's underside.
 fn ground_color(theme: Theme) -> Color {
-    match theme {
+    let color = match theme {
         Theme::Dark => Color::srgb(0.13, 0.15, 0.18),
         Theme::Light => Color::srgb(0.72, 0.74, 0.77),
-    }
+    };
+    color.with_alpha(GROUND_OPACITY)
 }
 
 /// Follows the interface theme, so the preview doesn't stay dark between light panels.
@@ -190,9 +234,12 @@ fn rebuild_preview(
             PreviewPiece,
         ),
     };
-    settings.distance = size_mm.map_or(DEFAULT_DISTANCE, |size| {
+    settings.fit_distance = size_mm.map_or(DEFAULT_DISTANCE, |size| {
         ((size * MM_TO_SCENE) as f32 * 2.7).clamp(MIN_DISTANCE, MAX_DISTANCE)
     });
+    // The scene is built around the origin, so a pan away from it would lose the model.
+    settings.distance = settings.fit_distance;
+    settings.target = Vec3::ZERO;
 }
 
 /// Spawns each piece flat, centered on the origin; returns the project's size in mm.
@@ -253,14 +300,51 @@ fn update_camera(
         return;
     }
 
-    let horizontal = settings.distance * settings.elevation.cos();
-    let offset = Vec3::new(
-        horizontal * settings.azimuth.cos(),
-        settings.distance * settings.elevation.sin(),
-        horizontal * settings.azimuth.sin(),
-    );
+    let position = settings.target + settings.camera_offset();
     for mut transform in &mut cameras {
-        *transform = Transform::from_translation(offset).looking_at(Vec3::ZERO, Vec3::Y);
+        *transform = Transform::from_translation(position).looking_at(settings.target, Vec3::Y);
+    }
+}
+
+/// Moves the camera with the mouse over the preview: the primary button orbits, the secondary
+/// or middle one pans (as on the 2D canvas), the wheel zooms and a double click resets the view.
+/// `settings` is only written on input, so the camera doesn't update every frame.
+pub fn navigate(ui: &mut egui::Ui, settings: &mut ResMut<PreviewSettings>) {
+    let rect = ui.max_rect();
+    let response = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+
+    if response.double_clicked() {
+        settings.reset_view();
+        return;
+    }
+    let delta = response.drag_delta();
+    if delta != egui::Vec2::ZERO {
+        if response.dragged_by(egui::PointerButton::Primary) {
+            let settings = &mut **settings;
+            settings.azimuth =
+                (settings.azimuth + delta.x * ORBIT_SPEED).rem_euclid(std::f32::consts::TAU);
+            settings.elevation =
+                (settings.elevation + delta.y * ORBIT_SPEED).clamp(MIN_ELEVATION, MAX_ELEVATION);
+        } else if response.dragged_by(egui::PointerButton::Secondary)
+            || response.dragged_by(egui::PointerButton::Middle)
+        {
+            // The camera renders to the whole window, so its scale follows the window's height.
+            let window_height = ui.ctx().content_rect().height().max(1.0);
+            let scene_per_point =
+                2.0 * settings.distance * (FIELD_OF_VIEW * 0.5).tan() / window_height;
+            let forward = -settings.camera_offset().normalize();
+            let right = forward.cross(Vec3::Y).normalize();
+            let up = right.cross(forward);
+            let shift = (up * delta.y - right * delta.x) * scene_per_point;
+            settings.target += shift;
+        }
+    }
+    if response.hovered() {
+        let scroll = ui.input(|input| input.smooth_scroll_delta.y);
+        if scroll != 0.0 {
+            settings.distance = (settings.distance * (-scroll * ZOOM_SPEED).exp())
+                .clamp(MIN_DISTANCE, MAX_DISTANCE);
+        }
     }
 }
 
@@ -287,10 +371,12 @@ pub fn show_controls(ui: &mut egui::Ui, settings: &mut PreviewSettings, language
             .text(language.label(Label::Orbit)),
     );
     ui.add(
-        egui::Slider::new(&mut settings.elevation, 0.12..=1.48).text(language.label(Label::Tilt)),
+        egui::Slider::new(&mut settings.elevation, MIN_ELEVATION..=MAX_ELEVATION)
+            .text(language.label(Label::Tilt)),
     );
     ui.add(
         egui::Slider::new(&mut settings.distance, MIN_DISTANCE..=MAX_DISTANCE)
             .text(language.label(Label::Zoom)),
     );
+    ui.weak(language.label(Label::PreviewNavigationHint));
 }

@@ -69,6 +69,8 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                         .first(Action::ToggleSnap)
                         .map(|shortcut| ui.ctx().format_shortcut(shortcut));
                     canvas(ui, self.project, self.events, self.state, hotkey.as_deref());
+                } else {
+                    crate::preview::navigate(ui, self.settings);
                 }
             }
             // Disabled rather than removed in preview mode, so that the layout doesn't jump.
