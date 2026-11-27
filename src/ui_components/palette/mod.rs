@@ -9,6 +9,7 @@ mod align_button;
 mod borders;
 mod button;
 mod checkbox;
+mod dimension;
 mod dock;
 mod dropdown;
 mod group_button;
@@ -30,6 +31,7 @@ use bevy_egui::egui::{self, Color32};
 
 use accent::AccentColors;
 use borders::Borders;
+use dimension::DimensionColors;
 use status::StatusColors;
 use surfaces::Surfaces;
 use text::TextColors;
@@ -69,6 +71,8 @@ pub(crate) struct Palette {
     pub(crate) centerline: Color32,
     /// The edge picked with the Edge tool.
     pub(crate) edge: Color32,
+    /// The dimension lines around the selection.
+    pub(crate) dimension: DimensionColors,
 
     pub(crate) surface: Surfaces,
     pub(crate) border: Borders,
@@ -116,6 +120,7 @@ impl Palette {
         hole: hex(0xD6D6D6),
         centerline: hex(0x78C3D7),
         edge: hex(0xFAD75A),
+        dimension: DimensionColors::DARK,
         surface: Surfaces::DARK,
         border: Borders::DARK,
         text: TextColors::DARK,
@@ -147,6 +152,7 @@ impl Palette {
         hole: hex(0x4A4E59),
         centerline: hex(0x1E82A5),
         edge: hex(0xC89100),
+        dimension: DimensionColors::LIGHT,
         surface: Surfaces::LIGHT,
         border: Borders::LIGHT,
         text: TextColors::LIGHT,

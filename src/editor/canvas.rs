@@ -148,6 +148,7 @@ pub(super) fn canvas(
     draw_centerlines(&painter, view, project, state);
     draw_stitch_holes(&painter, response.hover_pos(), view, project, state);
     draw_edges(&painter, response.hover_pos(), view, project, state);
+    draw_dimensions(&painter, view, project, state);
     if state.tool == Tool::StitchHoles {
         draw_stitch_draft(&painter, ui, response.hover_pos(), view, project, state);
     } else {
@@ -271,7 +272,8 @@ fn draw_snap_feedback(painter: &egui::Painter, view: Viewport, state: &EditorSta
     }
 }
 
-/// The box around the selected children, or else around every selected piece.
+/// The box around the selected children, or else around every selected piece, as displayed, so
+/// that it follows a drag in progress.
 fn selection_bounds(project: &Project, state: &EditorState) -> Option<Bounds> {
     let children = state.selected_children();
     if let Some(piece) = state
@@ -279,6 +281,7 @@ fn selection_bounds(project: &Project, state: &EditorState) -> Option<Bounds> {
         .and_then(|id| project.pieces.iter().find(|piece| piece.id == id))
         && !children.is_empty()
     {
+        let piece = state.displayed(piece);
         return children
             .iter()
             .filter_map(|id| piece.child(*id))
@@ -289,8 +292,106 @@ fn selection_bounds(project: &Project, state: &EditorState) -> Option<Bounds> {
         .pieces
         .iter()
         .filter(|piece| state.is_selected(piece.id))
-        .filter_map(PatternPiece::bounds)
+        .filter_map(|piece| state.displayed(piece).bounds())
         .reduce(Bounds::union)
+}
+
+/// How far a dimension line stands off the box it measures, in screen points.
+const DIMENSION_OFFSET_PX: f32 = 26.0;
+/// How far an end tick runs past the dimension line.
+const DIMENSION_TICK_OVERHANG_PX: f32 = 6.0;
+/// The gap between an end tick and the box.
+const DIMENSION_TICK_GAP_PX: f32 = 6.0;
+
+/// The dimension lines of the selection, as in the "Dim W" and "Dim H" overlays of the design:
+/// its width above the selection box and its height to the right of it, each a line between two
+/// end ticks with the measurement on a plate in the middle.
+fn draw_dimensions(
+    painter: &egui::Painter,
+    view: Viewport,
+    project: &Project,
+    state: &EditorState,
+) {
+    let Some(bounds) = selection_bounds(project, state) else {
+        return;
+    };
+    let colors = &Palette::of(painter).dimension;
+    let stroke = egui::Stroke::new(1.0, colors.line);
+    let corners = [
+        view.to_screen(Point::new(bounds.min_x, bounds.min_y)),
+        view.to_screen(Point::new(bounds.max_x, bounds.max_y)),
+    ];
+    let screen = egui::Rect::from_two_pos(corners[0], corners[1]);
+    let label = |millimeters: f64| format_length(state.language, project.units, millimeters);
+
+    // Width, above the box.
+    let y = screen.top() - DIMENSION_OFFSET_PX;
+    painter.line_segment(
+        [egui::pos2(screen.left(), y), egui::pos2(screen.right(), y)],
+        stroke,
+    );
+    for x in [screen.left(), screen.right()] {
+        painter.line_segment(
+            [
+                egui::pos2(x, y - DIMENSION_TICK_OVERHANG_PX),
+                egui::pos2(x, screen.top() - DIMENSION_TICK_GAP_PX),
+            ],
+            stroke,
+        );
+    }
+    draw_dimension_label(
+        painter,
+        egui::pos2(screen.center().x, y),
+        label(bounds.width()),
+        false,
+    );
+
+    // Height, right of the box, read from the bottom up.
+    let x = screen.right() + DIMENSION_OFFSET_PX;
+    painter.line_segment(
+        [egui::pos2(x, screen.top()), egui::pos2(x, screen.bottom())],
+        stroke,
+    );
+    for y in [screen.top(), screen.bottom()] {
+        painter.line_segment(
+            [
+                egui::pos2(screen.right() + DIMENSION_TICK_GAP_PX, y),
+                egui::pos2(x + DIMENSION_TICK_OVERHANG_PX, y),
+            ],
+            stroke,
+        );
+    }
+    draw_dimension_label(
+        painter,
+        egui::pos2(x, screen.center().y),
+        label(bounds.height()),
+        true,
+    );
+}
+
+/// A measurement on its plate, centered on `center`; `vertical` turns it a quarter turn
+/// counterclockwise.
+fn draw_dimension_label(painter: &egui::Painter, center: egui::Pos2, text: String, vertical: bool) {
+    let colors = &Palette::of(painter).dimension;
+    let galley = painter.layout_no_wrap(text, egui::FontId::monospace(10.0), colors.label_text);
+    let padding = egui::vec2(6.0, 2.0);
+    let size = galley.size() + padding * 2.0;
+    let plate = if vertical {
+        egui::Rect::from_center_size(center, egui::vec2(size.y, size.x))
+    } else {
+        egui::Rect::from_center_size(center, size)
+    };
+    painter.rect_filled(plate, 3.0, colors.label_fill);
+    let text_size = galley.size();
+    let shape = if vertical {
+        // Turned about its top left corner, the text runs upwards from there.
+        let origin = center + egui::vec2(-text_size.y * 0.5, text_size.x * 0.5);
+        egui::epaint::TextShape::new(origin, galley, colors.label_text)
+            .with_angle(-std::f32::consts::FRAC_PI_2)
+    } else {
+        egui::epaint::TextShape::new(center - text_size * 0.5, galley, colors.label_text)
+    };
+    painter.add(shape);
 }
 
 fn fit_view(rect: egui::Rect, bounds: Option<Bounds>, state: &mut EditorState) {
