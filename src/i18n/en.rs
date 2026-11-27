@@ -100,6 +100,7 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::NavigationHint => "Right or middle drag pans; scroll zooms.",
         Label::Snap => "Snap",
         Label::SnapEnabled => "Snapping",
+        Label::SnapTargets => "Snap targets",
         Label::SnapGrid => "To grid",
         Label::SnapGridStep => "Grid step",
         Label::SnapVertices => "To vertices",

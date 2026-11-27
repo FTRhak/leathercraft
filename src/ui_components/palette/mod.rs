@@ -16,6 +16,7 @@ mod input;
 mod layout;
 mod list;
 mod properties;
+mod snap;
 mod status;
 mod status_bar;
 mod surfaces;
@@ -43,6 +44,7 @@ pub(crate) use input::{InputColors, InputPaint};
 pub(crate) use layout::LayoutColors;
 pub(crate) use list::{ListColors, ListItemPaint};
 pub(crate) use properties::PropertiesColors;
+pub(crate) use snap::{PopoverColors, SnapColors, TargetRowPaint};
 pub(crate) use status_bar::StatusBarColors;
 pub(crate) use tabs::{TabColors, TabPaint};
 pub(crate) use title_bar::{ModePaint, ModeSwitchColors, TitleBarColors};
@@ -88,6 +90,7 @@ pub(crate) struct Palette {
     pub(crate) status_bar: StatusBarColors,
     pub(crate) toolbar: ToolbarColors,
     pub(crate) view_controls: ViewControlsColors,
+    pub(crate) snap: SnapColors,
 }
 
 /// A color written as `0xRRGGBB`.
@@ -133,6 +136,7 @@ impl Palette {
         status_bar: StatusBarColors::DARK,
         toolbar: ToolbarColors::DARK,
         view_controls: ViewControlsColors::DARK,
+        snap: SnapColors::DARK,
     };
     const LIGHT: Self = Self {
         grid_line: hex(0xE6E8EC),
@@ -163,6 +167,7 @@ impl Palette {
         status_bar: StatusBarColors::LIGHT,
         toolbar: ToolbarColors::LIGHT,
         view_controls: ViewControlsColors::LIGHT,
+        snap: SnapColors::LIGHT,
     };
 
     /// The palette of the current theme, from `visuals.dark_mode`.

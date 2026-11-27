@@ -102,6 +102,7 @@ pub(super) fn label(label: Label) -> &'static str {
         }
         Label::Snap => "Прив’язка",
         Label::SnapEnabled => "Прив’язувати",
+        Label::SnapTargets => "Ціль прив’язки",
         Label::SnapGrid => "До сітки",
         Label::SnapGridStep => "Крок сітки",
         Label::SnapVertices => "До вершин",

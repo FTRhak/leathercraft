@@ -175,6 +175,7 @@ pub fn editor_ui(
                 history_events: &mut history_events,
                 state,
                 view_mode: *view_mode,
+                hotkeys: &preferences.hotkeys,
                 settings: &mut settings,
                 style: ctx.style(),
                 decor: &mut dock.decor,

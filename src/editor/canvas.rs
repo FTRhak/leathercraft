@@ -3,6 +3,7 @@ use super::drag_state_struct::ShapeRef;
 use super::grid::draw_grid;
 use super::{EditorState, ShapeDraft, ShapePart, format_length, send};
 use crate::document::ProjectMessage;
+use crate::panels::snap;
 use crate::panels::tools::{Tool, ZoomRequest};
 use crate::ui_components::palette::Palette;
 use crate::ui_components::view_controls::{self, ViewCommand, ViewControls};
@@ -65,6 +66,7 @@ pub(super) fn canvas(
     project: &Project,
     events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
+    snap_hotkey: Option<&str>,
 ) {
     let (response, painter) =
         ui.allocate_painter(ui.available_size(), egui::Sense::click_and_drag());
@@ -154,6 +156,9 @@ pub(super) fn canvas(
     draw_shape_draft(&painter, view, project.units, state);
     draw_snap_feedback(&painter, view, state);
     show_view_controls(ui, rect, state);
+    snap::show(ui, rect, &mut state.snap, snap_hotkey, state.language);
+    let pointer_down = ui.input(|input| input.pointer.any_down());
+    state.save_snap_when_settled(pointer_down);
 }
 
 /// Screen points per mm at the actual size, 100%: egui points are 1/96 inch.

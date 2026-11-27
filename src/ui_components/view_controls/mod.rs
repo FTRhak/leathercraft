@@ -97,11 +97,11 @@ pub fn show(ui: &mut egui::Ui, canvas: egui::Rect, controls: &ViewControls) -> O
         primary_width,
     ];
     let content_width = widths.iter().sum::<f32>() + GAP * (widths.len() - 1) as f32;
-    let size = egui::vec2(
-        content_width + 2.0 * PADDING,
-        BUTTON_HEIGHT + 2.0 * PADDING,
+    let size = egui::vec2(content_width + 2.0 * PADDING, BUTTON_HEIGHT + 2.0 * PADDING);
+    let panel = egui::Rect::from_min_size(
+        canvas.right_bottom() - size - egui::Vec2::splat(MARGIN),
+        size,
     );
-    let panel = egui::Rect::from_min_size(canvas.right_bottom() - size - egui::Vec2::splat(MARGIN), size);
     // A canvas too small to hold the panel goes without it.
     if panel.left() < canvas.left() || panel.top() < canvas.top() {
         return None;
@@ -143,29 +143,53 @@ pub fn show(ui: &mut egui::Ui, canvas: egui::Rect, controls: &ViewControls) -> O
             command = Some(which);
         }
     };
-    let zoom_out = icon_button(ui, rects[0], id.with(0), Icon::ZoomOut, controls.zoom_out, colors);
+    let zoom_out = icon_button(
+        ui,
+        rects[0],
+        id.with(0),
+        Icon::ZoomOut,
+        controls.zoom_out,
+        colors,
+    );
     click(zoom_out, ViewCommand::ZoomOut);
 
     let response = button(ui, rects[1], id.with(1), true, controls.actual_size);
     paint_quiet(ui, rects[1], &response, colors);
-    ui.painter().galley(
-        rects[1].center() - value.size() / 2.0,
-        value,
-        colors.value,
-    );
+    ui.painter()
+        .galley(rects[1].center() - value.size() / 2.0, value, colors.value);
     click(response.clicked(), ViewCommand::ActualSize);
 
-    let zoom_in = icon_button(ui, rects[2], id.with(2), Icon::ZoomIn, controls.zoom_in, colors);
+    let zoom_in = icon_button(
+        ui,
+        rects[2],
+        id.with(2),
+        Icon::ZoomIn,
+        controls.zoom_in,
+        colors,
+    );
     click(zoom_in, ViewCommand::ZoomIn);
 
     let divider = egui::Rect::from_center_size(rects[3].center(), egui::vec2(1.0, DIVIDER_HEIGHT));
     ui.painter().rect_filled(divider, 0.0, colors.divider);
 
-    let fit_all = icon_button(ui, rects[4], id.with(4), Icon::FitAll, controls.fit_all, colors);
+    let fit_all = icon_button(
+        ui,
+        rects[4],
+        id.with(4),
+        Icon::FitAll,
+        controls.fit_all,
+        colors,
+    );
     click(fit_all, ViewCommand::FitAll);
 
     let enabled = controls.can_fit_selection;
-    let response = button(ui, rects[5], id.with(5), enabled, controls.fit_selection_tooltip);
+    let response = button(
+        ui,
+        rects[5],
+        id.with(5),
+        enabled,
+        controls.fit_selection_tooltip,
+    );
     let style = if !enabled {
         &colors.disabled
     } else if hovered(&response) {
@@ -284,7 +308,10 @@ fn paint_icon(painter: &egui::Painter, rect: egui::Rect, icon: Icon, color: egui
     match icon {
         Icon::ZoomOut | Icon::ZoomIn => {
             painter.circle_stroke(at(5.9, 5.9), 4.5, stroke);
-            painter.line_segment([at(9.4, 9.4), at(13.3, 13.3)], egui::Stroke::new(1.5, color));
+            painter.line_segment(
+                [at(9.4, 9.4), at(13.3, 13.3)],
+                egui::Stroke::new(1.5, color),
+            );
             painter.line_segment([at(3.8, 5.9), at(8.0, 5.9)], stroke);
             if matches!(icon, Icon::ZoomIn) {
                 painter.line_segment([at(5.9, 3.8), at(5.9, 8.0)], stroke);

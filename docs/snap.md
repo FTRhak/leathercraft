@@ -5,7 +5,8 @@ How points and moved shapes snap while drawing and dragging, and where the setti
 | File | Holds |
 |---|---|
 | `src/snap.rs` (lib) | `SnapSettings`, `SnapScope`, `SnapTargets`, `Moving`, `Guide`, `SnapFeedback`, `snap_point`, `snap_offset`; tests |
-| `src/panels/snap/mod.rs` | The Snap panel: `show_panel` |
+| `src/panels/snap/mod.rs` | The snap controls on the canvas: `show` (magnet toggle, targets button and its popover) |
+| `src/ui_components/palette/snap.rs` | `SnapColors`: the colors of the snap controls and popover |
 | `src/editor/canvas.rs` | `draw_targets`, `snap_draw` (drawing tools), the hover target, `draw_snap_feedback` |
 | `src/editor/drag.rs` | `snap_setup` (targets and moved shapes gathered when a drag starts), snapping in `update_drag` |
 | `src/editor/grid.rs` | The dots of the snap grid |
@@ -13,9 +14,13 @@ How points and moved shapes snap while drawing and dragging, and where the setti
 
 ## For users
 
-The **Snap** panel (beside Properties and Align; reopen it from the Window menu) has:
+The **snap controls** float in the top right corner of the canvas, from the "Snap Controls" and "Snap Popover" of the design:
 
-- **Snapping**: turns everything on or off. **F9** toggles it; holding **Alt** turns it off for a moment.
+- **The magnet** turns all snapping on or off. **F9** toggles it too (its tooltip shows the current hotkey); holding **Alt** turns it off for a moment.
+- **The targets button** (grid icon and caret) opens a popover with the hotkey in its header, the three targets as rows that toggle on a click (checked and accent-filled when on), the grid step, the snap distance, and the two hints. A click outside closes it.
+
+The settings in it:
+
 - **To grid** with a step of 1–10 mm, counted from the origin [0, 0]. While the dots are at least 8 px apart, the canvas shows them.
 - **To vertices**: the handles of other shapes: corners, ellipse axis ends, line and stitch line points. A child shape snaps only to the vertices of its own piece.
 - **Smart guides**: the left, right, top and bottom edges and the center of what moves line up with those of other objects. A dashed magenta line shows what lined up.
@@ -65,4 +70,4 @@ The tolerance in mm is `distance_px / zoom` (`Viewport::snap_tolerance`).
 ## Extending
 
 - **A new kind of target**, such as edge midpoints or shape centers: add the points in `SnapTargets::collect`.
-- **A new snap mode**: add a flag to `SnapSettings`, with a default, so that older `settings.json` files still load. Give it a step in `snap_offset` and a checkbox in `panels::snap`.
+- **A new snap mode**: add a flag to `SnapSettings`, with a default, so that older `settings.json` files still load. Give it a step in `snap_offset` and a row in the target list of `panels::snap`.

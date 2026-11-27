@@ -150,10 +150,12 @@ pub enum Label {
     MoveDown,
     DeleteChild,
     NavigationHint,
-    /// The Snap panel.
+    /// The title of the snap popover on the canvas.
     Snap,
     SnapEnabled,
     SnapGrid,
+    /// The caption of the target list in the snap popover, and the tooltip of its button.
+    SnapTargets,
     SnapGridStep,
     SnapVertices,
     SnapVerticesHint,

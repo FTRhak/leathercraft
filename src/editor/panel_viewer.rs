@@ -1,7 +1,8 @@
 use super::{EditorState, ViewMode, canvas, send};
 use crate::document::{HistoryMessage, ProjectMessage};
-use crate::panels::{align, history, layout, material, properties, snap};
+use crate::panels::{align, history, layout, material, properties};
 use crate::preview::PreviewSettings;
+use crate::settings::{Action, Hotkeys};
 use crate::ui_components::dock::{PanelTab, TabDecor};
 use crate::ui_components::icons::glyph;
 use bevy::prelude::*;
@@ -19,6 +20,8 @@ pub(super) struct PanelViewer<'a, 'e, 'h, 's> {
     pub(super) history_events: &'a mut MessageWriter<'h, HistoryMessage>,
     pub(super) state: &'a mut EditorState,
     pub(super) view_mode: ViewMode,
+    /// For the shortcut shown by the snap controls on the canvas.
+    pub(super) hotkeys: &'a Hotkeys,
     /// Stays behind `ResMut`, so that the camera only updates when the controls are shown.
     pub(super) settings: &'a mut ResMut<'s, PreviewSettings>,
     /// Sizes the tab titles and picks their theme.
@@ -40,8 +43,8 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
             PanelTab::Align => Some(glyph::ALIGN_LEFT),
             PanelTab::Layout => Some(glyph::LAYOUT),
             PanelTab::History => Some(glyph::HISTORY),
-            // No glyph yet for the canvas, the magnet of Snap or the swatch of Material.
-            PanelTab::Canvas | PanelTab::Snap | PanelTab::Material => None,
+            // No glyph yet for the canvas or the swatch of Material.
+            PanelTab::Canvas | PanelTab::Material => None,
         };
         self.decor.title(&self.style, *tab, glyph, text)
     }
@@ -61,7 +64,11 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
         match *tab {
             PanelTab::Canvas => {
                 if editing {
-                    canvas(ui, self.project, self.events, self.state);
+                    let hotkey = self
+                        .hotkeys
+                        .first(Action::ToggleSnap)
+                        .map(|shortcut| ui.ctx().format_shortcut(shortcut));
+                    canvas(ui, self.project, self.events, self.state, hotkey.as_deref());
                 }
             }
             // Disabled rather than removed in preview mode, so that the layout doesn't jump.
@@ -92,13 +99,6 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                         send(self.events, event);
                     }
                 });
-            }
-            PanelTab::Snap => {
-                ui.add_enabled_ui(editing, |ui| {
-                    snap::show_panel(ui, &mut self.state.snap, language);
-                });
-                let pointer_down = ui.input(|input| input.pointer.any_down());
-                self.state.save_snap_when_settled(pointer_down);
             }
             PanelTab::Properties => {
                 let state = &mut *self.state;
@@ -182,7 +182,7 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
 
     fn scroll_bars(&self, tab: &PanelTab) -> [bool; 2] {
         match tab {
-            PanelTab::Properties | PanelTab::Align | PanelTab::Snap => [false, true],
+            PanelTab::Properties | PanelTab::Align => [false, true],
             // The canvas pans itself, and these two have their own scroll areas.
             PanelTab::Canvas | PanelTab::Layout | PanelTab::Material | PanelTab::History => {
                 [false, false]

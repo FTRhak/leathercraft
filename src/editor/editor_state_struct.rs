@@ -52,7 +52,7 @@ pub struct EditorState {
     pub(super) zoom: f32,
     /// A zoom asked for by the tool bar, or by opening a project; done on the next canvas frame.
     pub(super) zoom_request: Option<ZoomRequest>,
-    /// The snapping settings of the Snap panel.
+    /// The snapping settings, edited by the snap controls on the canvas.
     pub(super) snap: SnapSettings,
     /// The settings last written to `settings.json`, so that only a change is saved.
     pub(super) snap_saved: SnapSettings,
