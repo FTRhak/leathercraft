@@ -1,5 +1,6 @@
 use crate::i18n::Message;
 use crate::material::Material;
+use crate::seams::SeamLink;
 use crate::shapes::{MAX_DASHES_PER_LINE, MAX_HOLES_PER_LINE, Shape, StitchLine};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -326,6 +327,10 @@ pub struct Project {
     /// The material given to each new piece. Older files lack the field.
     #[serde(default)]
     pub default_material: Material,
+    /// Pairs of stitch lines sewn together. Only their parameters are stored; the hole pairs
+    /// are computed by `SeamLink::pairs`. Older files lack the field.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub seam_links: Vec<SeamLink>,
     /// Where the document lives on disk; not part of the file format.
     #[serde(skip)]
     pub path: Option<PathBuf>,
@@ -341,6 +346,7 @@ impl Default for Project {
             units: Units::Millimeters,
             pieces: Vec::new(),
             default_material: Material::default(),
+            seam_links: Vec::new(),
             path: None,
             modified: false,
         }
@@ -386,7 +392,7 @@ impl Project {
             }
             piece.validate_shapes()?;
         }
-        Ok(())
+        self.validate_seam_links()
     }
 
     pub fn next_piece_id(&self) -> u64 {
@@ -525,6 +531,46 @@ mod tests {
                 name: "Pocket".to_owned()
             })
         );
+    }
+
+    #[test]
+    fn seam_links_are_validated() {
+        use crate::seams::ManualPair;
+        use crate::seams::tests::{link, side, two_lines};
+        let check = |link: crate::seams::SeamLink| {
+            let mut project = two_lines(10, 10, 4.0);
+            project.seam_links.push(link);
+            project.validate()
+        };
+        let good = link(side(1, 0, 9), side(2, 0, 9));
+        assert_eq!(check(good.clone()), Ok(()));
+        // A range past the holes is allowed: the line may have been shortened.
+        assert_eq!(check(link(side(1, 0, 30), side(2, 0, 9))), Ok(()));
+
+        let mut missing = good.clone();
+        missing.b.piece = 9;
+        assert_eq!(check(missing), Err(Message::SeamNotFound));
+        let mut not_a_line = two_lines(10, 10, 4.0);
+        not_a_line.pieces[1].children[0].shape =
+            Shape::rectangle_from_corners(Point::new(1.0, 1.0), Point::new(3.0, 3.0)).unwrap();
+        not_a_line.seam_links.push(good.clone());
+        assert_eq!(not_a_line.validate(), Err(Message::SeamNotFound));
+
+        assert_eq!(
+            check(link(side(1, 5, 2), side(2, 0, 9))),
+            Err(Message::InvalidSeamRange)
+        );
+        assert_eq!(
+            check(link(side(1, 0, 5), side(1, 5, 9))),
+            Err(Message::SeamRangesOverlap)
+        );
+        let mut repeated = good.clone();
+        repeated.manual = vec![ManualPair { a: 1, b: 2 }, ManualPair { a: 1, b: 3 }];
+        assert_eq!(check(repeated), Err(Message::DuplicateManualPair));
+
+        let mut project = two_lines(10, 10, 4.0);
+        project.seam_links = vec![good.clone(), good];
+        assert_eq!(project.validate(), Err(Message::DuplicateSeamLink));
     }
 
     #[test]

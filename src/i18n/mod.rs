@@ -274,6 +274,41 @@ pub enum Label {
     WaterResistance(WaterResistance),
     WaterResistanceHint(WaterResistance),
     HeatResistance(HeatResistance),
+    /// The Pattern menu item and Properties button that open the Link seams dialog.
+    LinkSeams,
+    LinkSeamsTitle,
+    LinkSeamsSubtitle,
+    SeamA,
+    SeamB,
+    /// Before the first hole of a seam's range.
+    HolesFrom,
+    /// Before the last hole of a seam's range.
+    HolesTo,
+    Reverse,
+    StartOffset,
+    /// The unit after the start offset: holes, shortened.
+    HolesShort,
+    LinkSchematic,
+    HolePairs,
+    /// The legend of automatic pairs on the schematic.
+    PairAuto,
+    /// The badge of a manual pair in the table.
+    PairManual,
+    /// The legend of manual pairs on the schematic.
+    PairManualLegend,
+    /// Holes without a pair: the legend, the table badge and the summary tile.
+    PairFree,
+    LinkHint,
+    ResetManualPairs,
+    /// The summary tile with the number of pairs.
+    Pairs,
+    LengthDifference,
+    /// The section of a stitch line's links in Properties.
+    SeamLinks,
+    EditLink,
+    RemoveLink,
+    /// A link whose range runs past its line's holes, which were cut short.
+    SeamLinkStale,
 }
 
 /// Text with arguments, kept structured so it is rendered in the language current when shown.
@@ -525,6 +560,70 @@ pub enum Message {
         name: String,
         count: usize,
     },
+    ActionLinkSeams {
+        a: String,
+        b: String,
+    },
+    ActionEditSeamLink {
+        a: String,
+        b: String,
+    },
+    ActionRemoveSeamLink {
+        a: String,
+        b: String,
+    },
+    // Seam links.
+    SeamNotFound,
+    InvalidSeamRange,
+    SeamRangesOverlap,
+    DuplicateManualPair,
+    DuplicateSeamLink,
+    /// The title of the warning when the ranges hold different numbers of holes.
+    HoleCountMismatch {
+        a: usize,
+        b: usize,
+    },
+    /// Under that title: how many holes are left without a pair, on one side or on both.
+    UnpairedHoles {
+        side: Option<char>,
+        count: usize,
+    },
+    /// A button that sets a side's pitch so that the counts match; `pitch` is formatted.
+    FitPitch {
+        side: char,
+        pitch: String,
+    },
+    LinkPairsButton {
+        count: usize,
+    },
+    /// A stitch line by its piece and its number among the piece's stitch lines.
+    SeamName {
+        piece: String,
+        index: usize,
+    },
+    /// A stitch line in the seam lists, with its hole count.
+    SeamOption {
+        piece: String,
+        index: usize,
+        holes: usize,
+    },
+    /// The hole count beside a seam's title.
+    HoleCountBadge {
+        count: usize,
+    },
+    /// The number of pairs beside the table title.
+    PairsCount {
+        count: usize,
+    },
+    /// The summary tile of unpaired holes: on one side, or on both.
+    FreeIn {
+        side: Option<char>,
+    },
+    /// A link in the Properties of one of its seams: the other seam and the number of pairs.
+    SeamLinkRow {
+        other: String,
+        pairs: usize,
+    },
 }
 
 impl fmt::Display for Message {
@@ -595,6 +694,40 @@ mod tests {
         assert_eq!(
             uk(piece(2, 48)),
             "Обрано: Wallet (2 фігури · 48 отворів шва)"
+        );
+    }
+
+    #[test]
+    fn seam_link_counts_use_the_right_plural_form() {
+        let uk = |message| Language::Ukrainian.message(&message);
+        assert_eq!(
+            uk(Message::LinkPairsButton { count: 48 }),
+            "Зв’язати 48 пар"
+        );
+        assert_eq!(uk(Message::LinkPairsButton { count: 2 }), "Зв’язати 2 пари");
+        assert_eq!(uk(Message::HoleCountBadge { count: 52 }), "52 отвори");
+        assert_eq!(
+            uk(Message::UnpairedHoles {
+                side: Some('B'),
+                count: 3
+            }),
+            "3 отвори шва B лишаються без пари. Вирівняйте крок, щоб кількості збіглися."
+        );
+        assert!(
+            uk(Message::UnpairedHoles {
+                side: None,
+                count: 1
+            })
+            .starts_with("1 отвір лишається")
+        );
+        let en = |message| Language::English.message(&message);
+        assert_eq!(en(Message::LinkPairsButton { count: 1 }), "Link 1 pair");
+        assert_eq!(
+            en(Message::ActionLinkSeams {
+                a: "Flap".to_owned(),
+                b: "Flap".to_owned()
+            }),
+            "Linked seams of 'Flap'"
         );
     }
 

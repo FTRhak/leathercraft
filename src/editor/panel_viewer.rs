@@ -115,15 +115,20 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                 } else {
                     properties::ViewControls::Preview(self.settings)
                 };
+                let mut open_link = None;
                 let selection = properties::Selection {
                     piece: piece.as_deref(),
                     child,
                     part,
                     rename_buffer: &mut state.rename_buffer,
+                    open_link: &mut open_link,
                 };
                 let event = properties::show_panel(ui, self.project, view, selection, language);
                 if let Some(event) = event {
                     send(self.events, event);
+                }
+                if let Some(request) = open_link {
+                    state.open_seam_link(self.project, request);
                 }
             }
             PanelTab::Layout => {

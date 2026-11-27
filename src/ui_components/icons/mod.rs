@@ -71,6 +71,113 @@ pub fn paint_glyph(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stro
     );
 }
 
+/// Two chain links on the diagonal: linked seams. Painted, as the icon font has no such glyph.
+pub fn paint_link(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+    let side = rect.width().min(rect.height());
+    let center = rect.center();
+    let along = egui::vec2(1.0, -1.0).normalized();
+    let (half_length, radius) = (side * 0.2, side * 0.16);
+    for sign in [-1.0, 1.0] {
+        let link_center = center + along * (sign * side * 0.17);
+        painter.add(egui::Shape::closed_line(
+            capsule(link_center, along, half_length, radius),
+            stroke,
+        ));
+    }
+}
+
+/// The outline of a stadium around `center`, long along the unit vector `along`.
+fn capsule(
+    center: egui::Pos2,
+    along: egui::Vec2,
+    half_length: f32,
+    radius: f32,
+) -> Vec<egui::Pos2> {
+    const ARC_STEPS: usize = 8;
+    let across = egui::vec2(-along.y, along.x);
+    let mut points = Vec::with_capacity(2 * (ARC_STEPS + 1));
+    for (end, start_angle) in [(1.0, -90.0_f32), (-1.0, 90.0)] {
+        let cap = center + along * (end * half_length);
+        for step in 0..=ARC_STEPS {
+            let angle = (start_angle + 180.0 * step as f32 / ARC_STEPS as f32).to_radians();
+            points.push(cap + (along * angle.cos() + across * angle.sin()) * radius);
+        }
+    }
+    points
+}
+
+/// Two opposite arrows, one above the other: reverse the direction.
+pub fn paint_reverse(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+    let rect = rect.shrink(rect.width() * 0.1);
+    let head = rect.height() * 0.22;
+    let rows = [
+        (rect.top() + rect.height() * 0.3, 1.0),
+        (rect.top() + rect.height() * 0.7, -1.0),
+    ];
+    for (y, direction) in rows {
+        let (from, to) = if direction > 0.0 {
+            (rect.left(), rect.right())
+        } else {
+            (rect.right(), rect.left())
+        };
+        let tip = egui::pos2(to, y);
+        painter.line_segment([egui::pos2(from, y), tip], stroke);
+        let back = -direction * head;
+        painter.line_segment([tip, egui::pos2(to + back, y - head)], stroke);
+        painter.line_segment([tip, egui::pos2(to + back, y + head)], stroke);
+    }
+}
+
+/// A triangle with an exclamation mark: a warning.
+pub fn paint_warning(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+    let side = rect.width().min(rect.height());
+    let center = rect.center();
+    let top = egui::pos2(center.x, center.y - side * 0.45);
+    let left = egui::pos2(center.x - side * 0.5, center.y + side * 0.42);
+    let right = egui::pos2(center.x + side * 0.5, center.y + side * 0.42);
+    painter.add(egui::Shape::closed_line(vec![top, right, left], stroke));
+    painter.line_segment(
+        [
+            egui::pos2(center.x, center.y - side * 0.12),
+            egui::pos2(center.x, center.y + side * 0.14),
+        ],
+        stroke,
+    );
+    painter.circle_filled(
+        egui::pos2(center.x, center.y + side * 0.28),
+        stroke.width * 0.7,
+        stroke.color,
+    );
+}
+
+/// A cross: close.
+pub fn paint_close(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+    let rect = rect.shrink(rect.width() * 0.25);
+    painter.line_segment([rect.left_top(), rect.right_bottom()], stroke);
+    painter.line_segment([rect.right_top(), rect.left_bottom()], stroke);
+}
+
+/// A counter-clockwise arrow around a circle: reset.
+pub fn paint_reset(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+    const STEPS: usize = 16;
+    let center = rect.center();
+    let radius = rect.width().min(rect.height()) * 0.36;
+    // From the top, counter-clockwise round to the left side, leaving a gap at the top left.
+    let start = -60.0_f32;
+    let sweep = 290.0_f32;
+    let points: Vec<egui::Pos2> = (0..=STEPS)
+        .map(|step| {
+            let angle = (start + sweep * step as f32 / STEPS as f32).to_radians();
+            center + egui::vec2(angle.cos(), angle.sin()) * radius
+        })
+        .collect();
+    let tip = points[0];
+    painter.add(egui::Shape::line(points, stroke));
+    let head = radius * 0.6;
+    painter.line_segment([tip, tip + egui::vec2(-head, -head * 0.1)], stroke);
+    painter.line_segment([tip, tip + egui::vec2(head * 0.15, -head)], stroke);
+}
+
 /// The icon font at `size`, for glyphs laid out with text.
 pub fn icon_font_id(size: f32) -> egui::FontId {
     egui::FontId::new(size, icon_font())

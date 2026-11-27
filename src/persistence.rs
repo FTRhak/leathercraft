@@ -82,6 +82,34 @@ mod tests {
     }
 
     #[test]
+    fn seam_links_round_trip_and_files_without_them_have_no_key() {
+        use crate::seams::ManualPair;
+        use crate::seams::tests::{link, side, two_lines};
+        let path = temp_path("seam-links");
+        let mut project = two_lines(10, 12, 4.0);
+        let unlinked = project.clone();
+        let mut linked = link(side(1, 0, 9), side(2, 2, 11));
+        linked.b.reversed = true;
+        linked.offset = -1;
+        linked.manual.push(ManualPair { a: 0, b: 2 });
+        project.seam_links.push(linked);
+
+        save_project(&path, &project).unwrap();
+        assert!(
+            fs::read_to_string(&path)
+                .unwrap()
+                .contains("\"seam_links\"")
+        );
+        assert_eq!(load_project(&path).unwrap(), project);
+
+        // A file without links, such as one saved before links existed, has no key and loads.
+        save_project(&path, &unlinked).unwrap();
+        assert!(!fs::read_to_string(&path).unwrap().contains("seam_links"));
+        assert_eq!(load_project(&path).unwrap(), unlinked);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn corner_radii_round_trip_and_sharp_shapes_save_without_them() {
         let path = temp_path("radii");
         let mut piece = flap();

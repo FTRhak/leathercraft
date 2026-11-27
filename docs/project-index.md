@@ -26,17 +26,17 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | File | Lines | ~Tokens | Crate | Role |
 |---|---:|---:|---|---|
 | `src/editor/mod.rs` | 86 | 600 | bin | `ViewMode`, `ShapePart` (edge or vertex picked with the Edge tool), `send`, `export`, `format_length` |
-| `src/editor/editor_state_struct.rs` | 440 | 3,700 | bin | `EditorState` and its methods (primary piece plus multi-selection, primary child plus multi-selection of children in that piece, selected edge or vertex; snap settings, Alt suspension, snap feedback and hover target: `active_snap`, `snap_point`, `save_snap_when_settled`), `document_name` |
+| `src/editor/editor_state_struct.rs` | 440 | 3,700 | bin | `EditorState` and its methods (primary piece plus multi-selection, primary child plus multi-selection of children in that piece, selected edge or vertex; snap settings, Alt suspension, snap feedback and hover target: `active_snap`, `snap_point`, `save_snap_when_settled`; the Link seams dialog: `seam_link_dialog`, `open_seam_link`, `selected_seam`), `document_name` |
 | `src/editor/drag_state_struct.rs` | 60 | 480 | bin | `ShapeRef`, `DragTarget`, `DragState` (with the `group` of pieces or `child_group` of children moved along, and the snap `targets` and `moving` shapes gathered at the start) |
 | `src/editor/shape_draft_struct.rs` | 9 | 60 | bin | `ShapeDraft` |
-| `src/editor/canvas.rs` | 1,290 | 10,400 | bin | `canvas`, `Viewport` (`hit_tolerance`), tool behavior (Shift+click toggles a child of the selected piece, else a piece; the Edge tool picks a vertex or a polygon edge; a line or stitch line is always added as a child; the Stitch holes tool clicks a draft), hit testing (pieces and their lines, children with a line tolerance, handles, vertices, polygon edges), painting (centerlines in their dash pattern and stitch holes above all outlines; `draw_dimensions`: the selection's width and height as dimension lines with end ticks and a measurement plate, from the design's "Dim W" and "Dim H" overlays, following a drag through `selection_bounds`); snapping of drawing tools (`draw_targets`, `snap_draw`, the hover target) and `draw_snap_feedback` |
+| `src/editor/canvas.rs` | 1,290 | 10,400 | bin | `canvas`, `Viewport` (`hit_tolerance`), tool behavior (Shift+click toggles a child of the selected piece, else a piece; the Edge tool picks a vertex or a polygon edge; a line or stitch line is always added as a child; the Stitch holes tool clicks a draft), hit testing (pieces and their lines, children with a line tolerance, handles, vertices, polygon edges), painting (centerlines in their dash pattern and stitch holes above all outlines; `draw_dimensions`: the selection's width and height as dimension lines with end ticks and a measurement plate, from the design's "Dim W" and "Dim H" overlays, following a drag through `selection_bounds`); snapping of drawing tools (`draw_targets`, `snap_draw`, the hover target) and `draw_snap_feedback`; `draw_seam_links` (pair lines while a linked seam is selected) |
 | `src/editor/confirm_discard.rs` | 14 | 100 | bin | `confirm_discard`: unsaved-changes prompt |
 | `src/editor/drag.rs` | 309 | 2,100 | bin | `begin_drag`, `begin_handle_drag`, `snap_setup` (what a drag snaps to), `update_drag` (snapped offset or handle; stops before a stitch line leaves its piece), `finish_drag`: dragging pieces and children (the whole selection when a selected piece or child is grabbed), children and shape handles with the Select tool, and handles with the Edge tool without changing the selection |
 | `src/editor/grid.rs` | 73 | 600 | bin | `draw_grid`: canvas grid and axes, grid steps; `draw_snap_dots`: the snap grid |
 | `src/editor/ruler.rs` | 215 | 1,900 | bin | The canvas rulers (from the design's "Ruler Top", "Ruler Left" and "Ruler Corner"): `RULER_SIZE` (20 px), `strips` (top and left, which `canvas` covers with interact areas so the pointer doesn't draw under them), `content_rect` (the area the view and snap controls are placed in), `draw_rulers`; numbered ticks every 1, 2 or 5 × 10ⁿ display units (`label_step`, at least 64 px apart), ten ticks between them with every second one longer, numbers in the project's units (`format_label`), the left ones turned to read upwards, the cursor marked in the accent; tests |
 | `src/editor/ui.rs` | 562 | 5,000 | bin | `editor_ui` (menu bar, tool bar, status bar, dock area), `show_status_bar`, `selection_summary`, `action_button`, `file_menu`, `file_command`, `edit_menu`, `handle_hotkeys`, `window_menu`, `delete_selection`, `select_all`, `language_control`, `project_dialog`, `save_as`: top and bottom bars, dock area, menus with configured shortcuts, hotkey dispatch, new-project and Settings dialogs, language picker |
 | `src/editor/panel_viewer.rs` | 192 | 1,300 | bin | `PanelViewer`: the `TabViewer` that draws each dock tab; the Properties, Align, Layout and History tab titles have icons, built by `TabDecor`, which also decorates each tab button; the Align tab targets the selected children when there are any, else the selected pieces |
-| `src/ui_components/icons/mod.rs` | 105 | 1,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_font_id` (the font for glyphs laid out with text); shared `icon_button` (no caller at the moment, `#[allow(dead_code)]`) |
+| `src/ui_components/icons/mod.rs` | 212 | 2,000 | bin | Icon font (`src/res/leathercrafticons.ttf`): `install_icon_font`, `glyph` codes, `paint_glyph`, `icon_font_id` (the font for glyphs laid out with text); painted `paint_link`, `paint_reverse`, `paint_warning`, `paint_close`, `paint_reset` (the Link seams dialog); shared `icon_button` (no caller at the moment, `#[allow(dead_code)]`) |
 | `src/panels/mod.rs` | 6 | 50 | bin | Panel module declarations |
 | `src/ui_components/mod.rs` | 17 | 200 | bin | Reusable UI component module declarations (`radio` allows dead code since the theme became a group button) |
 | `src/ui_components/button/mod.rs` | 98 | 800 | bin | `Button`: the design-system text button (`primary`, `secondary`, `outline`), an `egui::Widget` drawn in its default, hover or disabled state (disabled through `ui.add_enabled`), with a focus ring |
@@ -63,7 +63,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/ui_components/input/style.rs` | 44 | 350 | bin | `InputState` (default, hover, focus, accent, disabled), `paint`: picks the `Palette::input` entry for a state |
 | `src/ui_components/dock/mod.rs` | 191 | 1,600 | bin | `PanelTab` (the tools are a fixed tool bar and the snap settings are on the canvas, not tabs; a saved layout with the old `Snap` tab no longer parses and falls back to the default), `PanelDock`: panel arrangement, default layout, saving and restoring it, and the `TabDecor` of its tabs |
 | `src/ui_components/dock/style.rs` | 187 | 1,500 | bin | The dock look from the Brilliant `DockTab` component: `dock_style` (the `egui_dock::Style` of the current theme), `TabDecor` (tab titles with the icon colored by state; the accent line on the open tab and the divider right of inactive ones, painted from `on_tab_button`) |
-| `src/ui_components/palette/mod.rs` | 166 | 1,050 | bin | `Palette` (`DARK`, `LIGHT`, `of` and `of_visuals`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge, `dimension`) and one field per color group, each group in its own submodule with its `DARK` and `LIGHT` values; `hex` and `hex_opt` (`0xRRGGBB` to `Color32`); re-exports the component paint types; `layout` is the Layout panel's group; used by `canvas`, `grid`, `button`, `tabs`, `dropdown`, `input`, `checkbox`, `radio`, `group_button`, `list`, `title_bar`, `status_bar`, `tool_button`, `align_button`, the Properties panel and the Layout panel |
+| `src/ui_components/palette/mod.rs` | 166 | 1,050 | bin | `Palette` (`DARK`, `LIGHT`, `of` and `of_visuals`: picked from `visuals.dark_mode`), values from the Brilliant palette boards: canvas colors (grid, outline, label, hole, centerline, edge, `dimension`) and one field per color group, each group in its own submodule with its `DARK` and `LIGHT` values; `hex` and `hex_opt` (`0xRRGGBB` to `Color32`); re-exports the component paint types; `seam_link` is the Link seams dialog's group; `layout` is the Layout panel's group; used by `canvas`, `grid`, `button`, `tabs`, `dropdown`, `input`, `checkbox`, `radio`, `group_button`, `list`, `title_bar`, `status_bar`, `tool_button`, `align_button`, the Properties panel and the Layout panel |
 | `src/ui_components/palette/dimension.rs` | 28 | 250 | bin | `DimensionColors`: the canvas dimension lines (line and ticks, label plate, label text); light values derived |
 | `src/ui_components/palette/ruler.rs` | 36 | 300 | bin | `RulerColors`: the canvas rulers (background, border, ticks, numbers, cursor mark); light values derived |
 | `src/ui_components/palette/surfaces.rs` | 43 | 250 | bin | `Surfaces`: backgrounds from the canvas to chips |
@@ -103,7 +103,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/settings/material.rs` | 186 | 1,550 | bin | Default material tab: `material_tab`, its own material form of `Dropdown`s (the color one with swatches as leading slots and grouped items) and a thickness `NumberInput` in mm, with an outline Reset to defaults `Button` |
 | `src/panels/settings/hotkeys.rs` | 229 | 2,050 | bin | Hotkeys tab: `Capture`, `hotkeys_tab` (a `SearchInput` filtering the list), `matches_filter` (by action name or shortcut text), `shortcut_button`, key capture; an outline Reset to defaults `Button` |
 | `src/panels/properties/mod.rs` | 159 | 1,300 | bin | Properties panel, from the design's "Properties Body": `EditorView`, `ViewControls`, `Selection`; hint box (canvas controls: tool and navigation hints) or preview controls, display units dropdown, divider, `show_panel` in a scroll area; re-exports `line_style_fields` and `stitch_fields` for the tool bar |
-| `src/panels/properties/piece.rs` | 164 | 1,350 | bin | Selected piece's section header (with its name), name field, read-only W/H size boxes or result error, title and fields of its base or child, To Polygon button |
+| `src/panels/properties/piece.rs` | 176 | 1,450 | bin | Selected piece's section header (with its name), name field, read-only W/H size boxes or result error, title and fields of its base or child, a stitch line's links (editable while the piece is locked), To Polygon button |
 | `src/panels/properties/shape.rs` | 68 | 550 | bin | `shape_fields`: dispatch to the file of each shape type; the selected vertex's corner radius (edge marker, accent field) |
 | `src/panels/properties/fields.rs` | 292 | 2,400 | bin | Shared rows and inputs: `Marker` (dot in a canvas layer color), `param_row`, `FieldStyle` and `labeled` (panel rows or inline for the tool bar), `value_row`, `note`, `section_header`, `divider`, `length_field`, `marked_length_field`, `bounded_length_field`, `angle_field`, `center_fields` (all `NumberInput`s) |
 | `src/panels/properties/polygon.rs` | 48 | 350 | bin | Polygon's point count and the selected edge's length (edge marker, accent field) |
@@ -111,12 +111,16 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/properties/ellipse.rs` | 24 | 200 | bin | Ellipse's center, radii and rotation |
 | `src/panels/properties/regular_polygon.rs` | 34 | 300 | bin | Regular polygon's center, radius, sides and rotation |
 | `src/panels/properties/line.rs` | 86 | 800 | bin | Centerline's ends, length, angle and style (line type dropdown; `line_style_fields` is the inline version for the tool bar) |
-| `src/panels/properties/stitch.rs` | 159 | 1,250 | bin | Stitch line's hole type, pitch and size (`stitch_fields` is the inline version for the tool bar), and its length, hole count, actual pitch and thread hint (`stitch_details`) |
+| `src/panels/properties/stitch.rs` | 236 | 1,900 | bin | Stitch line's hole type, pitch and size (`stitch_fields` is the inline version for the tool bar), and its length, hole count, actual pitch and thread hint (`stitch_details`); `seam_links_section` (the seam's links with Edit and Remove, a stale one in the warning color, and Link seams…; `LinkAction`) |
+| `src/panels/seam_link/mod.rs` | 1,008 | 9,400 | bin | Link seams dialog (from the design's "Stitch Link Dialog"): `SeamLinkDraft` (the link being edited, `editing` id, `pending_a` hole), `OpenLink` (new from a seam, or edit), `SeamLinkResult` (Commit, FitPitch, Cancel), `seam_name`, `seam_link_dialog` (an `egui::Modal`; Esc drops a waiting hole, then closes); header, seam cards (seam dropdown, hole type, pitch and length chips, 1-based range `NumberInput`s, Reverse toggle), start offset, body, warning with Fit pitch buttons (`fit_pitch`, `Fit`, which also moves the range's end), summary tiles, footer; `small_button` and its toggle, icon and warning variants |
+| `src/panels/seam_link/schematic.rs` | 368 | 2,900 | bin | `schematic`: both ranges unrolled into rows of diamond holes placed by their distance along the seam, lined up at the first automatic pair, thinned out when under 6 px apart; pair lines, numbers every fifth hole and at the ends, direction arrows; `Side`, `Click` (a hole, with Alt or not), `paint_diamond` |
+| `src/panels/seam_link/table.rs` | 248 | 1,900 | bin | `pair_table`: the header and a `show_rows` scroll area of pairs (#, A, B, Δ in display units, Manual badge), then unpaired holes collapsed into ranges (`ranges`) with an Unpaired badge; test |
+| `src/ui_components/palette/seam_link.rs` | 76 | 700 | bin | `SeamLinkPaint`: auto, manual and unpaired pair colors, hole fills, guide, arrow, A/B badge, warning box, table rows and badges; light values picked |
 | `src/preview/mod.rs` | 302 | 2,600 | bin | 3D scene, camera, mesh extrusion from each piece's `punched_region`; `apply_theme` sets the background and ground plane colors for the theme |
-| `src/model.rs` | 594 | 4,500 | lib | `Project`, `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation (a base must be closed; a line's ends and dash count; a stitch line's points, hole parameters, hole count and overlap in `validate_stitch_line`) |
+| `src/model.rs` | 640 | 4,850 | lib | `Project` (with `seam_links`), `PatternPiece`, `ChildShape`, `BooleanOp`, `Point`, `Units`, validation (a base must be closed; a line's ends and dash count; a stitch line's points, hole parameters, hole count and overlap in `validate_stitch_line`; then `validate_seam_links`) |
 | `src/boolean.rs` | 290 | 2,500 | lib | `Region`, `PatternPiece::region`: combining a piece's shapes, skipping open lines; `punched_region`: the region with stitch holes cut, for the preview; `stitch_area`, `stray_stitch_lines`: the leather a stitch line must stay on |
 | `src/material.rs` | 462 | 2,800 | lib | `Material` and the scales of its properties |
-| `src/events.rs` | 980 | 6,650 | lib | `ProjectEvent` (including the group `MovePieces`, `RemovePieces`, `ArrangePieces`, `MoveChildren`, `ArrangeChildren`, `RemoveChildren`), `ProjectChange`, `Project::apply` |
+| `src/events.rs` | 1,194 | 8,100 | lib | `ProjectEvent` (including the group `MovePieces`, `RemovePieces`, `ArrangePieces`, `MoveChildren`, `ArrangeChildren`, `RemoveChildren`, and `AddSeamLink`, `SetSeamLink`, `RemoveSeamLink`), `ProjectChange` (with `SeamLinkAdded`), `Project::apply` (removing a seam or piece removes its links in the same edit) |
 | `src/snap.rs` | 558 | 4,300 | lib | `SnapSettings` (with `clamped`), `SnapScope` (`Project` or one `Piece`), `SnapTargets` (`collect`, `with_points`, `without_point`, `without_box`), `Moving`, `Guide`, `GuideAxis`, `SnapFeedback`, `snap_point`, `snap_offset` (vertex, then guides per axis, then grid per axis); tests in the second half |
 | `src/align/model.rs` | 108 | 850 | lib | `Axis`, `Edge`, `Arrange` (Illustrator's align, distribute and spacing operations), `AlignTo` (including `Parent`, the base shape of the children's piece), `Spacing`, re-exported from `align`; the module-private `Item` (an id, its span on one axis, and whether it stays fixed) |
 | `src/align/mod.rs` | 468 | 3,450 | lib | `piece_box`, `offsets` (pieces), `child_offsets` (children of one piece), shared `arrange_items` that dispatches to the submodules below; tests |
@@ -130,21 +134,22 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/exports/dxf.rs` | 60 | 550 | lib | `to_dxf`: outlines on `PATTERN`, each centerline dash as a `LINE` on `CENTERLINE`, stitch holes as `CIRCLE` or `LWPOLYLINE` on `STITCH_HOLES` |
 | `src/shapes/mod.rs` | 424 | 3,400 | lib | `Shape`: dispatch to the shape structs (including `StitchLine`), constructors from a drag, `is_open`, `distance_to`, `corners`, `corner_radius`, `with_corner_radius` (never a stitch line's ends), `contains` (false when open) |
 | `src/shapes/line.rs` | 305 | 2,300 | lib | `Line` (open, a centerline), `LineStyle` (solid, dashed, dash-dot), `MIN_DASH_MM`, `MAX_DASHES_PER_LINE`, `DOT_MM`: `from_ends`, `with_length`, `with_angle`, `distance_to`, `dashes`, `dash_count`; tests |
-| `src/shapes/stitch.rs` | 699 | 6,000 | lib | `StitchLine` (open path of stitch holes), `HoleKind` (French, Diamond, Round), `Hole`, `Run`, `StitchBand` (thread and leather hints by pitch), limits and `PITCH_PRESETS`: `path`, `runs`, `holes`, `hole_count`, `actual_pitch`, `hole_outline`, `holes_overlap`; tests in the second half |
+| `src/shapes/stitch.rs` | 849 | 7,300 | lib | `StitchLine` (open path of stitch holes), `HoleKind` (French, Diamond, Round), `Hole`, `Run`, `StitchBand` (thread and leather hints by pitch), limits and `PITCH_PRESETS`: `path`, `runs`, `holes`, `hole_count`, `hole_offsets`, `pitch_for_count` (with `bisect`, `bisect_last`), `actual_pitch`, `hole_outline`, `holes_overlap`; tests in the second half |
 | `src/shapes/corners.rs` | 243 | 1,900 | lib | Rounded corners: `round_corners` (fillet arcs), `radius_at`, `set_radius`, `valid_radii`; `fillet` and `push_point` also serve stitch lines |
 | `src/shapes/rectangle.rs` | 128 | 900 | lib | `Rectangle` |
 | `src/shapes/ellipse.rs` | 123 | 900 | lib | `Ellipse`, `CIRCLE_SEGMENTS` |
 | `src/shapes/regular_polygon.rs` | 154 | 1,150 | lib | `RegularPolygon`, `REGULAR_POLYGON_SIDES` |
 | `src/shapes/polygon.rs` | 116 | 850 | lib | `Polygon`, its edges and their lengths |
 | `src/i18n/en.rs` | 638 | 5,400 | lib | English catalog, `counted` helper |
-| `src/history.rs` | 725 | 4,950 | lib | `History`, `HistoryCommand`: snapshots for undo and redo |
+| `src/history.rs` | 792 | 5,450 | lib | `History`, `HistoryCommand`: snapshots for undo and redo (consecutive changes of one seam link merge) |
+| `src/seams.rs` | 557 | 5,000 | lib | Seam links (`docs/seam-links.md`): `SeamSide` (`whole`, `same_line`), `ManualPair`, `SeamLink` (`lines`, `uses_child`, `uses_piece`, `ranges_overlap`, `pairs`, `validate`), `HolePair`, `LinkPairs` (`count_mismatch`, `manual_count`); `Project::seam_link`, `next_seam_link_id`, `seam_links_of`, `validate_seam_links`; `stitch_line`, `stitch_lines`, `stitch_number`; tests, with fixtures (`two_lines`, `side`, `link`) shared with other modules' tests |
 | `src/persistence.rs` | 230 | 1,750 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings/mod.rs` | 165 | 1,350 | bin | `settings.json` in the OS config directory: language, panel layout, snap settings (`load_snap`, `save_snap`), and `Preferences` (default material, hotkeys, theme) with `load_preferences`, `save_preferences` |
 | `src/settings/theme.rs` | 45 | 350 | bin | `Theme` (Dark, Light; `ALL`, `label`), `apply_theme`: sets egui's theme when `Preferences::theme` changes |
 | `src/settings/hotkeys.rs` | 340 | 2,700 | bin | `Action` (bindable commands, default shortcuts), `Hotkeys` (`from_json`, `to_json`, `first`, conflicts, `triggered`), `format_shortcut`, `parse_shortcut`; tests |
 | `src/document.rs` | 70 | 550 | bin | `ActiveProject` (`new`, project and history), `ProjectMessage`, `HistoryMessage`, `apply_project_events` |
 | `src/main.rs` | 52 | 360 | bin | App wiring and system schedule (including `settings::apply_theme`); loads `Preferences` and starts the project with their default material; the editor UI starts one pass after the icon font is installed |
-| `src/lib.rs` | 11 | 45 | lib | Module declarations |
+| `src/lib.rs` | 12 | 50 | lib | Module declarations |
 
 ## Library crate (core, no Bevy)
 
@@ -233,7 +238,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | 31-212 | Top-level layout | `editor_ui`, which also shows the dock area, the new-project dialog and the Settings window (OK saves `Preferences`) |
 | 213-307 | Status bar | `show_status_bar` (message, grid step while grid snapping in 2D, cursor, wgpu backend from `RenderAdapterInfo`), `selection_summary` (`SelectedPieces`, `SelectedShapes`, or `SelectedPiece` with shape and stitch-hole counts) |
 | 309-412 | Menus | `action_button` (label plus the action's first shortcut), `file_menu`, `file_command` (New, Open, Save, Save As; shared with hotkeys), `edit_menu` (with Settings…), `window_menu` |
-| 414-526 | Input | `handle_hotkeys` (dispatches `Hotkeys::triggered`, skipped while drawing, in a dialog or in a text field), `delete_selection` (several children go as `RemoveChildren`, several pieces as `RemovePieces`, locked ones stay), `select_all` (all children of the selected piece while one is selected) |
+| 414-526 | Input | `handle_hotkeys` (dispatches `Hotkeys::triggered`, skipped while drawing, in a dialog or in a text field), `delete_selection` (several children go as `RemoveChildren`, several pieces as `RemovePieces`, locked ones stay), `select_all` (all children of the selected piece while one is selected), `pattern_menu` (Link seams…, while the project has a stitch line) |
 | 528-549 | Language | `language_control` |
 | 551-562 | File dialog | `project_dialog`, `save_as` |
 
@@ -396,21 +401,22 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 144 tests inline in the library crate, plus 6 in the binary (`settings::hotkeys` and `editor::ruler`, run with `cargo test --bin leathercraft`, which compiles Bevy):
+There are 169 tests inline in the library crate, plus 7 in the binary (`settings::hotkeys`, `editor::ruler` and `panels::seam_link::table`, run with `cargo test --bin leathercraft`, which compiles Bevy):
 
 | Module | Tests |
 |---|---:|
-| `model` | 8 |
-| `shapes` | 46 |
-| `boolean` | 9 |
+| `model` | 9 |
+| `shapes` | 49 |
+| `boolean` | 11 |
 | `material` | 3 |
 | `align` | 14 |
 | `snap` | 10 |
-| `events` | 18 |
-| `history` | 13 |
-| `i18n` | 5 |
+| `events` | 22 |
+| `history` | 14 |
+| `i18n` | 8 |
 | `exports` | 11 |
-| `persistence` | 7 |
+| `persistence` | 8 |
+| `seams` | 10 |
 
 Apart from shortcut parsing, `document`, `editor`, `preview`, `settings` and `panels` have no tests, so changes there need `cargo check` and a manual run.
 
@@ -426,6 +432,7 @@ Apart from shortcut parsing, `document`, `editor`, `preview`, `settings` and `pa
 | `docs/settings.md` | Current. Spec for `settings.json` and the Settings window: sections and their fallbacks, `Action` and `Hotkeys`, shortcut text format, the draft and key capture, adding a hotkey or preference. |
 | `docs/centerline.md` | Current. Spec for centerlines: `Shape::Line` as an open child, `LineStyle` and its dash pattern in mm, validation limits, hit testing and drawing, SVG and DXF output, extending to other open shapes. |
 | `docs/stitch-holes.md` | Current. Spec for stitch holes: `Shape::StitchLine` as an open polyline child, hole kinds, pitch and size, placement by runs between sharp vertices, validation limits, the click-by-click draft and canvas drawing, the `STITCH_HOLES` export layer, punching in the 3D preview, thread hints, and the saddle-stitch reference data behind the presets. |
+| `docs/seam-links.md` | Current. Spec for seam links: `SeamLink` keeps parameters, not pairs; the pairing algorithm (ranges, reverse, offset, manual pairs), `pitch_for_count`, validation (a range past the holes is clamped, not an error), the cascade on removal, history, the Link seams dialog and its schematic, the Properties section and the canvas lines. |
 | `docs/snap.md` | Current. Spec for snapping: the snap controls on the canvas, priority (vertex, guide, grid), scopes (a child only within its piece), the drag anchor, tolerance in px, Alt and F9, state and persistence. |
 | `docs/round-vertex.md` | Current. Spec for rounded vertices: per-vertex `radii`, `Shape::corners` vs `ring`, the fillet construction and its clamping, selecting a vertex with the Edge tool, the Corner radius field, extending to new shapes. |
 | `docs/i18n.md` | Current. Spec for the localization module: `Label` vs `Message`, rendering, language selection, adding text and languages, translation conventions. |

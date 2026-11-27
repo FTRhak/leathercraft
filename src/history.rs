@@ -21,6 +21,7 @@ enum MergeKey {
     Material(u64),
     Base(u64),
     Child(u64, u64),
+    SeamLink(u64),
 }
 
 #[derive(Clone, Debug)]
@@ -259,6 +260,24 @@ impl History {
                 },
                 None,
             ),
+            ProjectEvent::AddSeamLink { link } => {
+                let (a, b) = (name(link.a.piece), name(link.b.piece));
+                (Message::ActionLinkSeams { a, b }, None)
+            }
+            ProjectEvent::SetSeamLink { link } => {
+                let (a, b) = (name(link.a.piece), name(link.b.piece));
+                (
+                    Message::ActionEditSeamLink { a, b },
+                    Some(MergeKey::SeamLink(link.id)),
+                )
+            }
+            ProjectEvent::RemoveSeamLink { id } => {
+                let (a, b) = before
+                    .seam_link(*id)
+                    .map(|link| (name(link.a.piece), name(link.b.piece)))
+                    .unwrap_or_else(|| (id.to_string(), id.to_string()));
+                (Message::ActionRemoveSeamLink { a, b }, None)
+            }
             // These are handled by their `ProjectChange` before describing.
             ProjectEvent::New { .. } | ProjectEvent::Open { .. } | ProjectEvent::Save { .. } => {
                 (Message::ActionNewProject, None)
@@ -722,5 +741,52 @@ mod tests {
                 .map(|b| b.max_x),
             Some(2.0)
         );
+    }
+
+    #[test]
+    fn seam_link_edits_are_described_and_offset_changes_merge() {
+        use crate::seams::tests::{link, side, two_lines};
+        let mut project = two_lines(10, 10, 4.0);
+        let mut history = History::new(&project, Message::ActionNewProject);
+        let names = || ("Piece 1".to_owned(), "Piece 2".to_owned());
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::AddSeamLink {
+                link: link(side(1, 0, 9), side(2, 0, 9)),
+            },
+        );
+        let (a, b) = names();
+        assert_eq!(
+            history.actions().last(),
+            Some(&Message::ActionLinkSeams { a, b })
+        );
+        for offset in 1..=3 {
+            let mut changed = project.seam_links[0].clone();
+            changed.offset = offset;
+            run(
+                &mut project,
+                &mut history,
+                ProjectEvent::SetSeamLink { link: changed },
+            );
+        }
+        assert_eq!(history.actions().count(), 3);
+        let (a, b) = names();
+        assert_eq!(
+            history.actions().last(),
+            Some(&Message::ActionEditSeamLink { a, b })
+        );
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::RemoveSeamLink { id: 1 },
+        );
+        let (a, b) = names();
+        assert_eq!(
+            history.actions().last(),
+            Some(&Message::ActionRemoveSeamLink { a, b })
+        );
+        history.apply(HistoryCommand::Undo, &mut project);
+        assert_eq!(project.seam_links[0].offset, 3);
     }
 }

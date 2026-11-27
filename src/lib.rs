@@ -7,5 +7,6 @@ pub mod i18n;
 pub mod material;
 pub mod model;
 pub mod persistence;
+pub mod seams;
 pub mod shapes;
 pub mod snap;

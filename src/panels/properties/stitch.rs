@@ -1,12 +1,16 @@
 use super::fields::{
-    FIELD_WIDTH, FieldStyle, Marker, bounded_length_field, labeled, note, value_row,
+    FIELD_WIDTH, FieldStyle, Marker, ROW_GAP, bounded_length_field, labeled, note, section_header,
+    value_row,
 };
 use crate::editor::format_length;
+use crate::panels::seam_link::{OpenLink, seam_name};
+use crate::ui_components::button::Button;
 use crate::ui_components::dropdown::{Dropdown, DropdownItem};
 use crate::ui_components::palette::Palette;
 use bevy_egui::egui;
+use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language, Message};
-use leathercraft::model::Units;
+use leathercraft::model::{Project, Units};
 use leathercraft::shapes::{
     HoleKind, MAX_HOLE_MM, MAX_PITCH_MM, MIN_HOLE_MM, MIN_PITCH_MM, PITCH_PRESETS, StitchBand,
     StitchLine,
@@ -108,6 +112,79 @@ fn hole_fields(
         units,
         language,
     );
+}
+
+/// What a link row in Properties asks for.
+pub(super) enum LinkAction {
+    Open(OpenLink),
+    Event(ProjectEvent),
+}
+
+/// The links of the stitch line `child` of piece `piece`: one row per link with the other seam,
+/// its number of pairs, a mark when the line got shorter than its range, and Edit and Remove;
+/// then the button that links the seam anew.
+pub(super) fn seam_links_section(
+    ui: &mut egui::Ui,
+    project: &Project,
+    piece: u64,
+    child: u64,
+    language: Language,
+) -> Option<LinkAction> {
+    let palette = Palette::of(ui.painter());
+    let links: Vec<_> = project.seam_links_of(piece, child).collect();
+    let mut action = None;
+    ui.add_space(ROW_GAP / 2.0);
+    section_header(
+        ui,
+        language.label(Label::SeamLinks),
+        (!links.is_empty())
+            .then(|| links.len().to_string())
+            .as_deref(),
+    );
+    for link in links {
+        // The other side; both sides when the link is on this one seam.
+        let other = if link.a.piece == piece && link.a.child == child {
+            &link.b
+        } else {
+            &link.a
+        };
+        let pairs = link.pairs(project);
+        let text = language.message(&Message::SeamLinkRow {
+            other: seam_name(project, other.piece, other.child, language),
+            pairs: pairs.as_ref().map_or(0, |pairs| pairs.pairs.len()),
+        });
+        let stale = pairs.as_ref().map_or(true, |pairs| pairs.clamped);
+        ui.horizontal(|ui| {
+            let color = if stale {
+                palette.status.warning
+            } else {
+                palette.text.strong
+            };
+            let label = ui.add(
+                egui::Label::new(egui::RichText::new(text).size(11.0).color(color)).truncate(),
+            );
+            if stale {
+                label.on_hover_text(language.label(Label::SeamLinkStale));
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.small_button(language.label(Label::RemoveLink)).clicked() {
+                    action = Some(LinkAction::Event(ProjectEvent::RemoveSeamLink {
+                        id: link.id,
+                    }));
+                }
+                if ui.small_button(language.label(Label::EditLink)).clicked() {
+                    action = Some(LinkAction::Open(OpenLink::Edit(link.id)));
+                }
+            });
+        });
+    }
+    if ui
+        .add(Button::outline(language.label(Label::LinkSeams)))
+        .clicked()
+    {
+        action = Some(LinkAction::Open(OpenLink::New(Some((piece, child)))));
+    }
+    action
 }
 
 /// What a stitch line comes to: its vertices, length, hole count and actual pitch, the thread

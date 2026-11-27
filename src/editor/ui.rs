@@ -8,6 +8,7 @@ use super::{
 };
 use crate::document::{ActiveProject, HistoryMessage, ProjectMessage};
 use crate::panels::material::{self, DialogResult};
+use crate::panels::seam_link::{OpenLink, SeamLinkResult, seam_link_dialog};
 use crate::panels::settings::{SettingsDraft, SettingsResult, settings_dialog};
 use crate::panels::tools;
 use crate::preview::PreviewSettings;
@@ -82,7 +83,7 @@ pub fn editor_ui(
                 "pattern",
                 language.label(Label::Pattern),
                 menu(),
-                |_| {},
+                |ui| pattern_menu(ui, project, state),
             );
             // Stays open on a click, so that the toggled state can be seen.
             let stays_open = menu().close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
@@ -208,7 +209,30 @@ pub fn editor_ui(
             None => {}
         }
     }
+
+    if let Some(draft) = &mut state.seam_link_dialog {
+        match seam_link_dialog(ctx, draft, project, state.language) {
+            Some(SeamLinkResult::Commit(event)) => {
+                state.seam_link_dialog = None;
+                send(&mut events, event);
+            }
+            // The dialog stays open and shows the new pairs on the next frame.
+            Some(SeamLinkResult::FitPitch(event)) => send(&mut events, event),
+            Some(SeamLinkResult::Cancel) => state.seam_link_dialog = None,
+            None => {}
+        }
+    }
     Ok(())
+}
+
+/// The Pattern menu: Link seams, while the project has a stitch line.
+fn pattern_menu(ui: &mut egui::Ui, project: &Project, state: &mut EditorState) {
+    let any_seam = !leathercraft::seams::stitch_lines(project).is_empty();
+    let button = egui::Button::new(state.language.label(Label::LinkSeams));
+    if ui.add_enabled(any_seam, button).clicked() {
+        let seam = state.selected_seam(project);
+        state.open_seam_link(project, OpenLink::New(seam));
+    }
 }
 
 /// The status bar: the last message, the selection, the grid step and the cursor, and the
@@ -422,7 +446,9 @@ fn handle_hotkeys(
     view_mode: &mut ViewMode,
 ) {
     let drafting = !state.draft.is_empty() || state.shape_draft.is_some();
-    let dialog_open = state.new_project_dialog.is_some() || state.settings_dialog.is_some();
+    let dialog_open = state.new_project_dialog.is_some()
+        || state.settings_dialog.is_some()
+        || state.seam_link_dialog.is_some();
     if drafting || dialog_open || ctx.wants_keyboard_input() {
         return;
     }

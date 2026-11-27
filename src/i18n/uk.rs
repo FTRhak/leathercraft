@@ -211,6 +211,30 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::WaterResistance(value) => water_resistance(value),
         Label::WaterResistanceHint(value) => water_resistance_hint(value),
         Label::HeatResistance(value) => heat_resistance(value),
+        Label::LinkSeams => "Зв’язати шви…",
+        Label::LinkSeamsTitle => "Зв’язати шви",
+        Label::LinkSeamsSubtitle => "Співставте отвори двох швів для зшивання",
+        Label::SeamA => "Шов A",
+        Label::SeamB => "Шов B",
+        Label::HolesFrom => "Отвори від",
+        Label::HolesTo => "до",
+        Label::Reverse => "Реверс",
+        Label::StartOffset => "Зсув початку",
+        Label::HolesShort => "отв.",
+        Label::LinkSchematic => "Схема зв’язків",
+        Label::HolePairs => "Пари отворів",
+        Label::PairAuto => "Авто",
+        Label::PairManual => "Ручна",
+        Label::PairManualLegend => "Ручна пара",
+        Label::PairFree => "Без пари",
+        Label::LinkHint => "Клік: отвір A, потім B — ручна пара · Alt+клік — прибрати",
+        Label::ResetManualPairs => "Скинути ручні пари",
+        Label::Pairs => "Пар",
+        Label::LengthDifference => "Різниця довжин",
+        Label::SeamLinks => "Зв’язки швів",
+        Label::EditLink => "Змінити",
+        Label::RemoveLink => "Видалити",
+        Label::SeamLinkStale => "Шов скоротився: частина діапазону без отворів",
     }
 }
 
@@ -628,6 +652,71 @@ pub(super) fn message(message: &Message) -> String {
             let noun = plural(*count, "фігуру", "фігури", "фігур");
             format!("Видалено {count} {noun} з «{name}»")
         }
+        Message::ActionLinkSeams { a, b } => format!("Зв’язано шви {}", pair_names(a, b)),
+        Message::ActionEditSeamLink { a, b } => {
+            format!("Змінено зв’язок швів {}", pair_names(a, b))
+        }
+        Message::ActionRemoveSeamLink { a, b } => {
+            format!("Видалено зв’язок швів {}", pair_names(a, b))
+        }
+        Message::SeamNotFound => "Зв’язаного шва більше не існує.".to_owned(),
+        Message::InvalidSeamRange => {
+            "Діапазон шва має починатися не пізніше отвору, яким закінчується.".to_owned()
+        }
+        Message::SeamRangesOverlap => {
+            "На одному шві діапазони A і B не можуть мати спільних отворів.".to_owned()
+        }
+        Message::DuplicateManualPair => "Отвір може бути лише в одній ручній парі.".to_owned(),
+        Message::DuplicateSeamLink => "Два зв’язки швів мають однаковий ідентифікатор.".to_owned(),
+        Message::HoleCountMismatch { a, b } => {
+            format!("Різна кількість отворів: A — {a}, B — {b}")
+        }
+        Message::UnpairedHoles { side, count } => {
+            let noun = plural(*count, "отвір", "отвори", "отворів");
+            let verb = plural(*count, "лишається", "лишаються", "лишаються");
+            match side {
+                Some(side) => format!(
+                    "{count} {noun} шва {side} {verb} без пари. Вирівняйте крок, щоб кількості збіглися."
+                ),
+                None => format!(
+                    "{count} {noun} {verb} без пари. Вирівняйте крок, щоб кількості збіглися."
+                ),
+            }
+        }
+        Message::FitPitch { side, pitch } => format!("Крок {side} → {pitch}"),
+        Message::LinkPairsButton { count } => {
+            let noun = plural(*count, "пару", "пари", "пар");
+            format!("Зв’язати {count} {noun}")
+        }
+        Message::SeamName { piece, index } => format!("{piece} → Шов {index}"),
+        Message::SeamOption {
+            piece,
+            index,
+            holes,
+        } => format!("{piece} → Шов {index} ({holes} отв.)"),
+        Message::HoleCountBadge { count } => {
+            let noun = plural(*count, "отвір", "отвори", "отворів");
+            format!("{count} {noun}")
+        }
+        Message::PairsCount { count } => {
+            let noun = plural(*count, "пара", "пари", "пар");
+            format!("{count} {noun}")
+        }
+        Message::FreeIn { side: Some(side) } => format!("Без пари у {side}"),
+        Message::FreeIn { side: None } => "Без пари".to_owned(),
+        Message::SeamLinkRow { other, pairs } => {
+            let noun = plural(*pairs, "пара", "пари", "пар");
+            format!("↔ {other} · {pairs} {noun}")
+        }
+    }
+}
+
+/// `«Клапан» і «Основа»`, or `«Клапан»` when both sides are on one piece.
+fn pair_names(a: &str, b: &str) -> String {
+    if a == b {
+        format!("«{a}»")
+    } else {
+        format!("«{a}» і «{b}»")
     }
 }
 

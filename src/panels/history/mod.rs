@@ -78,6 +78,8 @@ fn action_glyph(action: &Message) -> Option<char> {
         Message::ActionUnlockPiece { .. } => glyph::UNLOCK,
         Message::ActionSetChildOp { .. } => glyph::SUBTRACT,
         Message::ActionReorderChild { .. } => glyph::LAYOUT,
+        Message::ActionLinkSeams { .. } | Message::ActionEditSeamLink { .. } => glyph::STITCH_HOLES,
+        Message::ActionRemoveSeamLink { .. } => glyph::TRASH,
         Message::ActionRemovePiece { .. }
         | Message::ActionRemovePieces { .. }
         | Message::ActionRemoveChild { .. }

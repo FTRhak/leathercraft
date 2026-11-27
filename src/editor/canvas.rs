@@ -14,6 +14,7 @@ use earcutr::earcut;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{BooleanOp, Bounds, PatternPiece, Point, Project, Units};
+use leathercraft::seams::SeamSide;
 use leathercraft::shapes::{
     Ellipse, HoleKind, Line, Polygon, Rectangle, RegularPolygon, Shape, StitchLine,
 };
@@ -156,6 +157,7 @@ pub(super) fn canvas(
     draw_pieces(&painter, view, project, state);
     draw_centerlines(&painter, view, project, state);
     draw_stitch_holes(&painter, response.hover_pos(), view, project, state);
+    draw_seam_links(&painter, view, project, state);
     draw_edges(&painter, response.hover_pos(), view, project, state);
     draw_dimensions(&painter, view, project, state);
     if state.tool == Tool::StitchHoles {
@@ -1095,6 +1097,51 @@ fn draw_stitch_holes(
                 ));
             }
             draw_stitch_line(painter, view, line, color);
+        }
+    }
+}
+
+/// While a linked stitch line is selected, its links as thin lines between the centers of the
+/// paired holes, with the manual pairs in their own color.
+fn draw_seam_links(
+    painter: &egui::Painter,
+    view: Viewport,
+    project: &Project,
+    state: &EditorState,
+) {
+    let Some((piece, child)) = state.selected_seam(project) else {
+        return;
+    };
+    let paint = &Palette::of(painter).seam_link;
+    // From the pieces as shown, so that the lines follow a drag in progress.
+    let holes = |side: &SeamSide| {
+        project
+            .pieces
+            .iter()
+            .find(|candidate| candidate.id == side.piece)
+            .and_then(
+                |piece| match &state.displayed(piece).child(side.child)?.shape {
+                    Shape::StitchLine(line) => Some(line.holes()),
+                    _ => None,
+                },
+            )
+            .unwrap_or_default()
+    };
+    for link in project.seam_links_of(piece, child) {
+        let Ok(pairs) = link.pairs(project) else {
+            continue;
+        };
+        let (holes_a, holes_b) = (holes(&link.a), holes(&link.b));
+        for pair in &pairs.pairs {
+            let (Some(a), Some(b)) = (holes_a.get(pair.a), holes_b.get(pair.b)) else {
+                continue;
+            };
+            let stroke = if pair.manual {
+                egui::Stroke::new(1.5, paint.link_manual)
+            } else {
+                egui::Stroke::new(1.0, paint.link_auto.gamma_multiply(0.6))
+            };
+            painter.line_segment([view.to_screen(a.center), view.to_screen(b.center)], stroke);
         }
     }
 }

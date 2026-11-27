@@ -338,6 +338,69 @@ impl StitchLine {
         holes
     }
 
+    /// How far each hole lies along the path from the first point, in the order of `holes`.
+    /// The last one is the path's length. At most `MAX_HOLES_PER_LINE` are returned.
+    pub fn hole_offsets(&self) -> Vec<f64> {
+        let runs = self.runs();
+        let mut offsets = Vec::new();
+        if runs.is_empty() {
+            return offsets;
+        }
+        offsets.push(0.0);
+        let mut walked = 0.0;
+        for run in runs {
+            let intervals = run.intervals(self.pitch);
+            let step = run.length / intervals as f64;
+            for k in 1..intervals {
+                if offsets.len() >= MAX_HOLES_PER_LINE {
+                    return offsets;
+                }
+                offsets.push(walked + step * k as f64);
+            }
+            if offsets.len() >= MAX_HOLES_PER_LINE {
+                return offsets;
+            }
+            walked += run.length;
+            offsets.push(walked);
+        }
+        offsets
+    }
+
+    /// A pitch, rounded to 0.01 mm, at which the line has exactly `count` holes, or `None` when
+    /// no valid pitch gives that many. One run takes its length over the intervals; several runs
+    /// are searched by bisection, since the hole count never grows as the pitch grows.
+    pub fn pitch_for_count(&self, count: usize) -> Option<f64> {
+        let runs = self.runs();
+        if count < runs.len() + 1 || runs.is_empty() {
+            return None;
+        }
+        let count_at = |pitch: f64| {
+            let mut line = self.clone();
+            line.pitch = pitch;
+            line.hole_count()
+        };
+        let round = |pitch: f64| (pitch * 100.0).round() / 100.0;
+        let total = self.length();
+        let ideal = total / (count - 1) as f64;
+        let mut candidates = vec![round(ideal)];
+        if runs.len() > 1 {
+            // The pitches that give `count` holes form one interval [low, high].
+            let low = bisect(MIN_PITCH_MM, MAX_PITCH_MM, |pitch| count_at(pitch) <= count);
+            let high = bisect_last(MIN_PITCH_MM, MAX_PITCH_MM, |pitch| count_at(pitch) >= count);
+            if let (Some(low), Some(high)) = (low, high)
+                && low <= high
+            {
+                candidates.push(round(ideal.clamp(low, high)));
+                candidates.push(round((low + high) / 2.0));
+            }
+        }
+        candidates.into_iter().find(|&pitch| {
+            let mut line = self.clone();
+            line.pitch = pitch;
+            line.hole_count() == count && line.has_valid_parameters() && !line.holes_overlap()
+        })
+    }
+
     /// The closed outline of a hole, without a repeated closing point.
     pub fn hole_outline(&self, hole: &Hole) -> Vec<Point> {
         hole_outline(hole, self.hole, self.size)
@@ -419,6 +482,42 @@ pub fn hole_outline(hole: &Hole, kind: HoleKind, size: f64) -> Vec<Point> {
             at(0.0, half_width),
         ],
     }
+}
+
+const BISECT_STEPS: usize = 60;
+
+/// The smallest value in `[min, max]` for which `holds` is true, where `holds` turns from false
+/// to true once as the value grows; `None` if it never holds.
+fn bisect(min: f64, max: f64, holds: impl Fn(f64) -> bool) -> Option<f64> {
+    if holds(min) {
+        return Some(min);
+    }
+    if !holds(max) {
+        return None;
+    }
+    let (mut lo, mut hi) = (min, max);
+    for _ in 0..BISECT_STEPS {
+        let mid = (lo + hi) / 2.0;
+        if holds(mid) { hi = mid } else { lo = mid }
+    }
+    Some(hi)
+}
+
+/// The largest value in `[min, max]` for which `holds` is true, where `holds` turns from true
+/// to false once as the value grows; `None` if it never holds.
+fn bisect_last(min: f64, max: f64, holds: impl Fn(f64) -> bool) -> Option<f64> {
+    if holds(max) {
+        return Some(max);
+    }
+    if !holds(min) {
+        return None;
+    }
+    let (mut lo, mut hi) = (min, max);
+    for _ in 0..BISECT_STEPS {
+        let mid = (lo + hi) / 2.0;
+        if holds(mid) { lo = mid } else { hi = mid }
+    }
+    Some(lo)
 }
 
 fn distance(a: Point, b: Point) -> f64 {
@@ -689,6 +788,57 @@ mod tests {
         assert!(StitchBand::Medium.suits_leather(3.0));
         assert!(!StitchBand::Medium.suits_leather(1.2));
         assert!(StitchBand::Heavy.suits_leather(8.0));
+    }
+
+    #[test]
+    fn hole_offsets_grow_and_end_at_the_length() {
+        let stitch = line(
+            &[(0.0, 0.0), (10.0, 0.0), (10.0, 7.0)],
+            HoleKind::Round,
+            4.5,
+        );
+        let offsets = stitch.hole_offsets();
+        assert_eq!(offsets.len(), stitch.hole_count());
+        assert!(offsets.windows(2).all(|pair| pair[1] > pair[0]));
+        assert_eq!(offsets[0], 0.0);
+        assert!((offsets.last().unwrap() - stitch.length()).abs() < 1.0e-9);
+        assert!((offsets[3] - 13.5).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn pitch_for_count_hits_the_count() {
+        let straight = line(&[(0.0, 0.0), (181.0, 0.0)], HoleKind::Diamond, 3.85);
+        let pitch = straight.pitch_for_count(52).unwrap();
+        let mut fitted = straight.clone();
+        fitted.pitch = pitch;
+        assert_eq!(fitted.hole_count(), 52);
+        assert!((pitch - 181.0 / 51.0).abs() < 0.006);
+
+        let bent = line(
+            &[(0.0, 0.0), (60.0, 0.0), (60.0, 37.0), (0.0, 50.0)],
+            HoleKind::Diamond,
+            3.85,
+        );
+        for count in [30, 40, 47] {
+            let mut fitted = bent.clone();
+            fitted.pitch = bent.pitch_for_count(count).unwrap();
+            assert_eq!(fitted.hole_count(), count);
+        }
+    }
+
+    #[test]
+    fn pitch_for_count_refuses_unreachable_counts() {
+        let stitch = line(&[(0.0, 0.0), (20.0, 0.0)], HoleKind::Diamond, 3.85);
+        // One hole is too few, and 40 holes on 20 mm would need a pitch under the minimum.
+        assert_eq!(stitch.pitch_for_count(1), None);
+        assert_eq!(stitch.pitch_for_count(40), None);
+        // Three runs need at least four holes.
+        let bent = line(
+            &[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)],
+            HoleKind::Round,
+            4.0,
+        );
+        assert_eq!(bent.pitch_for_count(3), None);
     }
 
     #[test]

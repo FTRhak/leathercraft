@@ -207,6 +207,30 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::WaterResistance(value) => water_resistance(value),
         Label::WaterResistanceHint(value) => water_resistance_hint(value),
         Label::HeatResistance(value) => heat_resistance(value),
+        Label::LinkSeams => "Link seams…",
+        Label::LinkSeamsTitle => "Link seams",
+        Label::LinkSeamsSubtitle => "Match the holes of two seams for sewing",
+        Label::SeamA => "Seam A",
+        Label::SeamB => "Seam B",
+        Label::HolesFrom => "Holes from",
+        Label::HolesTo => "to",
+        Label::Reverse => "Reverse",
+        Label::StartOffset => "Start offset",
+        Label::HolesShort => "holes",
+        Label::LinkSchematic => "Link schematic",
+        Label::HolePairs => "Hole pairs",
+        Label::PairAuto => "Auto",
+        Label::PairManual => "Manual",
+        Label::PairManualLegend => "Manual pair",
+        Label::PairFree => "Unpaired",
+        Label::LinkHint => "Click: hole A, then B for a manual pair · Alt+click removes it",
+        Label::ResetManualPairs => "Reset manual pairs",
+        Label::Pairs => "Pairs",
+        Label::LengthDifference => "Length difference",
+        Label::SeamLinks => "Seam links",
+        Label::EditLink => "Edit",
+        Label::RemoveLink => "Remove",
+        Label::SeamLinkStale => "The seam got shorter: part of the range has no holes",
     }
 }
 
@@ -574,6 +598,63 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionRemoveChildren { name, count } => {
             format!("Deleted {count} shapes from '{name}'")
         }
+        Message::ActionLinkSeams { a, b } => format!("Linked seams of {}", pair_names(a, b)),
+        Message::ActionEditSeamLink { a, b } => {
+            format!("Changed the seam link of {}", pair_names(a, b))
+        }
+        Message::ActionRemoveSeamLink { a, b } => {
+            format!("Removed the seam link of {}", pair_names(a, b))
+        }
+        Message::SeamNotFound => "A linked seam no longer exists.".to_owned(),
+        Message::InvalidSeamRange => {
+            "A seam's range must start at or before the hole it ends at.".to_owned()
+        }
+        Message::SeamRangesOverlap => {
+            "On one seam, the ranges of A and B must not share holes.".to_owned()
+        }
+        Message::DuplicateManualPair => "A hole can be in only one manual pair.".to_owned(),
+        Message::DuplicateSeamLink => "Two seam links have the same ID.".to_owned(),
+        Message::HoleCountMismatch { a, b } => {
+            format!("Different numbers of holes: A — {a}, B — {b}")
+        }
+        Message::UnpairedHoles { side, count } => {
+            let holes = counted(*count, "hole", "holes");
+            let verb = if *count == 1 { "is" } else { "are" };
+            match side {
+                Some(side) => format!(
+                    "{holes} of seam {side} {verb} left without a pair. Fit the pitch so that the counts match."
+                ),
+                None => format!(
+                    "{holes} {verb} left without a pair. Fit the pitch so that the counts match."
+                ),
+            }
+        }
+        Message::FitPitch { side, pitch } => format!("Pitch {side} → {pitch}"),
+        Message::LinkPairsButton { count } => {
+            format!("Link {}", counted(*count, "pair", "pairs"))
+        }
+        Message::SeamName { piece, index } => format!("{piece} → Seam {index}"),
+        Message::SeamOption {
+            piece,
+            index,
+            holes,
+        } => format!("{piece} → Seam {index} ({holes} holes)"),
+        Message::HoleCountBadge { count } => counted(*count, "hole", "holes"),
+        Message::PairsCount { count } => counted(*count, "pair", "pairs"),
+        Message::FreeIn { side: Some(side) } => format!("Unpaired in {side}"),
+        Message::FreeIn { side: None } => "Unpaired".to_owned(),
+        Message::SeamLinkRow { other, pairs } => {
+            format!("↔ {other} · {}", counted(*pairs, "pair", "pairs"))
+        }
+    }
+}
+
+/// `'Flap' and 'Body'`, or `'Flap'` when both sides are on one piece.
+fn pair_names(a: &str, b: &str) -> String {
+    if a == b {
+        format!("'{a}'")
+    } else {
+        format!("'{a}' and '{b}'")
     }
 }
 

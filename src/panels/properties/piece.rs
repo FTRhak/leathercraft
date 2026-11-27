@@ -1,7 +1,7 @@
 use super::Selection;
 use super::fields::{ROW_GAP, section_header};
 use super::shape::shape_fields;
-use super::stitch::stitch_details;
+use super::stitch::{LinkAction, seam_links_section, stitch_details};
 use crate::editor::format_length;
 use crate::ui_components::button::Button;
 use crate::ui_components::input::TextInput;
@@ -9,7 +9,7 @@ use crate::ui_components::palette::Palette;
 use bevy_egui::egui;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language};
-use leathercraft::model::Units;
+use leathercraft::model::{Project, Units};
 use leathercraft::shapes::Shape;
 
 const SIZE_BOX_HEIGHT: f32 = 28.0;
@@ -72,10 +72,11 @@ fn size_row(ui: &mut egui::Ui, width_mm: f64, height_mm: f64, units: Units, lang
 /// or child, with a To Polygon button for a primitive.
 pub(super) fn selected_piece_details(
     ui: &mut egui::Ui,
-    units: Units,
+    project: &Project,
     selection: Selection,
     language: Language,
 ) -> Option<ProjectEvent> {
+    let units = project.units;
     let Some(piece) = selection.piece else {
         *selection.rename_buffer = None;
         return None;
@@ -141,6 +142,17 @@ pub(super) fn selected_piece_details(
         if let Shape::StitchLine(line) = shape {
             stitch_details(ui, line, piece.material.thickness_mm, units, language);
         }
+    });
+    // Links don't change the piece, so they stay editable while it is locked.
+    if let (Shape::StitchLine(_), Some(child)) = (shape, child) {
+        match seam_links_section(ui, project, id, child.id, language) {
+            Some(LinkAction::Open(request)) => *selection.open_link = Some(request),
+            Some(LinkAction::Event(link_event)) => event = Some(link_event),
+            None => {}
+        }
+    }
+    ui.add_enabled_ui(!piece.locked, |ui| {
+        ui.spacing_mut().item_spacing.y = ROW_GAP;
         if !matches!(shape, Shape::Polygon(_))
             && !shape.is_open()
             && ui

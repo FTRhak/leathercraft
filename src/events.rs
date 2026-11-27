@@ -3,6 +3,7 @@ use crate::i18n::Message;
 use crate::material::Material;
 use crate::model::{BooleanOp, ChildShape, PatternPiece, Project, Units};
 use crate::persistence;
+use crate::seams::SeamLink;
 use crate::shapes::Shape;
 use std::path::PathBuf;
 
@@ -110,6 +111,17 @@ pub enum ProjectEvent {
         id: u64,
         children: Vec<u64>,
     },
+    /// Links two seams; the link's `id` is ignored and a new one is given.
+    AddSeamLink {
+        link: SeamLink,
+    },
+    /// Replaces the link with the same id.
+    SetSeamLink {
+        link: SeamLink,
+    },
+    RemoveSeamLink {
+        id: u64,
+    },
 }
 
 /// What an applied event did, so that listeners can react without inspecting the project.
@@ -125,6 +137,7 @@ pub enum ProjectChange {
     ChildAdded { id: u64, child: u64 },
     ChildRemoved { id: u64 },
     ChildrenRemoved { id: u64, count: usize },
+    SeamLinkAdded(u64),
 }
 
 impl Project {
@@ -214,9 +227,11 @@ impl Project {
                 project.piece_mut(id)?.material = material;
                 Ok(ProjectChange::Edited)
             }),
+            // The links of a removed piece go with it, in the same edit, so one undo restores both.
             ProjectEvent::RemovePiece { id } => self.edit(|project| {
                 project.unlocked_piece_mut(id)?;
                 project.remove_piece(id);
+                project.seam_links.retain(|link| !link.uses_piece(id));
                 Ok(ProjectChange::PieceRemoved(id))
             }),
             ProjectEvent::RemovePieces { ids } => self.edit(|project| {
@@ -225,6 +240,7 @@ impl Project {
                 }
                 for id in &ids {
                     project.remove_piece(*id);
+                    project.seam_links.retain(|link| !link.uses_piece(*id));
                 }
                 Ok(ProjectChange::PiecesRemoved)
             }),
@@ -259,6 +275,9 @@ impl Project {
                 let piece = project.unlocked_piece_mut(id)?;
                 let index = child_index(piece, child)?;
                 piece.children.remove(index);
+                project
+                    .seam_links
+                    .retain(|link| !link.uses_child(id, child));
                 Ok(ProjectChange::ChildRemoved { id })
             }),
             // Each id is checked first, so a repeated id still moves its child only once.
@@ -308,7 +327,33 @@ impl Project {
                 let before = piece.children.len();
                 piece.children.retain(|child| !children.contains(&child.id));
                 let count = before - piece.children.len();
+                project
+                    .seam_links
+                    .retain(|link| !children.iter().any(|child| link.uses_child(id, *child)));
                 Ok(ProjectChange::ChildrenRemoved { id, count })
+            }),
+            ProjectEvent::AddSeamLink { mut link } => self.edit(|project| {
+                link.id = project.next_seam_link_id();
+                let id = link.id;
+                project.seam_links.push(link);
+                Ok(ProjectChange::SeamLinkAdded(id))
+            }),
+            ProjectEvent::SetSeamLink { link } => self.edit(|project| {
+                let slot = project
+                    .seam_links
+                    .iter_mut()
+                    .find(|existing| existing.id == link.id)
+                    .ok_or(Message::SeamNotFound)?;
+                *slot = link;
+                Ok(ProjectChange::Edited)
+            }),
+            ProjectEvent::RemoveSeamLink { id } => self.edit(|project| {
+                let before = project.seam_links.len();
+                project.seam_links.retain(|link| link.id != id);
+                if project.seam_links.len() == before {
+                    return Err(Message::SeamNotFound);
+                }
+                Ok(ProjectChange::Edited)
             }),
         }
     }
@@ -1051,5 +1096,99 @@ mod tests {
             Err(Message::InvalidHoleParameters { .. })
         ));
         assert_eq!(project, before);
+    }
+
+    mod seam_links {
+        use super::*;
+        use crate::history::History;
+        use crate::seams::tests::{link, side, two_lines};
+
+        fn linked() -> Project {
+            let mut project = two_lines(10, 10, 4.0);
+            let mut new = link(side(1, 0, 9), side(2, 0, 9));
+            new.id = 42;
+            assert_eq!(
+                project.apply(ProjectEvent::AddSeamLink { link: new }),
+                Ok(ProjectChange::SeamLinkAdded(1))
+            );
+            project
+        }
+
+        #[test]
+        fn links_are_added_changed_and_removed() {
+            let mut project = linked();
+            assert_eq!(project.seam_links[0].id, 1);
+            let mut changed = project.seam_links[0].clone();
+            changed.offset = 2;
+            assert_eq!(
+                project.apply(ProjectEvent::SetSeamLink {
+                    link: changed.clone()
+                }),
+                Ok(ProjectChange::Edited)
+            );
+            assert_eq!(project.seam_links, [changed.clone()]);
+
+            changed.id = 9;
+            assert_eq!(
+                project.apply(ProjectEvent::SetSeamLink { link: changed }),
+                Err(Message::SeamNotFound)
+            );
+            assert_eq!(
+                project.apply(ProjectEvent::RemoveSeamLink { id: 1 }),
+                Ok(ProjectChange::Edited)
+            );
+            assert!(project.seam_links.is_empty());
+            assert_eq!(
+                project.apply(ProjectEvent::RemoveSeamLink { id: 1 }),
+                Err(Message::SeamNotFound)
+            );
+        }
+
+        #[test]
+        fn rejected_links_leave_the_project_unchanged() {
+            let mut project = linked();
+            let before = project.clone();
+            let overlapping = link(side(1, 0, 5), side(1, 3, 9));
+            assert_eq!(
+                project.apply(ProjectEvent::AddSeamLink { link: overlapping }),
+                Err(Message::SeamRangesOverlap)
+            );
+            assert_eq!(project, before);
+        }
+
+        #[test]
+        fn removing_a_seam_or_piece_removes_its_links_and_undo_restores_them() {
+            for event in [
+                ProjectEvent::RemoveChild { id: 2, child: 1 },
+                ProjectEvent::RemoveChildren {
+                    id: 2,
+                    children: vec![1],
+                },
+                ProjectEvent::RemovePiece { id: 1 },
+                ProjectEvent::RemovePieces { ids: vec![1, 2] },
+            ] {
+                let mut project = linked();
+                let mut history = History::new(&project, Message::ActionNewProject);
+                let change = project.apply(event.clone()).unwrap();
+                history.record(&event, change, &project);
+                assert!(project.seam_links.is_empty(), "{event:?}");
+                history.apply(crate::history::HistoryCommand::Undo, &mut project);
+                assert_eq!(project.seam_links.len(), 1, "{event:?}");
+            }
+        }
+
+        #[test]
+        fn moving_or_reshaping_a_seam_keeps_its_links() {
+            let mut project = linked();
+            project
+                .apply(ProjectEvent::MoveChildren {
+                    id: 1,
+                    children: vec![1],
+                    dx: 1.0,
+                    dy: 0.0,
+                })
+                .unwrap();
+            assert_eq!(project.seam_links.len(), 1);
+        }
     }
 }

@@ -13,6 +13,8 @@ An icon is anything that paints into a rect with a stroke: `FnOnce(&egui::Painte
 
 Prefer a glyph for a new pictogram. Paint an icon only when it depends on state or must follow the canvas geometry.
 
+The Link seams dialog paints its icons for now, since they were added without the font tool: `paint_link`, `paint_reverse`, `paint_warning`, `paint_close` and `paint_reset` in `icons/mod.rs`. Each draws into the rect it gets with the stroke it gets, so it can be swapped for a glyph later (`LINK`, `REVERSE`) without changing its callers.
+
 Both kinds must use only the `stroke` they are given for color and width. That is how they follow hover, selected and disabled states and the light or dark theme.
 
 ## The icon font

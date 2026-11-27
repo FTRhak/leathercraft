@@ -2,6 +2,7 @@ use super::ShapePart;
 use super::drag_state_struct::ShapeRef;
 use super::{DragState, ShapeDraft};
 use crate::panels::align::AlignOptions;
+use crate::panels::seam_link::{OpenLink, SeamLinkDraft};
 use crate::panels::settings::SettingsDraft;
 use crate::panels::tools::{StitchSettings, Tool, ZoomRequest};
 use bevy::prelude::*;
@@ -67,6 +68,8 @@ pub struct EditorState {
     pub(super) new_project_dialog: Option<Material>,
     /// The preferences being edited while the Settings window is open.
     pub(super) settings_dialog: Option<SettingsDraft>,
+    /// The link being made or changed while the Link seams dialog is open.
+    pub(super) seam_link_dialog: Option<SeamLinkDraft>,
     pub(super) language: Language,
     /// Kept untranslated so that it follows a change of language.
     pub(super) status: Message,
@@ -103,6 +106,7 @@ impl Default for EditorState {
             rename_buffer: None,
             new_project_dialog: None,
             settings_dialog: None,
+            seam_link_dialog: None,
             language: Language::default(),
             status: Message::Ready,
             status_is_error: false,
@@ -161,7 +165,23 @@ impl EditorState {
         }
     }
 
+    /// Opens the Link seams dialog, if the project has a stitch line or the link to change.
+    pub(super) fn open_seam_link(&mut self, project: &Project, request: OpenLink) {
+        // A draft would otherwise still react to Enter behind the dialog.
+        self.draft.clear();
+        self.shape_draft = None;
+        self.seam_link_dialog = SeamLinkDraft::open(project, request);
+    }
+
+    /// The selected child, if it is a stitch line: where a new link starts.
+    pub(super) fn selected_seam(&self, project: &Project) -> Option<(u64, u64)> {
+        let piece = self.selected?;
+        let child = self.selected_child_id()?;
+        leathercraft::seams::stitch_line(project, piece, child).map(|_| (piece, child))
+    }
+
     fn reset_document(&mut self) {
+        self.seam_link_dialog = None;
         self.draft.clear();
         self.shape_draft = None;
         self.selected = None;
@@ -188,7 +208,7 @@ impl EditorState {
             ProjectChange::Saved => self.report(Message::Saved {
                 path: document_name(project),
             }),
-            ProjectChange::Edited => {}
+            ProjectChange::Edited | ProjectChange::SeamLinkAdded(_) => {}
             ProjectChange::PieceAdded(id) => {
                 self.draft.clear();
                 self.select(Some(id), None);

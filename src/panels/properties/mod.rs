@@ -17,6 +17,7 @@ pub(crate) use line::line_style_fields;
 pub(crate) use stitch::stitch_fields;
 
 use crate::editor::ShapePart;
+use crate::panels::seam_link::OpenLink;
 use crate::preview::{self, PreviewSettings};
 use crate::ui_components::dropdown::{Dropdown, DropdownItem, dropdown_value};
 use crate::ui_components::palette::Palette;
@@ -45,6 +46,8 @@ pub struct Selection<'a> {
     pub part: Option<ShapePart>,
     /// The name being typed, kept while the name box has focus.
     pub rename_buffer: &'a mut Option<String>,
+    /// Set when a link row or button asks for the Link seams dialog.
+    pub open_link: &'a mut Option<OpenLink>,
 }
 
 /// Between the panel's edges and its content, as in the design.
@@ -149,8 +152,7 @@ pub fn show_panel(
                     let units = units_control(ui, project, language);
                     fields::divider(ui);
                     ui.spacing_mut().item_spacing.y = fields::ROW_GAP;
-                    let details =
-                        piece::selected_piece_details(ui, project.units, selection, language);
+                    let details = piece::selected_piece_details(ui, project, selection, language);
                     units.or(details)
                 })
                 .inner

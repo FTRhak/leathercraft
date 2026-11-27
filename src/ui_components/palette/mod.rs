@@ -18,6 +18,7 @@ mod layout;
 mod list;
 mod properties;
 mod ruler;
+mod seam_link;
 mod snap;
 mod status;
 mod status_bar;
@@ -48,6 +49,7 @@ pub(crate) use input::{InputColors, InputPaint};
 pub(crate) use layout::LayoutColors;
 pub(crate) use list::{ListColors, ListItemPaint};
 pub(crate) use properties::PropertiesColors;
+pub(crate) use seam_link::SeamLinkPaint;
 pub(crate) use snap::{PopoverColors, SnapColors, TargetRowPaint};
 pub(crate) use status_bar::StatusBarColors;
 pub(crate) use tabs::{TabColors, TabPaint};
@@ -99,6 +101,7 @@ pub(crate) struct Palette {
     pub(crate) toolbar: ToolbarColors,
     pub(crate) view_controls: ViewControlsColors,
     pub(crate) snap: SnapColors,
+    pub(crate) seam_link: SeamLinkPaint,
 }
 
 /// A color written as `0xRRGGBB`.
@@ -147,6 +150,7 @@ impl Palette {
         toolbar: ToolbarColors::DARK,
         view_controls: ViewControlsColors::DARK,
         snap: SnapColors::DARK,
+        seam_link: SeamLinkPaint::DARK,
     };
     const LIGHT: Self = Self {
         grid_line: hex(0xE6E8EC),
@@ -180,6 +184,7 @@ impl Palette {
         toolbar: ToolbarColors::LIGHT,
         view_controls: ViewControlsColors::LIGHT,
         snap: SnapColors::LIGHT,
+        seam_link: SeamLinkPaint::LIGHT,
     };
 
     /// The palette of the current theme, from `visuals.dark_mode`.

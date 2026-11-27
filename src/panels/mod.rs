@@ -3,6 +3,7 @@ pub mod history;
 pub mod layout;
 pub mod material;
 pub mod properties;
+pub mod seam_link;
 pub mod settings;
 pub mod snap;
 pub mod tools;
