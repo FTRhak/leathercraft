@@ -1,9 +1,9 @@
-//! How a seam link is sewn: the stitch, the backstitched holes at each end, and how the two
-//! pieces are laid together. Part of [`crate::seams::SeamLink`] and saved with it; the editor
-//! shows it in the Link seams dialog and estimates the thread from it.
+//! How a seam link is sewn: the stitch, the backstitched holes at each end, how the two pieces
+//! are laid together, and the thread. Part of [`crate::seams::SeamLink`] and saved with it; the
+//! editor shows it in the Link seams dialog and estimates the thread from it.
 
 use crate::i18n::Message;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// The stitch the seam is sewn with.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -105,6 +105,146 @@ impl OnTop {
     }
 }
 
+/// What the thread is made of.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ThreadKind {
+    /// Braided waxed polyester: round, strong, the usual thread for saddle stitching.
+    #[default]
+    WaxedPolyester,
+    /// Waxed linen: matte, the traditional thread.
+    WaxedLinen,
+    /// Bonded nylon: smooth and hard wearing, sewn by machine as well.
+    BondedNylon,
+    /// Flat waxed artificial sinew, split for finer work.
+    ArtificialSinew,
+}
+
+impl ThreadKind {
+    pub const ALL: [Self; 4] = [
+        Self::WaxedPolyester,
+        Self::WaxedLinen,
+        Self::BondedNylon,
+        Self::ArtificialSinew,
+    ];
+}
+
+/// A thread color in sRGB, saved as `"#RRGGBB"`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ThreadColor(pub [u8; 3]);
+
+impl ThreadColor {
+    pub fn rgb(self) -> [u8; 3] {
+        self.0
+    }
+
+    /// `#RRGGBB`, in capitals.
+    pub fn to_hex(self) -> String {
+        let [red, green, blue] = self.0;
+        format!("#{red:02X}{green:02X}{blue:02X}")
+    }
+
+    /// Reads `#RRGGBB` or `RRGGBB` in either case, with spaces around it.
+    pub fn from_hex(text: &str) -> Option<Self> {
+        let text = text.trim();
+        let digits = text.strip_prefix('#').unwrap_or(text);
+        if digits.len() != 6 || !digits.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
+        let channel = |at: usize| u8::from_str_radix(&digits[at..at + 2], 16).ok();
+        Some(Self([channel(0)?, channel(2)?, channel(4)?]))
+    }
+
+    /// The named shade of exactly this color, if it is one.
+    pub fn shade(self) -> Option<ThreadShade> {
+        ThreadShade::ALL
+            .into_iter()
+            .find(|shade| shade.color() == self)
+    }
+}
+
+impl Default for ThreadColor {
+    fn default() -> Self {
+        ThreadShade::Natural.color()
+    }
+}
+
+impl Serialize for ThreadColor {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_hex())
+    }
+}
+
+impl<'de> Deserialize<'de> for ThreadColor {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let text = String::deserialize(deserializer)?;
+        Self::from_hex(&text)
+            .ok_or_else(|| serde::de::Error::custom(format!("invalid thread color {text:?}")))
+    }
+}
+
+/// The thread colors offered as swatches in the Link seams dialog; any other can be picked too.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ThreadShade {
+    Natural,
+    White,
+    Black,
+    Brown,
+    Tan,
+    Red,
+    Navy,
+    Olive,
+}
+
+impl ThreadShade {
+    pub const ALL: [Self; 8] = [
+        Self::Natural,
+        Self::White,
+        Self::Black,
+        Self::Brown,
+        Self::Tan,
+        Self::Red,
+        Self::Navy,
+        Self::Olive,
+    ];
+
+    pub const fn color(self) -> ThreadColor {
+        ThreadColor(match self {
+            Self::Natural => [0xE8, 0xDC, 0xC0],
+            Self::White => [0xF2, 0xF0, 0xEA],
+            Self::Black => [0x1C, 0x1C, 0x1E],
+            Self::Brown => [0x6B, 0x42, 0x26],
+            Self::Tan => [0xB0, 0x7A, 0x45],
+            Self::Red => [0xA3, 0x26, 0x2A],
+            Self::Navy => [0x24, 0x3A, 0x63],
+            Self::Olive => [0x5C, 0x6B, 0x35],
+        })
+    }
+}
+
+pub const MIN_THREAD_MM: f64 = 0.2;
+pub const MAX_THREAD_MM: f64 = 1.5;
+const DEFAULT_THREAD_MM: f64 = 0.55;
+
+/// The thread a seam is sewn with.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Thread {
+    pub kind: ThreadKind,
+    /// Its diameter, in mm.
+    pub diameter_mm: f64,
+    pub color: ThreadColor,
+}
+
+impl Default for Thread {
+    fn default() -> Self {
+        Self {
+            kind: ThreadKind::default(),
+            diameter_mm: DEFAULT_THREAD_MM,
+            color: ThreadColor::default(),
+        }
+    }
+}
+
 pub const MAX_LOCK_HOLES: u32 = 10;
 pub const MIN_OVERLAP_MM: f64 = 1.0;
 pub const MAX_OVERLAP_MM: f64 = 100.0;
@@ -112,7 +252,7 @@ const DEFAULT_LOCK_HOLES: u32 = 2;
 const DEFAULT_OVERLAP_MM: f64 = 8.0;
 
 /// How a link is sewn. Every field has a default, so links saved before it existed load as a
-/// saddle stitch on pieces laid flesh to flesh.
+/// saddle stitch on pieces laid flesh to flesh, sewn with natural waxed polyester.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Sewing {
@@ -124,6 +264,7 @@ pub struct Sewing {
     /// assemblies, so switching back restores it.
     pub overlap_mm: f64,
     pub on_top: OnTop,
+    pub thread: Thread,
 }
 
 impl Default for Sewing {
@@ -134,6 +275,7 @@ impl Default for Sewing {
             assembly: Assembly::default(),
             overlap_mm: DEFAULT_OVERLAP_MM,
             on_top: OnTop::default(),
+            thread: Thread::default(),
         }
     }
 }
@@ -157,6 +299,9 @@ impl Sewing {
         if !(MIN_OVERLAP_MM..=MAX_OVERLAP_MM).contains(&self.overlap_mm) {
             return Err(Message::OverlapOutOfRange);
         }
+        if !(MIN_THREAD_MM..=MAX_THREAD_MM).contains(&self.thread.diameter_mm) {
+            return Err(Message::ThreadDiameterOutOfRange);
+        }
         Ok(())
     }
 }
@@ -173,6 +318,37 @@ mod tests {
         assert_eq!(sewing.assembly, Assembly::FleshToFlesh);
         assert_eq!(sewing.overlap_mm, DEFAULT_OVERLAP_MM);
         assert_eq!(sewing.on_top, OnTop::A);
+        assert_eq!(sewing.thread, Thread::default());
+    }
+
+    #[test]
+    fn the_thread_color_is_saved_as_hex() {
+        let sewing = Sewing {
+            thread: Thread {
+                kind: ThreadKind::WaxedLinen,
+                diameter_mm: 0.65,
+                color: ThreadColor([0x12, 0xAB, 0xEF]),
+            },
+            ..Sewing::default()
+        };
+        let json = serde_json::to_string(&sewing).unwrap();
+        assert!(json.contains(r##""color":"#12ABEF""##), "{json}");
+        let back: Sewing = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, sewing);
+        assert!(serde_json::from_str::<ThreadColor>(r##""#12AB""##).is_err());
+    }
+
+    #[test]
+    fn hex_is_read_leniently() {
+        let natural = ThreadShade::Natural.color();
+        assert_eq!(ThreadColor::from_hex("e8dcc0"), Some(natural));
+        assert_eq!(ThreadColor::from_hex(" #E8DCC0 "), Some(natural));
+        assert_eq!(ThreadColor::from_hex("#E8DCCG"), None);
+        assert_eq!(ThreadColor::from_hex("#E8DCC0F"), None);
+        assert_eq!(ThreadColor::from_hex("#ЕЕЕ"), None);
+        assert_eq!(natural.to_hex(), "#E8DCC0");
+        assert_eq!(ThreadShade::Navy.color().shade(), Some(ThreadShade::Navy));
+        assert_eq!(ThreadColor([1, 2, 3]).shade(), None);
     }
 
     #[test]
@@ -203,6 +379,16 @@ mod tests {
                 ..Sewing::default()
             };
             assert_eq!(overlap.validate(), Err(Message::OverlapOutOfRange));
+        }
+        for diameter_mm in [0.1, f64::NAN, MAX_THREAD_MM + 0.1] {
+            let thread = Sewing {
+                thread: Thread {
+                    diameter_mm,
+                    ..Thread::default()
+                },
+                ..Sewing::default()
+            };
+            assert_eq!(thread.validate(), Err(Message::ThreadDiameterOutOfRange));
         }
     }
 

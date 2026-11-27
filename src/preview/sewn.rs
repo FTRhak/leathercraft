@@ -7,9 +7,6 @@ use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;
 use leathercraft::drape::{Drape, DrapedPiece, Vec3 as DrapeVec};
 
-/// The waxed thread: light, so that it shows on dark and light leather.
-const THREAD_COLOR: Color = Color::srgb(0.93, 0.89, 0.78);
-
 /// The simulation behind the sewn preview, and the meshes it updates.
 #[derive(Resource, Default)]
 pub(super) struct SewnModel {
@@ -77,16 +74,24 @@ fn piece_mesh(drape: &Drape, piece: &DrapedPiece, center: DrapeVec) -> Mesh {
     mesh
 }
 
+/// The thread as lines, each seam in the color of its thread, carried by the vertex colors.
 fn thread_mesh(drape: &Drape, center: DrapeVec) -> Mesh {
     let segments = drape.thread_segments();
-    let positions: Vec<[f32; 3]> = segments
-        .iter()
-        .flat_map(|segment| segment.map(|point| to_scene(point, center)))
-        .collect();
+    let mut positions = Vec::with_capacity(segments.len() * 2);
+    let mut colors = Vec::with_capacity(segments.len() * 2);
+    for segment in &segments {
+        let [red, green, blue] = segment.color.rgb();
+        let color = Color::srgb_u8(red, green, blue).to_linear().to_f32_array();
+        for point in segment.ends {
+            positions.push(to_scene(point, center));
+            colors.push(color);
+        }
+    }
     let normals = vec![[0.0, 1.0, 0.0]; positions.len()];
     let mut mesh = Mesh::new(PrimitiveTopology::LineList, RenderAssetUsages::default());
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     mesh
 }
 
@@ -140,8 +145,9 @@ impl SewnModel {
         let thread = meshes.add(thread_mesh(&drape, self.center));
         commands.spawn((
             Mesh3d(thread.clone()),
+            // White, so that the vertex colors show as they are.
             MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: THREAD_COLOR,
+                base_color: Color::WHITE,
                 unlit: true,
                 ..default()
             })),

@@ -5,7 +5,10 @@ use crate::material::{
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
 };
 use crate::model::{BooleanOp, Units};
-use crate::sewing::{Assembly, MAX_LOCK_HOLES, MAX_OVERLAP_MM, MIN_OVERLAP_MM, StitchMethod};
+use crate::sewing::{
+    Assembly, MAX_LOCK_HOLES, MAX_OVERLAP_MM, MAX_THREAD_MM, MIN_OVERLAP_MM, MIN_THREAD_MM,
+    StitchMethod, ThreadKind, ThreadShade,
+};
 use crate::shapes::{HoleKind, MAX_HOLE_MM, MAX_PITCH_MM, MIN_HOLE_MM, MIN_PITCH_MM};
 
 pub(super) fn label(label: Label) -> &'static str {
@@ -281,6 +284,27 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::LockHoles => "Закріпка",
         Label::Overlap => "Напуск",
         Label::OnTop => "Зверху",
+        Label::ThreadTitle => "Нитка",
+        Label::ThreadKindCaption => "Тип",
+        Label::ThreadKind(kind) => match kind {
+            ThreadKind::WaxedPolyester => "Вощена поліефірна, плетена",
+            ThreadKind::WaxedLinen => "Вощена лляна",
+            ThreadKind::BondedNylon => "Нейлонова бондована",
+            ThreadKind::ArtificialSinew => "Штучна жила",
+        },
+        Label::ThreadDiameter => "Товщина",
+        Label::ThreadColorCaption => "Колір",
+        Label::ThreadShade(shade) => match shade {
+            ThreadShade::Natural => "Натуральна",
+            ThreadShade::White => "Біла",
+            ThreadShade::Black => "Чорна",
+            ThreadShade::Brown => "Коричнева",
+            ThreadShade::Tan => "Карамельна",
+            ThreadShade::Red => "Червона",
+            ThreadShade::Navy => "Темно-синя",
+            ThreadShade::Olive => "Оливкова",
+        },
+        Label::ThreadCustomColor => "Власний колір",
     }
 }
 
@@ -757,6 +781,11 @@ pub(super) fn message(message: &Message) -> String {
             "Напуск шва внакладку має бути від {} до {} мм.",
             decimal(MIN_OVERLAP_MM),
             decimal(MAX_OVERLAP_MM)
+        ),
+        Message::ThreadDiameterOutOfRange => format!(
+            "Товщина нитки має бути від {} до {} мм.",
+            decimal(MIN_THREAD_MM),
+            decimal(MAX_THREAD_MM)
         ),
         Message::AssemblyHint {
             assembly,

@@ -29,8 +29,8 @@ use leathercraft::shapes::{Shape, StitchLine};
 use schematic::{Side, schematic};
 
 /// The design's size, and the smallest size the cards and the body still fit in.
-const DEFAULT_SIZE: egui::Vec2 = egui::vec2(1000.0, 812.0);
-const MIN_SIZE: egui::Vec2 = egui::vec2(860.0, 712.0);
+const DEFAULT_SIZE: egui::Vec2 = egui::vec2(1000.0, 902.0);
+const MIN_SIZE: egui::Vec2 = egui::vec2(860.0, 802.0);
 /// Kept free around the dialog when the window is too small for it.
 const SCREEN_MARGIN: f32 = 20.0;
 /// The width of the strips along the edges that resize the dialog.

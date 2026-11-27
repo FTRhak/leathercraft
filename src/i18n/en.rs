@@ -5,7 +5,10 @@ use crate::material::{
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
 };
 use crate::model::{BooleanOp, Units};
-use crate::sewing::{Assembly, MAX_LOCK_HOLES, MAX_OVERLAP_MM, MIN_OVERLAP_MM, StitchMethod};
+use crate::sewing::{
+    Assembly, MAX_LOCK_HOLES, MAX_OVERLAP_MM, MAX_THREAD_MM, MIN_OVERLAP_MM, MIN_THREAD_MM,
+    StitchMethod, ThreadKind, ThreadShade,
+};
 use crate::shapes::{HoleKind, MAX_HOLE_MM, MAX_PITCH_MM, MIN_HOLE_MM, MIN_PITCH_MM};
 
 pub(super) fn label(label: Label) -> &'static str {
@@ -277,6 +280,27 @@ pub(super) fn label(label: Label) -> &'static str {
         Label::LockHoles => "Lock",
         Label::Overlap => "Overlap",
         Label::OnTop => "On top",
+        Label::ThreadTitle => "Thread",
+        Label::ThreadKindCaption => "Type",
+        Label::ThreadKind(kind) => match kind {
+            ThreadKind::WaxedPolyester => "Waxed polyester, braided",
+            ThreadKind::WaxedLinen => "Waxed linen",
+            ThreadKind::BondedNylon => "Bonded nylon",
+            ThreadKind::ArtificialSinew => "Artificial sinew",
+        },
+        Label::ThreadDiameter => "Thickness",
+        Label::ThreadColorCaption => "Color",
+        Label::ThreadShade(shade) => match shade {
+            ThreadShade::Natural => "Natural",
+            ThreadShade::White => "White",
+            ThreadShade::Black => "Black",
+            ThreadShade::Brown => "Brown",
+            ThreadShade::Tan => "Tan",
+            ThreadShade::Red => "Red",
+            ThreadShade::Navy => "Navy",
+            ThreadShade::Olive => "Olive",
+        },
+        Label::ThreadCustomColor => "Custom",
     }
 }
 
@@ -697,6 +721,9 @@ pub(super) fn message(message: &Message) -> String {
         }
         Message::OverlapOutOfRange => {
             format!("A lapped seam needs an overlap from {MIN_OVERLAP_MM} to {MAX_OVERLAP_MM} mm.")
+        }
+        Message::ThreadDiameterOutOfRange => {
+            format!("A thread is from {MIN_THREAD_MM} to {MAX_THREAD_MM} mm thick.")
         }
         Message::AssemblyHint {
             assembly,

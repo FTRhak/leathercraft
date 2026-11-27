@@ -1,11 +1,13 @@
-//! The stitch and assembly cards of the Link seams dialog, from the "Method" row of the design:
-//! a tile per stitch and per way of laying the pieces together, each with a small drawing, and
-//! under them the locked holes and the thread estimate, the overlap and the side on top.
+//! The stitch, assembly and thread cards of the Link seams dialog, from the "Method" and
+//! "Thread Row" rows of the design: a tile per stitch and per way of laying the pieces together,
+//! each with a small drawing, and under them the locked holes, the overlap and the side on top;
+//! then the thread's type, thickness and color, with the estimate of how much the seam takes.
 
 use super::{CARD_PADDING, CARD_RADIUS, EDGE, LABEL_TEXT, SMALL_TEXT, SeamLinkDraft, caption};
 use crate::editor::format_length;
+use crate::ui_components::dropdown::{Dropdown, DropdownItem, dropdown_value};
 use crate::ui_components::group_button::GroupButton;
-use crate::ui_components::input::NumberInput;
+use crate::ui_components::input::{NumberInput, TextInput};
 use crate::ui_components::palette::Palette;
 use bevy_egui::egui;
 use egui::epaint::CubicBezierShape;
@@ -13,8 +15,10 @@ use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{Project, Units};
 use leathercraft::seams::{LinkPairs, stitch_line};
 use leathercraft::sewing::{
-    Assembly, MAX_LOCK_HOLES, MAX_OVERLAP_MM, MIN_OVERLAP_MM, OnTop, Sewing, StitchMethod,
+    Assembly, MAX_LOCK_HOLES, MAX_OVERLAP_MM, MAX_THREAD_MM, MIN_OVERLAP_MM, MIN_THREAD_MM, OnTop,
+    Sewing, StitchMethod, Thread, ThreadColor, ThreadKind, ThreadShade,
 };
+use std::ops::RangeInclusive;
 
 const CARD_GAP: f32 = 12.0;
 const TILE_GAP: f32 = 6.0;
@@ -26,8 +30,19 @@ const GLYPH_SIZE: egui::Vec2 = egui::vec2(64.0, 24.0);
 const TITLE_HEIGHT: f32 = 16.0;
 const OPTIONS_HEIGHT: f32 = 26.0;
 const FIELD_WIDTH: f32 = 84.0;
+/// The thread card: the gap between its groups of fields, the type dropdown's narrowest and
+/// widest, the swatches and the hex field.
+const GROUP_GAP: f32 = 24.0;
+const KIND_WIDTH: (f32, f32) = (170.0, 250.0);
+/// What the thickness and color groups take beside the type dropdown.
+const THREAD_FIELDS_REST: f32 = 560.0;
+const SWATCH_SIZE: f32 = 22.0;
+const SWATCH_DOT: f32 = 15.0;
+const SWATCH_GAP: f32 = 3.0;
+const HEX_WIDTH: f32 = 76.0;
 
-/// The two cards side by side, with the dialog's margins.
+/// The stitch and assembly cards side by side, and the thread card under them, with the
+/// dialog's margins.
 pub(super) fn sewing_cards(
     ui: &mut egui::Ui,
     draft: &mut SeamLinkDraft,
@@ -38,17 +53,22 @@ pub(super) fn sewing_cards(
     egui::Frame::new()
         .inner_margin(egui::Margin::symmetric(EDGE as i8, 14))
         .show(ui, |ui| {
+            ui.spacing_mut().item_spacing.y = CARD_GAP;
+            let estimate = pairs.and_then(|pairs| thread_text(draft, project, pairs, language));
+            let sewing = &mut draft.link.sewing;
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing.x = CARD_GAP;
                 let width = (ui.available_width() - CARD_GAP) / 2.0;
-                let thread = pairs.and_then(|pairs| thread_text(draft, project, pairs, language));
-                let sewing = &mut draft.link.sewing;
                 card(ui, width, |ui, inner| {
-                    stitch_card(ui, inner, sewing, thread, language)
+                    stitch_card(ui, inner, sewing, language)
                 });
                 card(ui, width, |ui, inner| {
                     assembly_card(ui, inner, sewing, project.units, language)
                 });
+            });
+            let width = ui.available_width();
+            card(ui, width, |ui, _| {
+                thread_card(ui, &mut sewing.thread, estimate, project.units, language)
             });
         });
 }
@@ -87,13 +107,7 @@ fn card(ui: &mut egui::Ui, width: f32, add: impl FnOnce(&mut egui::Ui, f32)) {
         });
 }
 
-fn stitch_card(
-    ui: &mut egui::Ui,
-    width: f32,
-    sewing: &mut Sewing,
-    thread: Option<String>,
-    language: Language,
-) {
+fn stitch_card(ui: &mut egui::Ui, width: f32, sewing: &mut Sewing, language: Language) {
     title_row(
         ui,
         language.label(Label::StitchMethodTitle),
@@ -115,11 +129,6 @@ fn stitch_card(
                 .width(FIELD_WIDTH)
                 .id_salt("seam_link_lock"),
         );
-        if let Some(thread) = thread {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                muted(ui, &thread, LABEL_TEXT);
-            });
-        }
     });
 }
 
@@ -147,7 +156,15 @@ fn assembly_card(
     options_row(ui, |ui| {
         caption(ui, language.label(Label::Overlap));
         ui.add_enabled_ui(overlap, |ui| {
-            overlap_input(ui, &mut sewing.overlap_mm, units, language);
+            length_input(
+                ui,
+                &mut sewing.overlap_mm,
+                MIN_OVERLAP_MM..=MAX_OVERLAP_MM,
+                Precision::Overlap,
+                units,
+                language,
+                "seam_link_overlap",
+            );
         });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_enabled(
@@ -161,27 +178,229 @@ fn assembly_card(
     });
 }
 
-/// The overlap in display units; written back only when changed, so that an untouched value
-/// isn't rounded through the units.
-fn overlap_input(ui: &mut egui::Ui, millimeters: &mut f64, units: Units, language: Language) {
+/// The thread's type, thickness and color, with the estimate of how much the seam takes beside
+/// the title.
+fn thread_card(
+    ui: &mut egui::Ui,
+    thread: &mut Thread,
+    estimate: Option<String>,
+    units: Units,
+    language: Language,
+) {
+    title_row(
+        ui,
+        language.label(Label::ThreadTitle),
+        estimate.as_deref().unwrap_or_default(),
+    );
+    options_row(ui, |ui| {
+        // The dropdown gives up width first when the dialog is narrow.
+        let kind_width =
+            (ui.available_width() - THREAD_FIELDS_REST).clamp(KIND_WIDTH.0, KIND_WIDTH.1);
+        caption(ui, language.label(Label::ThreadKindCaption));
+        Dropdown::new(
+            "seam_link_thread_kind",
+            language.label(Label::ThreadKind(thread.kind)),
+        )
+        .width(kind_width)
+        .show_ui(ui, |ui| {
+            for kind in ThreadKind::ALL {
+                let item = DropdownItem::new(language.label(Label::ThreadKind(kind)));
+                dropdown_value(ui, &mut thread.kind, kind, item);
+            }
+        });
+        ui.add_space(GROUP_GAP - ui.spacing().item_spacing.x);
+        caption(ui, language.label(Label::ThreadDiameter));
+        length_input(
+            ui,
+            &mut thread.diameter_mm,
+            MIN_THREAD_MM..=MAX_THREAD_MM,
+            Precision::Thread,
+            units,
+            language,
+            "seam_link_thread_diameter",
+        );
+        ui.add_space(GROUP_GAP - ui.spacing().item_spacing.x);
+        caption(ui, language.label(Label::ThreadColorCaption));
+        thread_color(ui, &mut thread.color, language);
+    });
+}
+
+/// A swatch per named shade, a last one that opens a color picker (showing the color while it
+/// is none of the shades), the hex field and the name of the color.
+fn thread_color(ui: &mut egui::Ui, color: &mut ThreadColor, language: Language) {
+    let shade = color.shade();
+    ui.scope(|ui| {
+        ui.spacing_mut().item_spacing.x = SWATCH_GAP;
+        for option in ThreadShade::ALL {
+            let name = language.label(Label::ThreadShade(option));
+            if swatch(ui, Some(option.color()), shade == Some(option), name).clicked() {
+                *color = option.color();
+            }
+        }
+        let custom = shade.is_none().then_some(*color);
+        let name = language.label(Label::ThreadCustomColor);
+        let response = swatch(ui, custom, custom.is_some(), name);
+        let palette = Palette::of(ui.painter());
+        let frame = egui::Frame::popup(ui.style())
+            .fill(palette.surface.ruler)
+            .stroke(egui::Stroke::new(1.0, palette.border.control));
+        egui::Popup::from_toggle_button_response(&response)
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+            .frame(frame)
+            .show(|ui| {
+                let [red, green, blue] = color.rgb();
+                let mut picked = egui::Color32::from_rgb(red, green, blue);
+                egui::color_picker::color_picker_color32(
+                    ui,
+                    &mut picked,
+                    egui::color_picker::Alpha::Opaque,
+                );
+                *color = ThreadColor([picked.r(), picked.g(), picked.b()]);
+            });
+    });
+    hex_field(ui, color);
+    let name = match shade {
+        Some(shade) => language.label(Label::ThreadShade(shade)),
+        None => language.label(Label::ThreadCustomColor),
+    };
+    muted(ui, name, LABEL_TEXT);
+}
+
+/// The color as `#RRGGBB`. What is typed stays while the field has the focus, and is taken as
+/// soon as it reads as a color.
+fn hex_field(ui: &mut egui::Ui, color: &mut ThreadColor) {
+    let id = egui::Id::new("seam_link_thread_hex");
+    let mut text = ui
+        .data(|data| data.get_temp::<String>(id))
+        .unwrap_or_else(|| color.to_hex());
+    let response = ui.add(
+        TextInput::new(&mut text)
+            .width(HEX_WIDTH)
+            .id_salt("seam_link_thread_hex"),
+    );
+    if response.has_focus() {
+        if let Some(typed) = ThreadColor::from_hex(&text) {
+            *color = typed;
+        }
+        ui.data_mut(|data| data.insert_temp(id, text));
+    } else {
+        ui.data_mut(|data| data.remove::<String>(id));
+    }
+}
+
+/// A round swatch of `color`, ringed while it is chosen; without a color, the swatch that opens
+/// the picker, a plus in a ring.
+fn swatch(
+    ui: &mut egui::Ui,
+    color: Option<ThreadColor>,
+    selected: bool,
+    name: &str,
+) -> egui::Response {
+    let palette = Palette::of(ui.painter());
+    let (rect, response) =
+        ui.allocate_exact_size(egui::Vec2::splat(SWATCH_SIZE), egui::Sense::click());
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, selected, name)
+    });
+    let response = response.on_hover_text(name);
+    if !ui.is_rect_visible(rect) {
+        return response;
+    }
+    let painter = ui.painter();
+    let center = rect.center();
+    let ring = if selected {
+        Some(palette.seam_link.link_auto)
+    } else if response.hovered() || response.has_focus() {
+        Some(palette.border.chip)
+    } else {
+        None
+    };
+    if let Some(ring) = ring {
+        painter.circle_stroke(
+            center,
+            SWATCH_SIZE / 2.0 - 0.75,
+            egui::Stroke::new(1.5, ring),
+        );
+    }
+    let radius = SWATCH_DOT / 2.0;
+    match color {
+        // The color is document data, not a theme color, so it is painted as it is; the edge
+        // keeps a black thread visible on a dark card and a white one on a light card.
+        Some(color) => {
+            let [red, green, blue] = color.rgb();
+            painter.circle(
+                center,
+                radius,
+                egui::Color32::from_rgb(red, green, blue),
+                egui::Stroke::new(1.0, palette.border.control),
+            );
+        }
+        None => {
+            painter.circle(
+                center,
+                radius,
+                palette.surface.input,
+                egui::Stroke::new(1.0, palette.seam_link.arrow),
+            );
+            let arm = radius * 0.5;
+            let stroke = egui::Stroke::new(1.2, palette.text.secondary);
+            painter.line_segment(
+                [center - egui::vec2(arm, 0.0), center + egui::vec2(arm, 0.0)],
+                stroke,
+            );
+            painter.line_segment(
+                [center - egui::vec2(0.0, arm), center + egui::vec2(0.0, arm)],
+                stroke,
+            );
+        }
+    }
+    response
+}
+
+/// How finely a length field steps, in each unit.
+#[derive(Clone, Copy)]
+enum Precision {
+    Overlap,
+    Thread,
+}
+
+impl Precision {
+    fn step_and_decimals(self, units: Units) -> (f64, usize) {
+        match (self, units) {
+            (Self::Overlap, Units::Millimeters) => (0.5, 1),
+            (Self::Overlap, Units::Inches) => (0.02, 2),
+            (Self::Thread, Units::Millimeters) => (0.05, 2),
+            (Self::Thread, Units::Inches) => (0.002, 3),
+        }
+    }
+}
+
+/// A length in display units; written back only when changed, so that an untouched value isn't
+/// rounded through the units.
+fn length_input(
+    ui: &mut egui::Ui,
+    millimeters: &mut f64,
+    range: RangeInclusive<f64>,
+    precision: Precision,
+    units: Units,
+    language: Language,
+    id_salt: &str,
+) {
     let scale = units.from_millimeters(1.0);
     let current = *millimeters * scale;
     let mut value = current;
-    let (step, decimals) = match units {
-        Units::Millimeters => (0.5, 1),
-        Units::Inches => (0.02, 2),
-    };
+    let (step, decimals) = precision.step_and_decimals(units);
     ui.add(
         NumberInput::new(&mut value)
-            .range(MIN_OVERLAP_MM * scale..=MAX_OVERLAP_MM * scale)
+            .range(range.start() * scale..=range.end() * scale)
             .step(step)
             .decimals(decimals)
             .unit(language.unit_symbol(units))
             .width(FIELD_WIDTH)
-            .id_salt("seam_link_overlap"),
+            .id_salt(id_salt),
     );
     if value != current {
-        *millimeters = value / scale;
+        *millimeters = (value / scale).clamp(*range.start(), *range.end());
     }
 }
 

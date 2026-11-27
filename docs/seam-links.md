@@ -16,7 +16,7 @@ The dialog follows the "Stitch Link Dialog — Зв'язати шви" frame (`0
 | `src/history.rs` | `describe` arms; `MergeKey::SeamLink` |
 | `src/i18n/` | The labels and messages under [Text](#text) |
 | `src/panels/seam_link/mod.rs` | `SeamLinkDraft`, `OpenLink`, `SeamLinkResult`, `seam_name`, `seam_link_dialog`: the header, seam cards, start offset, warning with the Fit pitch buttons, summary and footer |
-| `src/panels/seam_link/sewing.rs` | `sewing_cards`: the stitch and assembly tiles with their drawings, Lock, the thread estimate, Overlap and On top |
+| `src/panels/seam_link/sewing.rs` | `sewing_cards`: the stitch and assembly tiles with their drawings, Lock, Overlap and On top; the thread card under them (type dropdown, thickness, shade swatches, a color picker, the hex field) with the thread estimate |
 | `src/panels/seam_link/schematic.rs` | `schematic`: the two seams unrolled into rows of holes, the pair lines, the clicks that set manual pairs |
 | `src/panels/seam_link/table.rs` | `pair_table`: the pairs, then the unpaired holes collapsed into ranges |
 | `src/panels/properties/stitch.rs` | `seam_links_section`: the selected seam's links, with Edit and Remove, and Link seams… |
@@ -84,8 +84,17 @@ pub struct Sewing {                // #[serde(default)]: a missing field takes i
     pub assembly: Assembly,        // FleshToFlesh
     pub overlap_mm: f64,           // 8, from MIN_OVERLAP_MM (1) to MAX_OVERLAP_MM (100); used while Lapped
     pub on_top: OnTop,             // A; used while the assembly stacks
+    pub thread: Thread,            // also #[serde(default)]
+}
+
+pub struct Thread {
+    pub kind: ThreadKind,          // WaxedPolyester; WaxedLinen, BondedNylon, ArtificialSinew
+    pub diameter_mm: f64,          // 0.55, from MIN_THREAD_MM (0.2) to MAX_THREAD_MM (1.5)
+    pub color: ThreadColor,        // "#E8DCC0" (ThreadShade::Natural); any sRGB color
 }
 ```
+
+`ThreadColor` is saved as a `"#RRGGBB"` string. The dialog offers the eight `ThreadShade`s as swatches and any other color through a picker or the hex field; the sewn 3D preview draws each link's thread in its color.
 
 `SeamLink.sewing` is `#[serde(default, skip_serializing_if = "Sewing::is_default")]`, so a link sewn the default way saves as before and older links load as a saddle stitch on pieces laid flesh to flesh.
 
@@ -151,8 +160,8 @@ A range past the line's holes is **not** an error: otherwise an edit that shorte
 
 | Kind | Entries |
 |---|---|
-| `Label` | `LinkSeams`, `LinkSeamsTitle`, `LinkSeamsSubtitle`, `SeamA`, `SeamB`, `HolesFrom`, `HolesTo`, `Reverse`, `StartOffset`, `HolesShort`, `LinkSchematic`, `HolePairs`, `PairAuto`, `PairManual`, `PairManualLegend`, `PairFree`, `LinkHint`, `ResetManualPairs`, `Pairs`, `LengthDifference`, `SeamLinks`, `EditLink`, `RemoveLink`, `SeamLinkStale`, `StitchMethodTitle`, `StitchMethod`, `StitchMethodNote`, `StitchMethodHint`, `AssemblyTitle`, `Assembly`, `AssemblyNote`, `LockHoles`, `Overlap`, `OnTop` |
-| `Message` | Errors: `SeamNotFound`, `InvalidSeamRange`, `SeamRangesOverlap`, `DuplicateManualPair`, `DuplicateSeamLink`, `LockHolesOutOfRange`, `OverlapOutOfRange`. Dialog: `AssemblyHint`, `ThreadEstimate`, `HoleCountMismatch`, `UnpairedHoles`, `FitPitch` (its pitch is formatted by the caller, since `Message` is `Eq`), `LinkPairsButton`, `SeamName`, `SeamOption`, `HoleCountBadge`, `PairsCount`, `FreeIn`, `SeamLinkRow`. History: `ActionLinkSeams`, `ActionEditSeamLink`, `ActionRemoveSeamLink` |
+| `Label` | `LinkSeams`, `LinkSeamsTitle`, `LinkSeamsSubtitle`, `SeamA`, `SeamB`, `HolesFrom`, `HolesTo`, `Reverse`, `StartOffset`, `HolesShort`, `LinkSchematic`, `HolePairs`, `PairAuto`, `PairManual`, `PairManualLegend`, `PairFree`, `LinkHint`, `ResetManualPairs`, `Pairs`, `LengthDifference`, `SeamLinks`, `EditLink`, `RemoveLink`, `SeamLinkStale`, `StitchMethodTitle`, `StitchMethod`, `StitchMethodNote`, `StitchMethodHint`, `AssemblyTitle`, `Assembly`, `AssemblyNote`, `LockHoles`, `Overlap`, `OnTop`, `ThreadTitle`, `ThreadKindCaption`, `ThreadKind`, `ThreadDiameter`, `ThreadColorCaption`, `ThreadShade`, `ThreadCustomColor` |
+| `Message` | Errors: `SeamNotFound`, `InvalidSeamRange`, `SeamRangesOverlap`, `DuplicateManualPair`, `DuplicateSeamLink`, `LockHolesOutOfRange`, `OverlapOutOfRange`, `ThreadDiameterOutOfRange`. Dialog: `AssemblyHint`, `ThreadEstimate`, `HoleCountMismatch`, `UnpairedHoles`, `FitPitch` (its pitch is formatted by the caller, since `Message` is `Eq`), `LinkPairsButton`, `SeamName`, `SeamOption`, `HoleCountBadge`, `PairsCount`, `FreeIn`, `SeamLinkRow`. History: `ActionLinkSeams`, `ActionEditSeamLink`, `ActionRemoveSeamLink` |
 
 Ukrainian counts use the catalog's `plural` helper.
 
@@ -169,7 +178,7 @@ The link, reverse, warning, close and reset icons are painted (`docs/icons.md`),
 | Module | Covers |
 |---|---|
 | `shapes::stitch` | `hole_offsets` grow and end at the length; `pitch_for_count` hits the count on one run and on a bent line, and refuses unreachable counts |
-| `sewing` | Missing fields take their defaults; the thread estimate; the limits; which assemblies stack or overlap |
+| `sewing` | Missing fields take their defaults; the thread color saved as hex and read leniently; the thread estimate; the limits; which assemblies stack or overlap |
 | `seams` | Equal counts pair every hole with Δ 0; reverse; positive and negative offset; a manual pair replacing one or two automatic pairs; 48 against 52 holes; creep in Δ; clamping after a seam got shorter and for a manual pair outside a range; one seam linked to itself; a missing seam; listing and numbering seams |
 | `model` | Each validation rule, and that a range past the holes is accepted |
 | `events` | Add, set and remove, with their errors; a rejected link, including one with an overlap out of range, leaves the project unchanged; each removal cascades and Undo restores the link; moving a seam keeps its links |

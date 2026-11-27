@@ -7,7 +7,7 @@ use crate::material::{
     ThicknessCategory, Treatment, WaterResistance,
 };
 use crate::model::{BooleanOp, Units};
-use crate::sewing::{Assembly, StitchMethod};
+use crate::sewing::{Assembly, StitchMethod, ThreadKind, ThreadShade};
 use crate::shapes::{HoleKind, StitchBand};
 use std::error::Error;
 use std::fmt;
@@ -333,6 +333,15 @@ pub enum Label {
     Overlap,
     /// Which side lies on top.
     OnTop,
+    /// The card of the thread in the Link seams dialog, and its fields.
+    ThreadTitle,
+    ThreadKindCaption,
+    ThreadKind(ThreadKind),
+    ThreadDiameter,
+    ThreadColorCaption,
+    ThreadShade(ThreadShade),
+    /// A thread color that isn't one of the named shades.
+    ThreadCustomColor,
 }
 
 /// Text with arguments, kept structured so it is rendered in the language current when shown.
@@ -650,6 +659,7 @@ pub enum Message {
     },
     LockHolesOutOfRange,
     OverlapOutOfRange,
+    ThreadDiameterOutOfRange,
     /// Beside the assembly card's title: how the chosen assembly lays the sides, `top` being
     /// the side on top for those that stack.
     AssemblyHint {

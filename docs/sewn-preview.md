@@ -4,14 +4,14 @@ The 3D preview can show the pieces sewn together along their seam links. Each pi
 
 | File | Contents |
 |---|---|
-| `src/drape/mod.rs` | `Drape` (`new`, `step`, `is_settled`, `positions`, `pieces`, `bounds`, `vertex_normals`, `thread_segments`), `DrapedPiece`, `SeamThread`, `Join` and `join_of` (the assembly as geometry), `slack` (by stitch), `attach` (a hole as a point of a triangle); tests |
+| `src/drape/mod.rs` | `Drape` (`new`, `step`, `is_settled`, `positions`, `pieces`, `bounds`, `vertex_normals`, `thread_segments`), `DrapedPiece`, `SeamThread`, `ThreadSegment` (two ends and the link's thread color), `Join` and `join_of` (the assembly as geometry), `slack` (by stitch), `attach` (a hole as a point of a triangle); tests |
 | `src/drape/sheet.rs` | `Sheet`, `build`: a piece's mesh (resampled outline and holes, points along centerlines, a hexagonal grid inside) and its crease edges; tests |
 | `src/drape/delaunay.rs` | `triangulate`: Bowyer–Watson with neighbor links; tests |
 | `src/drape/placement.rs` | `Iso`, `Pose`, `fit` (best rigid move, turned over or not), `prefold`, `preroll`, `place`; tests |
 | `src/drape/solver.rs` | `Solver` (XPBD), `Distance`, `Bend` (quadratic bending), `Seam`, `SeamKind`, `Anchor`, and how the material sets the compliances; tests |
 | `src/drape/vec3.rs` | `Vec3` |
 | `src/preview/mod.rs` | `PreviewMode` (Sewn, Flat), `PreviewSettings`, `rebuild_preview` (only while the preview is shown), `step_sewn`, `show_controls` (the View switch and Sew again) |
-| `src/preview/sewn.rs` | `SewnModel`: the `Drape` and its mesh handles, `piece_mesh` (a shell of the leather's thickness), `thread_mesh` (lines) |
+| `src/preview/sewn.rs` | `SewnModel`: the `Drape` and its mesh handles, `piece_mesh` (a shell of the leather's thickness), `thread_mesh` (lines, each seam in its thread color through vertex colors) |
 | `src/preview/flat.rs` | `build_piece_mesh`: the flat preview, unchanged |
 
 ## For users
@@ -25,7 +25,7 @@ The 3D preview can show the pieces sewn together along their seam links. Each pi
 | Make a piece bend more or less | Its material's **Flexibility** and **Thickness** |
 
 - Pieces with no seam links lie flat where they are drawn. Pieces whose shapes don't combine into one outline are left out, as in the flat preview.
-- Stitch holes aren't cut in the sewn model. The thread is drawn over the seams instead: along both faces for a saddle stitch, every other stitch on each face for a running stitch, and crossing between the two seams for the baseball, whip and cross stitches.
+- Stitch holes aren't cut in the sewn model. The thread is drawn over the seams instead: along both faces for a saddle stitch, every other stitch on each face for a running stitch, and crossing between the two seams for the baseball, whip and cross stitches. Each link's thread is drawn in the color chosen in the Link seams dialog.
 - The model is built when the preview is shown, not on every edit in 2D. Each change to the project builds it again and starts the sewing over.
 - There is no gravity and no collision. Pieces that would have to pass through each other to reach their seams can end up crossed. For example, a gusset that the simulation bends to the wrong side stays there.
 

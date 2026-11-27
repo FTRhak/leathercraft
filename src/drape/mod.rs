@@ -17,7 +17,7 @@ use crate::boolean::Region;
 use crate::material::Material;
 use crate::model::{Point, Project, signed_area};
 use crate::seams::stitch_line;
-use crate::sewing::{Assembly, OnTop, Sewing, StitchMethod};
+use crate::sewing::{Assembly, OnTop, Sewing, StitchMethod, ThreadColor};
 use crate::shapes::Shape;
 use placement::{Edge, Pose};
 use sheet::{Sheet, segment_distance};
@@ -75,11 +75,19 @@ pub struct DrapedPiece {
 /// A seam as the thread is drawn along it.
 pub struct SeamThread {
     pub stitch: StitchMethod,
+    pub color: ThreadColor,
     /// The holes of each pair, in the order they are sewn.
     pub a: Vec<Anchor>,
     pub b: Vec<Anchor>,
     pub thickness_a: f64,
     pub thickness_b: f64,
+}
+
+/// A stretch of thread on a face of the leather, in its seam's thread color.
+#[derive(Clone, Copy, Debug)]
+pub struct ThreadSegment {
+    pub ends: [Vec3; 2],
+    pub color: ThreadColor,
 }
 
 /// The sewn model and its simulation.
@@ -451,6 +459,7 @@ impl Drape {
             }
             threads.push(SeamThread {
                 stitch: link.sewing.stitch,
+                color: link.sewing.thread.color,
                 a: pairs.iter().map(|p| p.0).collect(),
                 b: pairs.iter().map(|p| p.1).collect(),
                 thickness_a: built[link.a].material.thickness_mm,
@@ -525,7 +534,7 @@ impl Drape {
     /// The thread on the leather's faces, as segments: along the seam on both faces for a
     /// saddle stitch, every other stitch on each face for a running stitch, crossing from one
     /// side's hole to the other's next one for the baseball, whip and cross stitches.
-    pub fn thread_segments(&self) -> Vec<[Vec3; 2]> {
+    pub fn thread_segments(&self) -> Vec<ThreadSegment> {
         let positions = self.positions();
         let face = |anchor: &Anchor, thickness: f64, grain: bool| {
             let lift = thickness * 0.5 + THREAD_LIFT_MM;
@@ -535,6 +544,12 @@ impl Drape {
         let mut segments = Vec::new();
         for thread in &self.threads {
             let (ta, tb) = (thread.thickness_a, thread.thickness_b);
+            let mut push = |ends| {
+                segments.push(ThreadSegment {
+                    ends,
+                    color: thread.color,
+                })
+            };
             for k in 0..thread.a.len().saturating_sub(1) {
                 let (a0, a1, b0, b1) = (
                     &thread.a[k],
@@ -550,14 +565,14 @@ impl Drape {
                             _ => &[false],
                         };
                         for &grain in faces {
-                            segments.push([face(a0, ta, grain), face(a1, ta, grain)]);
-                            segments.push([face(b0, tb, grain), face(b1, tb, grain)]);
+                            push([face(a0, ta, grain), face(a1, ta, grain)]);
+                            push([face(b0, tb, grain), face(b1, tb, grain)]);
                         }
                     }
                     StitchMethod::Baseball | StitchMethod::Whip | StitchMethod::Cross => {
-                        segments.push([face(a0, ta, true), face(b1, tb, true)]);
+                        push([face(a0, ta, true), face(b1, tb, true)]);
                         if thread.stitch != StitchMethod::Whip {
-                            segments.push([face(b0, tb, true), face(a1, ta, true)]);
+                            push([face(b0, tb, true), face(a1, ta, true)]);
                         }
                     }
                 }
@@ -776,9 +791,15 @@ mod tests {
 
     #[test]
     fn a_folded_strip_shows_its_thread() {
-        let project = folded_strip(Flexibility::Medium);
+        let mut project = folded_strip(Flexibility::Medium);
+        let navy = crate::sewing::ThreadShade::Navy.color();
+        for link in &mut project.seam_links {
+            link.sewing.thread.color = navy;
+        }
         let drape = Drape::new(&project);
-        assert!(!drape.thread_segments().is_empty());
+        let segments = drape.thread_segments();
+        assert!(!segments.is_empty());
+        assert!(segments.iter().all(|segment| segment.color == navy));
         assert_eq!(drape.pieces().len(), 1);
         assert!(!drape.pieces()[0].boundary.is_empty());
     }
