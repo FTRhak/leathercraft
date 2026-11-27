@@ -126,6 +126,11 @@ impl ThreadKind {
         Self::BondedNylon,
         Self::ArtificialSinew,
     ];
+
+    /// Whether the thread is a flat tape rather than a round cord.
+    pub fn is_flat(self) -> bool {
+        self == Self::ArtificialSinew
+    }
 }
 
 /// A thread color in sRGB, saved as `"#RRGGBB"`.
@@ -233,6 +238,25 @@ pub struct Thread {
     /// Its diameter, in mm.
     pub diameter_mm: f64,
     pub color: ThreadColor,
+}
+
+/// How much wider than its diameter a flat thread lies, and how much thinner.
+const FLAT_WIDTH: f64 = 1.6;
+const FLAT_HEIGHT: f64 = 0.5;
+
+impl Thread {
+    /// Its cross-section as it lies on the leather, as (width, height) in mm: a round thread
+    /// is its diameter both ways; a flat one is wider and thinner, about the same in area.
+    pub fn profile_mm(&self) -> (f64, f64) {
+        if self.kind.is_flat() {
+            (
+                self.diameter_mm * FLAT_WIDTH,
+                self.diameter_mm * FLAT_HEIGHT,
+            )
+        } else {
+            (self.diameter_mm, self.diameter_mm)
+        }
+    }
 }
 
 impl Default for Thread {
@@ -390,6 +414,19 @@ mod tests {
             };
             assert_eq!(thread.validate(), Err(Message::ThreadDiameterOutOfRange));
         }
+    }
+
+    #[test]
+    fn sinew_lies_flat_and_round_threads_do_not() {
+        let round = Thread::default();
+        assert_eq!(round.profile_mm(), (round.diameter_mm, round.diameter_mm));
+        let sinew = Thread {
+            kind: ThreadKind::ArtificialSinew,
+            diameter_mm: 1.0,
+            ..Thread::default()
+        };
+        let (width, height) = sinew.profile_mm();
+        assert!(width > 1.0 && height < 1.0);
     }
 
     #[test]

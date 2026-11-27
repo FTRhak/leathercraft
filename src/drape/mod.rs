@@ -17,7 +17,7 @@ use crate::boolean::Region;
 use crate::material::Material;
 use crate::model::{Point, Project, signed_area};
 use crate::seams::stitch_line;
-use crate::sewing::{Assembly, OnTop, Sewing, StitchMethod, ThreadColor};
+use crate::sewing::{Assembly, OnTop, Sewing, StitchMethod, Thread};
 use crate::shapes::Shape;
 use placement::{Edge, Pose};
 use sheet::{Sheet, segment_distance};
@@ -29,8 +29,8 @@ use std::ops::Range;
 const TARGET_VERTICES: f64 = 2_500.0;
 /// The finest spacing, in mm.
 const MIN_SPACING_MM: f64 = 1.0;
-/// How far above the leather the thread is drawn, in mm, so that it isn't hidden in it.
-const THREAD_LIFT_MM: f64 = 0.12;
+/// How far above the leather the thread's surface is drawn, in mm, so that it isn't hidden in it.
+const THREAD_LIFT_MM: f64 = 0.03;
 /// Each vertex starts this many spacings off the plane at most, so that a piece that has to
 /// curve can leave it.
 const NOISE: f64 = 0.02;
@@ -75,7 +75,9 @@ pub struct DrapedPiece {
 /// A seam as the thread is drawn along it.
 pub struct SeamThread {
     pub stitch: StitchMethod,
-    pub color: ThreadColor,
+    pub thread: Thread,
+    /// How many holes are sewn back over at each end.
+    pub lock_holes: u32,
     /// The holes of each pair, in the order they are sewn.
     pub a: Vec<Anchor>,
     pub b: Vec<Anchor>,
@@ -83,11 +85,15 @@ pub struct SeamThread {
     pub thickness_b: f64,
 }
 
-/// A stretch of thread on a face of the leather, in its seam's thread color.
+/// A stretch of thread on a face of the leather, its middle line lying half the thread's
+/// height off the face.
 #[derive(Clone, Copy, Debug)]
 pub struct ThreadSegment {
+    /// Its seam in `Drape::threads`.
+    pub seam: usize,
     pub ends: [Vec3; 2],
-    pub color: ThreadColor,
+    /// Out of the face it lies on, for the side a flat thread lies flat against.
+    pub normal: Vec3,
 }
 
 /// The sewn model and its simulation.
@@ -459,7 +465,8 @@ impl Drape {
             }
             threads.push(SeamThread {
                 stitch: link.sewing.stitch,
-                color: link.sewing.thread.color,
+                thread: link.sewing.thread,
+                lock_holes: link.sewing.lock_holes,
                 a: pairs.iter().map(|p| p.0).collect(),
                 b: pairs.iter().map(|p| p.1).collect(),
                 thickness_a: built[link.a].material.thickness_mm,
@@ -476,6 +483,11 @@ impl Drape {
 
     pub fn pieces(&self) -> &[DrapedPiece] {
         &self.pieces
+    }
+
+    /// The seams' threads, in the order of `ThreadSegment::seam`.
+    pub fn threads(&self) -> &[SeamThread] {
+        &self.threads
     }
 
     pub fn positions(&self) -> &[Vec3] {
@@ -532,25 +544,33 @@ impl Drape {
     }
 
     /// The thread on the leather's faces, as segments: along the seam on both faces for a
-    /// saddle stitch, every other stitch on each face for a running stitch, crossing from one
-    /// side's hole to the other's next one for the baseball, whip and cross stitches.
+    /// saddle stitch, every other stitch on each face for a running stitch (both faces where it
+    /// is sewn back over its lock holes), crossing from one side's hole to the other's next
+    /// one for the baseball, whip and cross stitches. Each lies on the face by half its
+    /// thread's height.
     pub fn thread_segments(&self) -> Vec<ThreadSegment> {
         let positions = self.positions();
-        let face = |anchor: &Anchor, thickness: f64, grain: bool| {
-            let lift = thickness * 0.5 + THREAD_LIFT_MM;
-            let normal = anchor.normal(positions);
-            anchor.position(positions) + normal * if grain { lift } else { -lift }
-        };
         let mut segments = Vec::new();
-        for thread in &self.threads {
-            let (ta, tb) = (thread.thickness_a, thread.thickness_b);
-            let mut push = |ends| {
+        for (seam, thread) in self.threads.iter().enumerate() {
+            let (_, height) = thread.thread.profile_mm();
+            // The face's normal at the hole, and the thread's middle line over it.
+            let face = |anchor: &Anchor, thickness: f64, grain: bool| {
+                let sign = if grain { 1.0 } else { -1.0 };
+                let normal = anchor.normal(positions) * sign;
+                let lift = thickness * 0.5 + THREAD_LIFT_MM + height * 0.5;
+                (anchor.position(positions) + normal * lift, normal)
+            };
+            let mut push = |(p0, n0): (Vec3, Vec3), (p1, n1): (Vec3, Vec3)| {
                 segments.push(ThreadSegment {
-                    ends,
-                    color: thread.color,
+                    seam,
+                    ends: [p0, p1],
+                    normal: (n0 + n1).normalized(),
                 })
             };
-            for k in 0..thread.a.len().saturating_sub(1) {
+            let (ta, tb) = (thread.thickness_a, thread.thickness_b);
+            let stitches = thread.a.len().saturating_sub(1);
+            let lock = thread.lock_holes as usize;
+            for k in 0..stitches {
                 let (a0, a1, b0, b1) = (
                     &thread.a[k],
                     &thread.a[k + 1],
@@ -559,20 +579,22 @@ impl Drape {
                 );
                 match thread.stitch {
                     StitchMethod::Saddle | StitchMethod::Running => {
+                        let locked = k < lock || k + lock >= stitches;
                         let faces: &[bool] = match thread.stitch {
                             StitchMethod::Saddle => &[true, false],
+                            _ if locked => &[true, false],
                             _ if k % 2 == 0 => &[true],
                             _ => &[false],
                         };
                         for &grain in faces {
-                            push([face(a0, ta, grain), face(a1, ta, grain)]);
-                            push([face(b0, tb, grain), face(b1, tb, grain)]);
+                            push(face(a0, ta, grain), face(a1, ta, grain));
+                            push(face(b0, tb, grain), face(b1, tb, grain));
                         }
                     }
                     StitchMethod::Baseball | StitchMethod::Whip | StitchMethod::Cross => {
-                        push([face(a0, ta, true), face(b1, tb, true)]);
+                        push(face(a0, ta, true), face(b1, tb, true));
                         if thread.stitch != StitchMethod::Whip {
-                            push([face(b0, tb, true), face(a1, ta, true)]);
+                            push(face(b0, tb, true), face(a1, ta, true));
                         }
                     }
                 }
@@ -799,8 +821,40 @@ mod tests {
         let drape = Drape::new(&project);
         let segments = drape.thread_segments();
         assert!(!segments.is_empty());
-        assert!(segments.iter().all(|segment| segment.color == navy));
+        assert_eq!(drape.threads().len(), 2);
+        assert!(drape.threads().iter().all(|t| t.thread.color == navy));
+        assert!(segments.iter().all(|segment| segment.seam < 2));
         assert_eq!(drape.pieces().len(), 1);
         assert!(!drape.pieces()[0].boundary.is_empty());
+    }
+
+    #[test]
+    fn a_running_stitch_covers_both_faces_over_its_lock_holes() {
+        let count = |lock_holes: u32| {
+            let mut project = folded_strip(Flexibility::Medium);
+            for link in &mut project.seam_links {
+                link.sewing.stitch = StitchMethod::Running;
+                link.sewing.lock_holes = lock_holes;
+            }
+            Drape::new(&project).thread_segments().len()
+        };
+        // Two locked stitches at each end of two links: each gains its other face, on both
+        // sides of the link.
+        assert_eq!(count(2), count(0) + 2 * 4 * 2);
+    }
+
+    #[test]
+    fn a_thicker_thread_lies_further_off_the_leather() {
+        let lift = |diameter_mm: f64| {
+            let mut project = folded_strip(Flexibility::Medium);
+            for link in &mut project.seam_links {
+                link.sewing.thread.diameter_mm = diameter_mm;
+            }
+            let drape = Drape::new(&project);
+            let segment = drape.thread_segments()[0];
+            let anchor = &drape.threads()[segment.seam].a[0];
+            (segment.ends[0] - anchor.position(drape.positions())).length()
+        };
+        assert!((lift(1.2) - lift(0.4) - 0.4).abs() < 1.0e-9);
     }
 }

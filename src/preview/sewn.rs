@@ -1,11 +1,16 @@
 //! The sewn preview: the pieces of `leathercraft::drape::Drape`, rebuilt from the simulation
-//! each frame until it settles, with the thread drawn along the seams.
+//! each frame until it settles, with the thread drawn along the seams as tubes of its
+//! diameter, round or flat, in its color and finish.
 
 use super::MM_TO_SCENE;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;
-use leathercraft::drape::{Drape, DrapedPiece, Vec3 as DrapeVec};
+use leathercraft::drape::{Drape, DrapedPiece, ThreadSegment, Vec3 as DrapeVec};
+use leathercraft::sewing::{Thread, ThreadKind};
+
+/// Sides of the thread's cross-section.
+const THREAD_SIDES: usize = 8;
 
 /// The simulation behind the sewn preview, and the meshes it updates.
 #[derive(Resource, Default)]
@@ -14,7 +19,8 @@ pub(super) struct SewnModel {
     /// The model point shown at the scene's origin, where the camera orbits.
     center: DrapeVec,
     pieces: Vec<Handle<Mesh>>,
-    thread: Option<Handle<Mesh>>,
+    /// One mesh per seam, in the order of `Drape::threads`.
+    threads: Vec<Handle<Mesh>>,
 }
 
 fn to_scene(point: DrapeVec, center: DrapeVec) -> [f32; 3] {
@@ -74,25 +80,97 @@ fn piece_mesh(drape: &Drape, piece: &DrapedPiece, center: DrapeVec) -> Mesh {
     mesh
 }
 
-/// The thread as lines, each seam in the color of its thread, carried by the vertex colors.
-fn thread_mesh(drape: &Drape, center: DrapeVec) -> Mesh {
-    let segments = drape.thread_segments();
-    let mut positions = Vec::with_capacity(segments.len() * 2);
-    let mut colors = Vec::with_capacity(segments.len() * 2);
-    for segment in &segments {
-        let [red, green, blue] = segment.color.rgb();
-        let color = Color::srgb_u8(red, green, blue).to_linear().to_f32_array();
-        for point in segment.ends {
-            positions.push(to_scene(point, center));
-            colors.push(color);
+/// How the thread's surface takes the light: waxed linen is matte, bonded nylon smooth.
+fn thread_finish(kind: ThreadKind) -> (f32, f32) {
+    // (perceptual roughness, reflectance)
+    match kind {
+        ThreadKind::WaxedPolyester => (0.5, 0.5),
+        ThreadKind::WaxedLinen => (0.85, 0.35),
+        ThreadKind::BondedNylon => (0.3, 0.6),
+        ThreadKind::ArtificialSinew => (0.45, 0.5),
+    }
+}
+
+fn thread_material(thread: &Thread) -> StandardMaterial {
+    let [red, green, blue] = thread.color.rgb();
+    let (perceptual_roughness, reflectance) = thread_finish(thread.kind);
+    StandardMaterial {
+        base_color: Color::srgb_u8(red, green, blue),
+        perceptual_roughness,
+        reflectance,
+        ..default()
+    }
+}
+
+/// One seam's thread: each segment a tube around its middle line, as wide and as high as the
+/// thread's profile, its height along the normal of the face it lies on.
+fn thread_mesh(thread: &Thread, segments: &[&ThreadSegment], center: DrapeVec) -> Mesh {
+    let (width, height) = thread.profile_mm();
+    let (rx, ry) = (width * 0.5, height * 0.5);
+    let ring = THREAD_SIDES;
+    let mut positions = Vec::with_capacity(segments.len() * ring * 2);
+    let mut normals = Vec::with_capacity(positions.capacity());
+    let mut indices = Vec::with_capacity(segments.len() * ring * 6);
+    for segment in segments {
+        let [start, end] = segment.ends;
+        let axis = end - start;
+        if axis.length() < 1.0e-9 {
+            continue;
+        }
+        let axis = axis.normalized();
+        // The face's normal, square to the segment; any square direction if they line up.
+        let mut up = segment.normal - axis * segment.normal.dot(axis);
+        if up.length() < 1.0e-6 {
+            up = axis.cross(DrapeVec::new(0.0, 1.0, 0.0));
+            if up.length() < 1.0e-6 {
+                up = axis.cross(DrapeVec::new(1.0, 0.0, 0.0));
+            }
+        }
+        let up = up.normalized();
+        let side = axis.cross(up);
+        let base = positions.len() as u32;
+        for point in [start, end] {
+            for k in 0..ring {
+                let angle = std::f64::consts::TAU * k as f64 / ring as f64;
+                let (sin, cos) = angle.sin_cos();
+                positions.push(to_scene(
+                    point + side * (rx * cos) + up * (ry * sin),
+                    center,
+                ));
+                // The ellipse's normal leans towards its flatter sides.
+                let n = (side * (cos / rx) + up * (sin / ry)).normalized();
+                normals.push([n.x as f32, n.y as f32, n.z as f32]);
+            }
+        }
+        let ring = ring as u32;
+        for k in 0..ring {
+            let next = (k + 1) % ring;
+            let (a, b, c, d) = (base + k, base + next, base + ring + k, base + ring + next);
+            indices.extend_from_slice(&[a, b, d, a, d, c]);
         }
     }
-    let normals = vec![[0.0, 1.0, 0.0]; positions.len()];
-    let mut mesh = Mesh::new(PrimitiveTopology::LineList, RenderAssetUsages::default());
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
+    mesh.insert_indices(Indices::U32(indices));
     mesh
+}
+
+/// Every seam's thread mesh, in the order of `Drape::threads`.
+fn thread_meshes(drape: &Drape, center: DrapeVec) -> Vec<Mesh> {
+    let segments = drape.thread_segments();
+    drape
+        .threads()
+        .iter()
+        .enumerate()
+        .map(|(seam, thread)| {
+            let own: Vec<&ThreadSegment> = segments.iter().filter(|s| s.seam == seam).collect();
+            thread_mesh(&thread.thread, &own, center)
+        })
+        .collect()
 }
 
 impl SewnModel {
@@ -108,7 +186,7 @@ impl SewnModel {
     ) -> Option<f64> {
         let drape = Drape::new(project);
         self.pieces.clear();
-        self.thread = None;
+        self.threads.clear();
         let (min, max) = drape.bounds()?;
         // Centered over the origin and standing on the ground: the lowest middle surface is
         // lifted by half the thickest leather.
@@ -142,19 +220,19 @@ impl SewnModel {
             ));
             self.pieces.push(handle);
         }
-        let thread = meshes.add(thread_mesh(&drape, self.center));
-        commands.spawn((
-            Mesh3d(thread.clone()),
-            // White, so that the vertex colors show as they are.
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: Color::WHITE,
-                unlit: true,
-                ..default()
-            })),
-            bevy::camera::visibility::NoFrustumCulling,
-            tag,
-        ));
-        self.thread = Some(thread);
+        for (mesh, seam) in thread_meshes(&drape, self.center)
+            .into_iter()
+            .zip(drape.threads())
+        {
+            let handle = meshes.add(mesh);
+            commands.spawn((
+                Mesh3d(handle.clone()),
+                MeshMaterial3d(materials.add(thread_material(&seam.thread))),
+                bevy::camera::visibility::NoFrustumCulling,
+                tag.clone(),
+            ));
+            self.threads.push(handle);
+        }
 
         let size = (max.x - min.x).max(max.y - min.y).max(max.z - min.z);
         self.drape = Some(drape);
@@ -179,8 +257,13 @@ impl SewnModel {
                 *mesh = piece_mesh(drape, piece, self.center);
             }
         }
-        if let Some(mesh) = self.thread.as_ref().and_then(|h| meshes.get_mut(h)) {
-            *mesh = thread_mesh(drape, self.center);
+        for (mesh, handle) in thread_meshes(drape, self.center)
+            .into_iter()
+            .zip(&self.threads)
+        {
+            if let Some(target) = meshes.get_mut(handle) {
+                *target = mesh;
+            }
         }
     }
 }
