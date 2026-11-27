@@ -10,7 +10,7 @@ Project structure `docs/project-index.md` should be updated after any changes
 
 ## Design
 
-https://brilliant.design/neat-pansy/leathercraft-design/main
+Local Brilliant project `leathercraft-design/` (canvas `main.bl`), open in the Brilliant app and reachable over MCP at `http://127.0.0.1:3333/mcp`.
 
 ## Commands
 
