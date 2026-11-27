@@ -10,7 +10,8 @@ The 3D preview can show the pieces sewn together along their seam links. Each pi
 | `src/drape/placement.rs` | `Iso`, `Pose`, `fit` (best rigid move, turned over or not), `prefold`, `preroll`, `place`; tests |
 | `src/drape/solver.rs` | `Solver` (XPBD), `Distance`, `Bend` (quadratic bending), `Seam`, `SeamKind`, `Anchor`, and how the material sets the compliances; tests |
 | `src/drape/vec3.rs` | `Vec3` |
-| `src/preview/mod.rs` | `PreviewMode` (Sewn, Flat), `PreviewSettings`, `rebuild_preview` (only while the preview is shown), `step_sewn`, `show_controls` (the View switch and Sew again) |
+| `src/preview/mod.rs` | `PreviewMode` (Sewn, Flat), `PreviewSettings`, `rebuild_preview` (only while the preview is shown), `step_sewn` |
+| `src/preview/controls.rs` | `show_controls` (the View switch and Sew again) |
 | `src/preview/sewn.rs` | `SewnModel`: the `Drape` and its mesh handles, `piece_mesh` (a shell of the leather's thickness), `thread_mesh` (each seam a mesh of tubes as wide and high as its thread), `thread_material` (its color, with a finish by kind) |
 | `src/preview/flat.rs` | `build_piece_mesh`: the flat preview, unchanged |
 

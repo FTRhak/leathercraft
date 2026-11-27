@@ -2,7 +2,7 @@
 //! each frame until it settles, with the thread drawn along the seams as tubes of its
 //! diameter, round or flat, in its color and finish.
 
-use super::MM_TO_SCENE;
+use super::constants::MM_TO_SCENE;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use bevy::prelude::*;

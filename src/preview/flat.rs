@@ -1,6 +1,6 @@
 //! The flat preview: each piece extruded from its region, with its stitch holes cut through.
 
-use super::MM_TO_SCENE;
+use super::constants::MM_TO_SCENE;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, Mesh, PrimitiveTopology};
 use earcutr::earcut;

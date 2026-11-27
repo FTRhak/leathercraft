@@ -1,36 +1,25 @@
 //! The 3D preview: the pieces either flat, each extruded on its own (`flat`), or sewn
 //! together along their seam links (`sewn`, `docs/sewn-preview.md`).
 
+mod constants;
+mod controls;
 mod flat;
+mod navigation;
 mod sewn;
+
+pub use controls::show_controls;
+pub use navigation::navigate;
+use navigation::update_camera;
 
 use crate::document::ActiveProject;
 use crate::editor::ViewMode;
 use crate::settings::{Preferences, Theme};
-use crate::ui_components::button::Button;
-use crate::ui_components::group_button::GroupButton;
 use bevy::prelude::*;
-use bevy_egui::egui;
-use leathercraft::i18n::{Label, Language};
+use constants::{
+    DEFAULT_AZIMUTH, DEFAULT_DISTANCE, DEFAULT_ELEVATION, GROUND_OPACITY, MAX_DISTANCE,
+    MIN_DISTANCE, MM_TO_SCENE,
+};
 use sewn::SewnModel;
-
-// Scene units per millimeter; the scene is scaled up, so this is not a meters conversion.
-const MM_TO_SCENE: f64 = 0.01;
-const MIN_DISTANCE: f32 = 1.0;
-const MAX_DISTANCE: f32 = 60.0;
-const DEFAULT_DISTANCE: f32 = 3.2;
-const DEFAULT_AZIMUTH: f32 = 0.72;
-const DEFAULT_ELEVATION: f32 = 0.78;
-const MIN_ELEVATION: f32 = 0.12;
-const MAX_ELEVATION: f32 = 1.48;
-/// Radians the camera turns per point the mouse moves.
-const ORBIT_SPEED: f32 = 0.008;
-/// Matches the zoom speed of the 2D canvas.
-const ZOOM_SPEED: f32 = 0.002;
-/// Bevy's default vertical field of view, to pan the scene along with the cursor.
-const FIELD_OF_VIEW: f32 = std::f32::consts::FRAC_PI_4;
-/// The ground plane's opacity.
-const GROUND_OPACITY: f32 = 0.05;
 
 pub struct PreviewPlugin;
 
@@ -94,26 +83,6 @@ impl Default for PreviewSettings {
             mode: PreviewMode::default(),
             resew: false,
         }
-    }
-}
-
-impl PreviewSettings {
-    /// Turns the camera back to where it starts, framing the whole scene.
-    fn reset_view(&mut self) {
-        self.azimuth = DEFAULT_AZIMUTH;
-        self.elevation = DEFAULT_ELEVATION;
-        self.distance = self.fit_distance;
-        self.target = Vec3::ZERO;
-    }
-
-    /// The camera's position relative to its target.
-    fn camera_offset(&self) -> Vec3 {
-        let horizontal = self.distance * self.elevation.cos();
-        Vec3::new(
-            horizontal * self.azimuth.cos(),
-            self.distance * self.elevation.sin(),
-            horizontal * self.azimuth.sin(),
-        )
     }
 }
 
@@ -290,93 +259,4 @@ fn step_sewn(
     if *view_mode == ViewMode::Preview3d && settings.mode == PreviewMode::Sewn {
         sewn.step(&mut meshes);
     }
-}
-
-fn update_camera(
-    settings: Res<PreviewSettings>,
-    mut cameras: Query<&mut Transform, With<PreviewCamera>>,
-) {
-    if !settings.is_changed() {
-        return;
-    }
-
-    let position = settings.target + settings.camera_offset();
-    for mut transform in &mut cameras {
-        *transform = Transform::from_translation(position).looking_at(settings.target, Vec3::Y);
-    }
-}
-
-/// Moves the camera with the mouse over the preview: the primary button orbits, the secondary
-/// or middle one pans (as on the 2D canvas), the wheel zooms and a double click resets the view.
-/// `settings` is only written on input, so the camera doesn't update every frame.
-pub fn navigate(ui: &mut egui::Ui, settings: &mut ResMut<PreviewSettings>) {
-    let rect = ui.max_rect();
-    let response = ui.allocate_rect(rect, egui::Sense::click_and_drag());
-
-    if response.double_clicked() {
-        settings.reset_view();
-        return;
-    }
-    let delta = response.drag_delta();
-    if delta != egui::Vec2::ZERO {
-        if response.dragged_by(egui::PointerButton::Primary) {
-            let settings = &mut **settings;
-            settings.azimuth =
-                (settings.azimuth + delta.x * ORBIT_SPEED).rem_euclid(std::f32::consts::TAU);
-            settings.elevation =
-                (settings.elevation + delta.y * ORBIT_SPEED).clamp(MIN_ELEVATION, MAX_ELEVATION);
-        } else if response.dragged_by(egui::PointerButton::Secondary)
-            || response.dragged_by(egui::PointerButton::Middle)
-        {
-            // The camera renders to the whole window, so its scale follows the window's height.
-            let window_height = ui.ctx().content_rect().height().max(1.0);
-            let scene_per_point =
-                2.0 * settings.distance * (FIELD_OF_VIEW * 0.5).tan() / window_height;
-            let forward = -settings.camera_offset().normalize();
-            let right = forward.cross(Vec3::Y).normalize();
-            let up = right.cross(forward);
-            let shift = (up * delta.y - right * delta.x) * scene_per_point;
-            settings.target += shift;
-        }
-    }
-    if response.hovered() {
-        let scroll = ui.input(|input| input.smooth_scroll_delta.y);
-        if scroll != 0.0 {
-            settings.distance = (settings.distance * (-scroll * ZOOM_SPEED).exp())
-                .clamp(MIN_DISTANCE, MAX_DISTANCE);
-        }
-    }
-}
-
-pub fn show_controls(ui: &mut egui::Ui, settings: &mut PreviewSettings, language: Language) {
-    ui.label(language.label(Label::PreviewShows));
-    ui.horizontal(|ui| {
-        ui.add(
-            GroupButton::new(&mut settings.mode)
-                .option(PreviewMode::Sewn, language.label(Label::PreviewSewn))
-                .option(PreviewMode::Flat, language.label(Label::PreviewFlat)),
-        );
-        if settings.mode == PreviewMode::Sewn
-            && ui
-                .add(Button::outline(language.label(Label::SewAgain)))
-                .on_hover_text(language.label(Label::SewAgainHint))
-                .clicked()
-        {
-            settings.resew = true;
-        }
-    });
-    ui.label(language.label(Label::Camera));
-    ui.add(
-        egui::Slider::new(&mut settings.azimuth, 0.0..=std::f32::consts::TAU)
-            .text(language.label(Label::Orbit)),
-    );
-    ui.add(
-        egui::Slider::new(&mut settings.elevation, MIN_ELEVATION..=MAX_ELEVATION)
-            .text(language.label(Label::Tilt)),
-    );
-    ui.add(
-        egui::Slider::new(&mut settings.distance, MIN_DISTANCE..=MAX_DISTANCE)
-            .text(language.label(Label::Zoom)),
-    );
-    ui.weak(language.label(Label::PreviewNavigationHint));
 }
