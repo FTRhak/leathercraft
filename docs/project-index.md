@@ -123,11 +123,13 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/panels/seam_link/schematic.rs` | 368 | 2,900 | bin | `schematic`: both ranges unrolled into rows of diamond holes placed by their distance along the seam, lined up at the first automatic pair, thinned out when under 6 px apart; pair lines, numbers every fifth hole and at the ends, direction arrows; `Side`, `Click` (a hole, with Alt or not), `paint_diamond` |
 | `src/panels/seam_link/table.rs` | 248 | 1,900 | bin | `pair_table`: the header and a `show_rows` scroll area of pairs (#, A, B, Δ in display units, Manual badge), then unpaired holes collapsed into ranges (`ranges`) with an Unpaired badge; test |
 | `src/ui_components/palette/seam_link.rs` | 91 | 850 | bin | `SeamLinkPaint`: auto, manual and unpaired pair colors, hole fills, guide, arrow, A/B badge, warning box, table rows and badges, the chosen sewing tile, idle thread and the two leathers of the assembly drawings; light values picked |
-| `src/preview/mod.rs` | 262 | 2,000 | bin | 3D scene, camera, `PreviewMode` (Sewn by default, Flat), `PreviewSettings` (orbit angles, distance, pan target); `rebuild_preview` (on a project or mode change, or Sew again, only while the 3D view is shown), `spawn_flat`, `step_sewn`; re-exports `navigate` and `show_controls`; `apply_theme` sets the background and ground plane colors for the theme; the ground plane is 5% opaque (`GROUND_OPACITY`) |
+| `src/preview/mod.rs` | 225 | 1,900 | bin | 3D scene, camera; `rebuild_preview` (on a project or mode change, or Sew again, only while the 3D view is shown), `spawn_flat`, `step_sewn`; re-exports `PreviewMode`, `PreviewSettings`, `navigate` and `show_controls`; `apply_theme` sets the background and ground plane colors for the theme; the ground plane is 5% opaque (`GROUND_OPACITY`) |
+| `src/preview/mode.rs` | 10 | 100 | bin | `PreviewMode` (Sewn by default, Flat): what the 3D preview shows |
 | `src/preview/constants.rs` | 13 | 100 | bin | Preview constants: `MM_TO_SCENE`, camera distance and elevation limits, default azimuth, elevation and distance, `GROUND_OPACITY` |
-| `src/preview/controls.rs` | 42 | 400 | bin | `show_controls`, drawn in the Properties panel: the View switch as a `GroupButton`, Sew again, camera sliders, navigation hint |
-| `src/preview/navigation.rs` | 83 | 700 | bin | Camera navigation: `PreviewSettings::reset_view` and `camera_offset`, `update_camera` (looks at `target`), `navigate` (mouse navigation over the canvas tab, called by `PanelViewer`: drag orbits, right or middle drag pans, wheel zooms, double click resets), the orbit, zoom and pan speed constants |
-| `src/preview/flat.rs` | 106 | 1,000 | bin | `build_piece_mesh`: the flat mode's extrusion of each piece's `punched_region` |
+| `src/preview/controls.rs` | 41 | 400 | bin | `show_controls`, drawn in the Properties panel: the View switch as a `GroupButton`, Sew again, camera sliders, navigation hint |
+| `src/preview/navigation.rs` | 91 | 800 | bin | Camera navigation: `PreviewSettings::reset_view` and `camera_offset`, `update_camera` (looks at `target`), `navigate` (mouse navigation over the canvas tab, called by `PanelViewer`: drag orbits, right or middle drag pans, wheel zooms, double click resets), the orbit, zoom and pan speed constants |
+| `src/preview/settings.rs` | 33 | 250 | bin | `PreviewSettings` Bevy resource: orbit angles, distance, pan target, fitted distance, preview mode and resew flag |
+| `src/preview/flat.rs` | 112 | 1,000 | bin | `build_piece_mesh`: the flat mode's extrusion of each piece's `punched_region` |
 | `src/preview/sewn.rs` | 269 | 2,600 | bin | `SewnModel` (the `Drape`, the model center, mesh handles, one thread mesh per seam): `rebuild`, `clear`, `step` (one simulation frame, then the meshes replaced); `piece_mesh` (grain and flesh faces offset by half the thickness along vertex normals, walls on boundary edges), `thread_mesh` (each segment an 8-sided tube of the thread's `profile_mm`, its height along the face normal), `thread_meshes`, `thread_material` and `thread_finish` (color, and roughness and reflectance by `ThreadKind`) |
 | `src/drape/mod.rs` | 860 | 8,400 | lib | The sewn preview (`docs/sewn-preview.md`): `Drape` (`new`: meshes, anchors, self-link shaping, placement, constraints; `step`, `is_settled`, `positions`, `pieces`, `bounds`, `vertex_normals`, `threads`, `thread_segments`), `DrapedPiece`, `SeamThread` (stitch, `Thread`, lock holes), `ThreadSegment` (seam, ends, face normal), `Join`, `join_of`, `slack`, `attach`, `edge_distance`; tests in the second half |
 | `src/drape/sheet.rs` | 303 | 2,800 | lib | `Sheet`, `build` (resample rings keeping corners, centerline crossings, line points, hex grid, triangulate, cut back to the leather, clockwise triangles, creases), `segment_distance`; tests |
@@ -381,16 +383,16 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ### `preview/mod.rs`
 
+The full symbol index of `src/preview/` is in `docs/preview.md#code-index`.
+
 | Lines | Symbols |
 |---:|---|
-| 4-12 | Submodules; `navigate` and `show_controls` re-exported from `navigation` and `controls` |
-| 18-21 | Constants imported from `constants` |
-| 24-59 | `PreviewPlugin`, `PreviewPiece`, `PreviewCamera`, `Ground`, `PreviewMode` |
-| 61-87 | `PreviewSettings` (azimuth, elevation, distance, pan `target`, `fit_distance`) and its `Default` |
-| 89-134 | `setup_scene` (the ground is alpha-blended), `clear_color`, `ground_color` (at `GROUND_OPACITY`) |
-| 136-154 | `apply_theme` (follows `Preferences::theme`) |
-| 156-251 | `Built`, `rebuild_preview` (frames the scene: sets `fit_distance` and recenters the target), `spawn_flat` |
-| 253-262 | `step_sewn` |
+| 4-23 | Submodules; re-exports `show_controls`, `PreviewMode`, `navigate`, `PreviewSettings` |
+| 25-50 | `PreviewPlugin`, `PreviewPiece`, `PreviewCamera`, `Ground` |
+| 52-96 | `setup_scene` (the ground is alpha-blended), `clear_color`, `ground_color` (at `GROUND_OPACITY`) |
+| 98-117 | `apply_theme` (follows `Preferences::theme`) |
+| 119-213 | `Built`, `rebuild_preview` (frames the scene: sets `fit_distance` and recenters the target), `spawn_flat` |
+| 215-225 | `step_sewn` |
 
 ## Where to look for common tasks
 
@@ -405,8 +407,8 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | Add or change a material value | `material.rs`, `i18n/en.rs`, `i18n/uk.rs` | The enum and its `ALL`, plus catalog arms; a new property also goes in `Material`, `material_form` (`panels/material/form.rs`) and the Settings form in `panels/settings/material.rs` |
 | Change the file format | `model.rs` 119-160, 265-278, `shapes/mod.rs` 14-23 and the shape structs, `persistence.rs` 7-30 | Bump `PROJECT_VERSION` and decide how older files are handled |
 | Change SVG or DXF output | `exports/svg.rs`, `exports/dxf.rs` | `to_svg` or `to_dxf` |
-| Change the 3D look or mesh | `preview/mod.rs` 89-251, `preview/constants.rs`, `preview/flat.rs`, `preview/sewn.rs` | `setup_scene`, `rebuild_preview`, `build_piece_mesh` |
-| Change 3D camera navigation | `preview/navigation.rs`, `preview/constants.rs`, `preview/mod.rs` 61-87 | `navigate` (mouse), `update_camera`, the speed constants |
+| Change the 3D look or mesh | `docs/preview.md`, `preview/mod.rs` 52-213, `preview/constants.rs`, `preview/flat.rs`, `preview/sewn.rs` | `setup_scene`, `rebuild_preview`, `build_piece_mesh`, `piece_mesh`, `thread_mesh` |
+| Change 3D camera navigation | `docs/preview.md#camera-and-navigation`, `preview/navigation.rs`, `preview/constants.rs`, `preview/settings.rs` | `navigate` (mouse), `update_camera`, the speed constants |
 | Change snapping | `snap.rs`, `editor/canvas.rs` `draw_targets`, `editor/drag.rs` `snap_setup`, `docs/snap.md` | The rules live in `snap_offset`; what snaps to what is chosen by `draw_targets` (drawing tools) and `snap_setup` (drags); settings in `SnapSettings` and the snap controls on the canvas (`panels::snap`) |
 | Change align or distribute | `align/mod.rs` `arrange_items`, `align/align_edges.rs`, `align/distribute.rs`, `align/space.rs`, `panels/align/mod.rs` | `arrange_items` measures the items and picks the operation's submodule; it is shared by `offsets` (pieces) and `child_offsets` (children); the panel only builds an `ArrangePieces` or `ArrangeChildren` event |
 | Add a dockable panel | `ui_components/dock/mod.rs`, `editor/panel_viewer.rs` | A `PanelTab` variant, its `CLOSEABLE` and `label` entries, `default_state`, and arms in `PanelViewer::ui` and `scroll_bars` |
@@ -425,26 +427,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 207 tests inline in the library crate, plus 8 in the binary (`settings::hotkeys`, `editor::ruler`, `editor::background` and `panels::seam_link::table`, run with `cargo test --bin leathercraft`, which compiles Bevy):
-
-| Module | Tests |
-|---|---:|
-| `model` | 9 |
-| `background` | 9 |
-| `shapes` | 49 |
-| `boolean` | 11 |
-| `material` | 3 |
-| `align` | 14 |
-| `snap` | 10 |
-| `events` | 22 |
-| `history` | 14 |
-| `i18n` | 8 |
-| `exports` | 11 |
-| `persistence` | 8 |
-| `seams` | 10 |
-| `sewing` | 4 |
-
-Apart from shortcut parsing, `document`, `editor`, `preview`, `settings` and `panels` have no tests, so changes there need `cargo check` and a manual run.
+Test counts per module and what has no tests are in `docs/tests.md`; update it when tests are added or removed.
 
 ## Docs
 
@@ -458,11 +441,13 @@ Apart from shortcut parsing, `document`, `editor`, `preview`, `settings` and `pa
 | `docs/settings.md` | Current. Spec for `settings.json` and the Settings window: sections and their fallbacks, `Action` and `Hotkeys`, shortcut text format, the draft and key capture, adding a hotkey or preference. |
 | `docs/centerline.md` | Current. Spec for centerlines: `Shape::Line` as an open child, `LineStyle` and its dash pattern in mm, validation limits, hit testing and drawing, SVG and DXF output, extending to other open shapes. |
 | `docs/stitch-holes.md` | Current. Spec for stitch holes: `Shape::StitchLine` as an open polyline child, hole kinds, pitch and size, placement by runs between sharp vertices, validation limits, the click-by-click draft and canvas drawing, the `STITCH_HOLES` export layer, punching in the 3D preview, thread hints, and the saddle-stitch reference data behind the presets. |
+| `docs/preview.md` | Current. Spec and code index for `src/preview/`: scope, scene entities and resources, systems and schedule, the rebuild lifecycle and framing, coordinates, the Flat and Sewn meshes, camera math and input, controls, theme, invariants, review findings (thread tube winding, change detection, camera reset, per-frame mesh rebuild), tests to add, and where to change what. |
 | `docs/sewn-preview.md` | Current. The sewn 3D preview: meshing, self-link folding and rolling, placement by assembly, the XPBD solver with quadratic bending and centerline creases, material compliances, stitch slack, the thread drawing, limits (no gravity, no collision). |
 | `docs/seam-links.md` | Current. Spec for seam links: `SeamLink` keeps parameters, not pairs; the pairing algorithm (ranges, reverse, offset, manual pairs), `pitch_for_count`, validation (a range past the holes is clamped, not an error), the cascade on removal, history, the Link seams dialog and its schematic, the Properties section and the canvas lines. |
 | `docs/snap.md` | Current. Spec for snapping: the snap controls on the canvas, priority (vertex, guide, grid), scopes (a child only within its piece), the drag anchor, tolerance in px, Alt and F9, state and persistence. |
 | `docs/round-vertex.md` | Current. Spec for rounded vertices: per-vertex `radii`, `Shape::corners` vs `ring`, the fillet construction and its clamping, selecting a vertex with the Edge tool, the Corner radius field, extending to new shapes. |
 | `docs/background-image.md` | Current. Spec and mockup index for background images (photos or scans to trace): multiple per project, linked by path and saved in the project, opacity, Back/Front depth, Stretch/Fit/Crop, size in mm with calibration, offset, rotation, scale, flip; events, validation, canvas drawing as textured quads, the panel and its new `Slider`. The phased implementation plan is `docs/plans/background-image.md`. |
+| `docs/tests.md` | Current. Test counts per module (library and binary) and which binary modules have no tests. |
 | `docs/i18n.md` | Current. Spec for the localization module: `Label` vs `Message`, rendering, language selection, adding text and languages, translation conventions. |
 | `docs/plan.md` | Historical MVP plan. It still says the repo contains only a license. Its todo 6 asks for build and run docs, and there is no README; `CLAUDE.md` only lists the commands. |
 

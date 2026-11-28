@@ -4,21 +4,22 @@
 mod constants;
 mod controls;
 mod flat;
+mod mode;
 mod navigation;
+mod settings;
 mod sewn;
 
 pub use controls::show_controls;
+pub use mode::PreviewMode;
 pub use navigation::navigate;
 use navigation::update_camera;
+pub use settings::PreviewSettings;
 
 use crate::document::ActiveProject;
 use crate::editor::ViewMode;
 use crate::settings::{Preferences, Theme};
 use bevy::prelude::*;
-use constants::{
-    DEFAULT_AZIMUTH, DEFAULT_DISTANCE, DEFAULT_ELEVATION, GROUND_OPACITY, MAX_DISTANCE,
-    MIN_DISTANCE, MM_TO_SCENE,
-};
+use constants::{DEFAULT_DISTANCE, GROUND_OPACITY, MAX_DISTANCE, MIN_DISTANCE, MM_TO_SCENE};
 use sewn::SewnModel;
 
 pub struct PreviewPlugin;
@@ -47,44 +48,6 @@ struct PreviewCamera;
 
 #[derive(Component)]
 struct Ground;
-
-/// What the preview shows.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum PreviewMode {
-    /// Each piece flat on the ground, with its holes cut through.
-    Flat,
-    /// The pieces sewn together along their seam links.
-    #[default]
-    Sewn,
-}
-
-#[derive(Resource)]
-pub struct PreviewSettings {
-    azimuth: f32,
-    elevation: f32,
-    distance: f32,
-    /// The point the camera orbits and looks at, moved by panning.
-    target: Vec3,
-    /// The distance that frames the whole scene, which a reset of the view returns to.
-    fit_distance: f32,
-    mode: PreviewMode,
-    /// Set by Sew again: start the simulation over.
-    resew: bool,
-}
-
-impl Default for PreviewSettings {
-    fn default() -> Self {
-        Self {
-            azimuth: DEFAULT_AZIMUTH,
-            elevation: DEFAULT_ELEVATION,
-            distance: DEFAULT_DISTANCE,
-            target: Vec3::ZERO,
-            fit_distance: DEFAULT_DISTANCE,
-            mode: PreviewMode::default(),
-            resew: false,
-        }
-    }
-}
 
 fn setup_scene(
     mut commands: Commands,
