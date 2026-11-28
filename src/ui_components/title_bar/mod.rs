@@ -23,12 +23,14 @@
 //! double-clicks the bar, or clicks a window button.
 
 mod icons;
+mod logo;
 mod mode_switch;
 
 pub use mode_switch::{ModeIcon, ModeSwitch};
 
 use bevy::math::CompassOctant;
 use bevy_egui::egui;
+use bevy_egui::egui::emath::GuiRounding;
 
 use crate::ui_components::palette::{Palette, TitleBarColors};
 
@@ -43,8 +45,6 @@ const CENTER_GAP: f32 = 16.0;
 const DIVIDER_HEIGHT: f32 = 16.0;
 
 const LOGO_SIZE: f32 = 22.0;
-const LOGO_RADIUS: u8 = 5;
-const LOGO_ICON: egui::Vec2 = egui::vec2(13.0, 10.5);
 const BRAND_GAP: f32 = 8.0;
 const BRAND_FONT_SIZE: f32 = 13.0;
 /// The brand is a name, so it is the same in every language.
@@ -323,20 +323,26 @@ fn resize_cursor(direction: CompassOctant) -> egui::CursorIcon {
     }
 }
 
-/// The logo badge and the app name.
+/// The logo (the app icon) and the app name.
 fn brand(ui: &mut egui::Ui, colors: &TitleBarColors) {
     ui.scope(|ui| {
         ui.spacing_mut().item_spacing.x = BRAND_GAP;
-        let (logo, _) = ui.allocate_exact_size(egui::Vec2::splat(LOGO_SIZE), egui::Sense::hover());
-        ui.painter().rect(
-            logo,
-            LOGO_RADIUS,
-            colors.logo_fill,
-            egui::Stroke::new(1.0, colors.logo_border),
-            egui::StrokeKind::Inside,
+        let (slot, _) = ui.allocate_exact_size(egui::Vec2::splat(LOGO_SIZE), egui::Sense::hover());
+        // On whole pixels, one texel per pixel, so the picture isn't resampled again.
+        let ppp = ui.ctx().pixels_per_point();
+        let side = (LOGO_SIZE * ppp).round().max(1.0) as u32;
+        let logo = egui::Rect::from_min_size(
+            slot.min.round_to_pixels(ppp),
+            egui::Vec2::splat(side as f32 / ppp),
         );
-        let icon = egui::Rect::from_center_size(logo.center(), LOGO_ICON);
-        icons::scissors(ui.painter(), icon, egui::Stroke::new(1.2, colors.logo_icon));
+        let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+        // A white tint leaves the picture's own colors untouched.
+        ui.painter().image(
+            logo::texture(ui.ctx(), side).id(),
+            logo,
+            uv,
+            egui::Color32::WHITE,
+        );
         let font = egui::FontId::proportional(BRAND_FONT_SIZE);
         ui.add(
             egui::Label::new(

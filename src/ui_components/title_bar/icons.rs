@@ -3,22 +3,6 @@
 
 use bevy_egui::egui::{self, Painter, Rect, Stroke, pos2};
 
-/// Open scissors, blades to the right: the logo of the app.
-pub(super) fn scissors(painter: &Painter, rect: Rect, stroke: Stroke) {
-    let ring = rect.height() * 0.2;
-    let left = rect.left() + ring + stroke.width / 2.0;
-    let upper = pos2(left, rect.top() + ring + stroke.width / 2.0);
-    let lower = pos2(left, rect.bottom() - ring - stroke.width / 2.0);
-    painter.circle_stroke(upper, ring, stroke);
-    painter.circle_stroke(lower, ring, stroke);
-    // Each blade starts at the edge of its ring and crosses the other one.
-    let towards = |from: egui::Pos2, to: egui::Pos2| from + (to - from).normalized() * ring;
-    let upper_tip = pos2(rect.right(), rect.bottom() - rect.height() * 0.1);
-    let lower_tip = pos2(rect.right(), rect.top() + rect.height() * 0.1);
-    painter.line_segment([towards(upper, upper_tip), upper_tip], stroke);
-    painter.line_segment([towards(lower, lower_tip), lower_tip], stroke);
-}
-
 /// A square with a handle at each corner: the 2D editor.
 pub(super) fn bounding_box(painter: &Painter, rect: Rect, stroke: Stroke) {
     let rect = rect.shrink(stroke.width / 2.0);

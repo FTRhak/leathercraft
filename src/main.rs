@@ -1,3 +1,4 @@
+mod app_icon;
 mod background_textures;
 mod document;
 mod editor;
@@ -41,7 +42,7 @@ fn main() {
         .insert_resource(PanelDock::load(language))
         .init_resource::<ViewMode>()
         .init_resource::<WindowMaximized>()
-        .add_systems(Update, editor::track_maximized)
+        .add_systems(Update, (editor::track_maximized, app_icon::set_window_icon))
         .add_systems(
             EguiPrimaryContextPass,
             (

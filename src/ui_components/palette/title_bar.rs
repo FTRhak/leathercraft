@@ -11,10 +11,6 @@ pub(crate) struct TitleBarColors {
     pub(crate) border: Color32,
     /// The short vertical lines between the groups of the bar.
     pub(crate) divider: Color32,
-    /// The background and edge of the logo badge, and its scissors.
-    pub(crate) logo_fill: Color32,
-    pub(crate) logo_border: Color32,
-    pub(crate) logo_icon: Color32,
     /// "Leathercraft", the first word of the app name.
     pub(crate) app_name: Color32,
     /// "Pattern Studio", the rest of it, in the accent.
@@ -92,9 +88,6 @@ impl TitleBarColors {
         background: hex(0x111215),
         border: hex(0x25272E),
         divider: hex(0x282A32),
-        logo_fill: hex(0x1B6B85),
-        logo_border: hex(0x78C3D7),
-        logo_icon: hex(0xFAFAF9),
         app_name: hex(0xF3F4F6),
         app_subtitle: hex(0x78C3D7),
         menu: MenuTitleStates {
@@ -123,9 +116,6 @@ impl TitleBarColors {
         background: hex(0xEBEDF1),
         border: hex(0xD9DCE2),
         divider: hex(0xCDD0D7),
-        logo_fill: hex(0x176E8D),
-        logo_border: hex(0x1E82A5),
-        logo_icon: hex(0xFFFFFF),
         app_name: hex(0x17181C),
         app_subtitle: hex(0x1E82A5),
         menu: MenuTitleStates {
