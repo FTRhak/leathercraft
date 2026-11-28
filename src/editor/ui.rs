@@ -51,6 +51,7 @@ pub fn editor_ui(
     let history = project.history();
     let project: &Project = &project;
     let state = &mut *state;
+    state.background_textures.retain_used(project);
     let dock = &mut *dock;
     let maximized = maximized.0;
 
@@ -445,7 +446,10 @@ fn handle_hotkeys(
     state: &mut EditorState,
     view_mode: &mut ViewMode,
 ) {
-    let drafting = !state.draft.is_empty() || state.shape_draft.is_some();
+    let drafting = !state.draft.is_empty()
+        || state.shape_draft.is_some()
+        || state.calibration.is_some()
+        || state.background_drag.is_some();
     let dialog_open = state.new_project_dialog.is_some()
         || state.settings_dialog.is_some()
         || state.seam_link_dialog.is_some();
@@ -510,6 +514,12 @@ fn delete_selection(
     events: &mut MessageWriter<ProjectMessage>,
     state: &EditorState,
 ) {
+    if state.selected.is_none()
+        && let Some(id) = state.selected_background
+    {
+        send(events, ProjectEvent::RemoveBackgroundImage { id });
+        return;
+    }
     if let Some(id) = state.selected
         && state.selected_children().len() > 1
     {

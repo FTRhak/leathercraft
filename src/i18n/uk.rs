@@ -1,5 +1,6 @@
 use super::{Label, Message};
 use crate::align::{Arrange, Axis, Edge};
+use crate::background::{Depth, FrameMethod};
 use crate::material::{
     ColorGroup, Flexibility, HeatResistance, LeatherColor, MAX_THICKNESS_MM, MIN_THICKNESS_MM,
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
@@ -308,6 +309,44 @@ pub(super) fn label(label: Label) -> &'static str {
             ThreadShade::Olive => "Оливкова",
         },
         Label::ThreadCustomColor => "Власний колір",
+        Label::BackgroundImages => "Фонові зображення",
+        Label::AddBackgroundImage => "Додати зображення",
+        Label::ImageSource => "ДЖЕРЕЛО",
+        Label::ImageDisplay => "ВІДОБРАЖЕННЯ",
+        Label::ImagePlacement => "РОЗМІЩЕННЯ",
+        Label::Opacity => "Непрозорість",
+        Label::ImageDepth => "Глибина",
+        Label::ImageDepthOption(depth) => match depth {
+            Depth::Back => "Позаду",
+            Depth::Front => "Попереду",
+        },
+        Label::FrameMethodField => "Вписування",
+        Label::FrameMethod(frame) => match frame {
+            FrameMethod::Stretch => "Розтягти",
+            FrameMethod::Fit => "Вписати",
+            FrameMethod::Crop => "Обрізати",
+        },
+        Label::Offset => "Зсув",
+        Label::Scale => "Масштаб",
+        Label::Flip => "Віддзеркалити",
+        Label::Calibrate => "Калібрувати…",
+        Label::CalibrateHint => {
+            "Клацніть дві точки на зображенні й введіть справжню відстань між ними"
+        }
+        Label::CalibrateDistance => "Відстань",
+        Label::ImageFileType => "Зображення",
+        Label::ImageNotFound => "не знайдено",
+        Label::BackgroundEmptyHint => {
+            "Додайте фото або скан, щоб обвести викрійку. PNG, JPEG, WebP, TIFF."
+        }
+        Label::ShowImage => "Показати",
+        Label::HideImage => "Сховати",
+        Label::LockImage => "Заблокувати на полотні",
+        Label::UnlockImage => "Розблокувати",
+        Label::RemoveImage => "Вилучити зображення",
+        Label::BrowseImage => "Вибрати інший файл",
+        Label::ReloadImage => "Перечитати з диска",
+        Label::KeepAspect => "Зберігати пропорції",
     }
 }
 
@@ -732,6 +771,40 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionRemoveSeamLink { a, b } => {
             format!("Видалено зв’язок швів {}", pair_names(a, b))
         }
+        Message::ActionAddBackgroundImage { name } => {
+            format!("Додано фонове зображення «{name}»")
+        }
+        Message::ActionEditBackgroundImage { name } => {
+            format!("Змінено фонове зображення «{name}»")
+        }
+        Message::ActionRemoveBackgroundImage { name } => {
+            format!("Вилучено фонове зображення «{name}»")
+        }
+        Message::ActionReorderBackgroundImages => "Змінено порядок фонових зображень".to_owned(),
+        Message::BackgroundImageNotFound => "Фонового зображення більше не існує.".to_owned(),
+        Message::InvalidBackgroundImage { name } => format!(
+            "Фонове зображення «{name}» має мати додатні розмір і масштаб, непрозорість від 0 до 100 % і положення в допустимих межах."
+        ),
+        Message::InvalidBackgroundImageId { name } => {
+            format!("Фонове зображення «{name}» не має ID або має повторюваний.")
+        }
+        Message::ImageLoadFailed { path, detail } => {
+            format!("Не вдалося завантажити зображення «{path}»: {detail}")
+        }
+        Message::ImageInfo {
+            width,
+            height,
+            kilobytes,
+        } => format!(
+            "{width} × {height} px · {}",
+            file_size(*kilobytes, "КБ", "МБ")
+        ),
+        Message::CalibrateFirstPoint => {
+            "Калібрування: клацніть першу точку на зображенні. Esc скасовує.".to_owned()
+        }
+        Message::CalibrateSecondPoint => {
+            "Калібрування: клацніть другу точку. Esc скасовує.".to_owned()
+        }
         Message::SeamNotFound => "Зв’язаного шва більше не існує.".to_owned(),
         Message::InvalidSeamRange => {
             "Діапазон шва має починатися не пізніше отвору, яким закінчується.".to_owned()
@@ -895,5 +968,15 @@ fn range((min, max): (f64, Option<f64>)) -> String {
     match max {
         Some(max) => format!("{}–{}", decimal(min), decimal(max)),
         None => format!("{}+", decimal(min)),
+    }
+}
+
+/// A file size in kilobytes, shown in megabytes from 1 MB.
+fn file_size(kilobytes: u64, kb: &str, mb: &str) -> String {
+    if kilobytes < 1024 {
+        format!("{kilobytes} {kb}")
+    } else {
+        let tenths = kilobytes * 10 / 1024;
+        format!("{},{} {mb}", tenths / 10, tenths % 10)
     }
 }

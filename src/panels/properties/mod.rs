@@ -4,7 +4,7 @@
 //! it, and `fields` holds the rows, headers and inputs they share.
 
 mod ellipse;
-mod fields;
+pub(crate) mod fields;
 mod line;
 mod piece;
 mod polygon;

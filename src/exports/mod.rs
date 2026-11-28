@@ -320,4 +320,14 @@ EOF
             6
         );
     }
+
+    #[test]
+    fn exports_ignore_background_images() {
+        let mut with_image = project();
+        with_image
+            .background_images
+            .push(crate::background::tests::image(1));
+        assert_eq!(to_svg(&with_image).unwrap(), to_svg(&project()).unwrap());
+        assert_eq!(to_dxf(&with_image).unwrap(), to_dxf(&project()).unwrap());
+    }
 }

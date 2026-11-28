@@ -12,9 +12,9 @@ use leathercraft::model::{Point, Units};
 pub(super) const MIN_SIZE_MM: f64 = 0.01;
 
 /// Between the rows of a section.
-pub(super) const ROW_GAP: f32 = 8.0;
+pub(crate) const ROW_GAP: f32 = 8.0;
 /// The width of the number fields and of the dropdowns of the rows.
-pub(super) const FIELD_WIDTH: f32 = 96.0;
+pub(crate) const FIELD_WIDTH: f32 = 96.0;
 const ROW_HEIGHT: f32 = 26.0;
 const LABEL_SIZE: f32 = 12.0;
 const HEADER_SIZE: f32 = 10.0;
@@ -23,7 +23,7 @@ const MARKER_GAP: f32 = 6.0;
 
 /// A dot before a row's name, in the color of the canvas layer the value belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Marker {
+pub(crate) enum Marker {
     /// The selected edge or vertex.
     Edge,
     /// The pitch of the stitch holes.
@@ -54,7 +54,7 @@ impl Marker {
 }
 
 /// A row: the name, with `marker` before it, at the left, and `add_control` at the right.
-pub(super) fn param_row<R>(
+pub(crate) fn param_row<R>(
     ui: &mut egui::Ui,
     name: &str,
     marker: Option<Marker>,
@@ -121,13 +121,13 @@ pub(super) fn value_row(ui: &mut egui::Ui, name: &str, value: impl Into<String>)
 }
 
 /// A small secondary text, such as a count or a hint.
-pub(super) fn note(ui: &mut egui::Ui, text: &str) {
+pub(crate) fn note(ui: &mut egui::Ui, text: &str) {
     let color = Palette::of(ui.painter()).properties.hint_text;
     ui.label(egui::RichText::new(text).size(11.0).color(color));
 }
 
 /// A section header: a title in capitals at the left and an optional accent text at the right.
-pub(super) fn section_header(ui: &mut egui::Ui, title: &str, trailing: Option<&str>) {
+pub(crate) fn section_header(ui: &mut egui::Ui, title: &str, trailing: Option<&str>) {
     let palette = Palette::of(ui.painter());
     ui.horizontal(|ui| {
         let title = egui::RichText::new(title.to_uppercase())
@@ -148,7 +148,7 @@ pub(super) fn section_header(ui: &mut egui::Ui, title: &str, trailing: Option<&s
 }
 
 /// A 1 px line across the panel, between its sections.
-pub(super) fn divider(ui: &mut egui::Ui) {
+pub(crate) fn divider(ui: &mut egui::Ui) {
     let color = Palette::of(ui.painter()).border.divider;
     let (rect, _) =
         ui.allocate_exact_size(egui::vec2(ui.available_width(), 1.0), egui::Sense::hover());
@@ -263,7 +263,7 @@ pub(super) fn bounded_length_field(
 }
 
 /// An angle row, shown in degrees and kept in radians.
-pub(super) fn angle_field(ui: &mut egui::Ui, label: Label, radians: &mut f64, language: Language) {
+pub(crate) fn angle_field(ui: &mut egui::Ui, label: Label, radians: &mut f64, language: Language) {
     param_row(ui, language.label(label), None, |ui| {
         let current = radians.to_degrees();
         let mut degrees = current;

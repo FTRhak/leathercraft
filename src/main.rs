@@ -1,3 +1,4 @@
+mod background_textures;
 mod document;
 mod editor;
 mod panels;

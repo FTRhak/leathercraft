@@ -1,4 +1,5 @@
 use crate::align::{self, AlignTo, Arrange, Spacing};
+use crate::background::BackgroundImage;
 use crate::i18n::Message;
 use crate::material::Material;
 use crate::model::{BooleanOp, ChildShape, PatternPiece, Project, Units};
@@ -122,6 +123,21 @@ pub enum ProjectEvent {
     RemoveSeamLink {
         id: u64,
     },
+    /// Adds a background image; its `id` is ignored and a new one is given.
+    AddBackgroundImage {
+        image: BackgroundImage,
+    },
+    /// Replaces the background image with the same id.
+    UpdateBackgroundImage {
+        image: BackgroundImage,
+    },
+    RemoveBackgroundImage {
+        id: u64,
+    },
+    /// Puts the background images in this order, which must hold each of their ids once.
+    ReorderBackgroundImages {
+        order: Vec<u64>,
+    },
 }
 
 /// What an applied event did, so that listeners can react without inspecting the project.
@@ -134,10 +150,31 @@ pub enum ProjectChange {
     PieceAdded(u64),
     PieceRemoved(u64),
     PiecesRemoved,
-    ChildAdded { id: u64, child: u64 },
-    ChildRemoved { id: u64 },
-    ChildrenRemoved { id: u64, count: usize },
+    ChildAdded {
+        id: u64,
+        child: u64,
+    },
+    ChildRemoved {
+        id: u64,
+    },
+    ChildrenRemoved {
+        id: u64,
+        count: usize,
+    },
     SeamLinkAdded(u64),
+    /// Background image edits change nothing the 3D preview is built from.
+    BackgroundAdded(u64),
+    BackgroundEdited,
+}
+
+impl ProjectChange {
+    /// Whether the change touches what the 3D preview is built from.
+    pub fn affects_pattern(self) -> bool {
+        !matches!(
+            self,
+            Self::Saved | Self::BackgroundAdded(_) | Self::BackgroundEdited
+        )
+    }
 }
 
 impl Project {
@@ -354,6 +391,45 @@ impl Project {
                     return Err(Message::SeamNotFound);
                 }
                 Ok(ProjectChange::Edited)
+            }),
+            ProjectEvent::AddBackgroundImage { mut image } => self.edit(|project| {
+                image.id = project.next_background_id();
+                let id = image.id;
+                project.background_images.push(image);
+                Ok(ProjectChange::BackgroundAdded(id))
+            }),
+            ProjectEvent::UpdateBackgroundImage { image } => self.edit(|project| {
+                let slot = project
+                    .background_images
+                    .iter_mut()
+                    .find(|existing| existing.id == image.id)
+                    .ok_or(Message::BackgroundImageNotFound)?;
+                *slot = image;
+                Ok(ProjectChange::BackgroundEdited)
+            }),
+            ProjectEvent::RemoveBackgroundImage { id } => self.edit(|project| {
+                let before = project.background_images.len();
+                project.background_images.retain(|image| image.id != id);
+                if project.background_images.len() == before {
+                    return Err(Message::BackgroundImageNotFound);
+                }
+                Ok(ProjectChange::BackgroundEdited)
+            }),
+            ProjectEvent::ReorderBackgroundImages { order } => self.edit(|project| {
+                let mut ordered = Vec::with_capacity(order.len());
+                for id in &order {
+                    let index = project
+                        .background_images
+                        .iter()
+                        .position(|image| image.id == *id)
+                        .ok_or(Message::BackgroundImageNotFound)?;
+                    ordered.push(project.background_images.remove(index));
+                }
+                if !project.background_images.is_empty() {
+                    return Err(Message::BackgroundImageNotFound);
+                }
+                project.background_images = ordered;
+                Ok(ProjectChange::BackgroundEdited)
             }),
         }
     }
@@ -1199,5 +1275,65 @@ mod tests {
                 .unwrap();
             assert_eq!(project.seam_links.len(), 1);
         }
+    }
+
+    #[test]
+    fn background_images_are_added_updated_reordered_and_removed() {
+        use crate::background::tests::image;
+        let mut project = Project::default();
+        let change = project
+            .apply(ProjectEvent::AddBackgroundImage { image: image(9) })
+            .unwrap();
+        assert_eq!(change, ProjectChange::BackgroundAdded(1));
+        assert!(!change.affects_pattern());
+        project
+            .apply(ProjectEvent::AddBackgroundImage { image: image(9) })
+            .unwrap();
+        assert_eq!(
+            project
+                .background_images
+                .iter()
+                .map(|i| i.id)
+                .collect::<Vec<_>>(),
+            [1, 2]
+        );
+
+        let mut changed = project.background_images[0].clone();
+        changed.opacity = 0.25;
+        project
+            .apply(ProjectEvent::UpdateBackgroundImage { image: changed })
+            .unwrap();
+        assert_eq!(project.background_images[0].opacity, 0.25);
+
+        let mut invalid = project.background_images[0].clone();
+        invalid.opacity = 2.0;
+        let before = project.clone();
+        assert!(
+            project
+                .apply(ProjectEvent::UpdateBackgroundImage { image: invalid })
+                .is_err()
+        );
+        assert_eq!(project, before);
+
+        for order in [vec![2], vec![2, 2], vec![2, 1, 3]] {
+            assert_eq!(
+                project.apply(ProjectEvent::ReorderBackgroundImages { order }),
+                Err(Message::BackgroundImageNotFound)
+            );
+            assert_eq!(project, before);
+        }
+        project
+            .apply(ProjectEvent::ReorderBackgroundImages { order: vec![2, 1] })
+            .unwrap();
+        assert_eq!(project.background_images[0].id, 2);
+
+        project
+            .apply(ProjectEvent::RemoveBackgroundImage { id: 2 })
+            .unwrap();
+        assert_eq!(project.background_images.len(), 1);
+        assert_eq!(
+            project.apply(ProjectEvent::RemoveBackgroundImage { id: 2 }),
+            Err(Message::BackgroundImageNotFound)
+        );
     }
 }

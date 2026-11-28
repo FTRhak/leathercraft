@@ -1,3 +1,4 @@
+mod background;
 mod canvas;
 mod confirm_discard;
 mod drag;

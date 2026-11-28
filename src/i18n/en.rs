@@ -1,5 +1,6 @@
 use super::{Label, Message};
 use crate::align::{Arrange, Axis, Edge};
+use crate::background::{Depth, FrameMethod};
 use crate::material::{
     ColorGroup, Flexibility, HeatResistance, LeatherColor, MAX_THICKNESS_MM, MIN_THICKNESS_MM,
     Origin, Strength, Texture, ThicknessCategory, Treatment, WaterResistance,
@@ -304,6 +305,44 @@ pub(super) fn label(label: Label) -> &'static str {
             ThreadShade::Olive => "Olive",
         },
         Label::ThreadCustomColor => "Custom",
+        Label::BackgroundImages => "Background images",
+        Label::AddBackgroundImage => "Add image",
+        Label::ImageSource => "SOURCE",
+        Label::ImageDisplay => "DISPLAY",
+        Label::ImagePlacement => "PLACEMENT",
+        Label::Opacity => "Opacity",
+        Label::ImageDepth => "Depth",
+        Label::ImageDepthOption(depth) => match depth {
+            Depth::Back => "Back",
+            Depth::Front => "Front",
+        },
+        Label::FrameMethodField => "Frame method",
+        Label::FrameMethod(frame) => match frame {
+            FrameMethod::Stretch => "Stretch",
+            FrameMethod::Fit => "Fit",
+            FrameMethod::Crop => "Crop",
+        },
+        Label::Offset => "Offset",
+        Label::Scale => "Scale",
+        Label::Flip => "Flip",
+        Label::Calibrate => "Calibrate…",
+        Label::CalibrateHint => {
+            "Click two points on the image, then enter the real distance between them"
+        }
+        Label::CalibrateDistance => "Distance",
+        Label::ImageFileType => "Images",
+        Label::ImageNotFound => "not found",
+        Label::BackgroundEmptyHint => {
+            "Add a photo or scan to trace a pattern from. PNG, JPEG, WebP, TIFF."
+        }
+        Label::ShowImage => "Show",
+        Label::HideImage => "Hide",
+        Label::LockImage => "Lock on the canvas",
+        Label::UnlockImage => "Unlock",
+        Label::RemoveImage => "Remove image",
+        Label::BrowseImage => "Choose another file",
+        Label::ReloadImage => "Reload from disk",
+        Label::KeepAspect => "Keep proportions",
     }
 }
 
@@ -678,6 +717,40 @@ pub(super) fn message(message: &Message) -> String {
         Message::ActionRemoveSeamLink { a, b } => {
             format!("Removed the seam link of {}", pair_names(a, b))
         }
+        Message::ActionAddBackgroundImage { name } => {
+            format!("Added background image '{name}'")
+        }
+        Message::ActionEditBackgroundImage { name } => {
+            format!("Changed background image '{name}'")
+        }
+        Message::ActionRemoveBackgroundImage { name } => {
+            format!("Removed background image '{name}'")
+        }
+        Message::ActionReorderBackgroundImages => "Reordered background images".to_owned(),
+        Message::BackgroundImageNotFound => "The background image no longer exists.".to_owned(),
+        Message::InvalidBackgroundImage { name } => format!(
+            "Background image '{name}' needs a positive size and scale, opacity from 0 to 100 % and a position within range."
+        ),
+        Message::InvalidBackgroundImageId { name } => {
+            format!("Background image '{name}' has a missing or repeated ID.")
+        }
+        Message::ImageLoadFailed { path, detail } => {
+            format!("Could not load image '{path}': {detail}")
+        }
+        Message::ImageInfo {
+            width,
+            height,
+            kilobytes,
+        } => format!(
+            "{width} × {height} px · {}",
+            file_size(*kilobytes, "KB", "MB")
+        ),
+        Message::CalibrateFirstPoint => {
+            "Calibrate: click the first point on the image. Esc cancels.".to_owned()
+        }
+        Message::CalibrateSecondPoint => {
+            "Calibrate: click the second point. Esc cancels.".to_owned()
+        }
         Message::SeamNotFound => "A linked seam no longer exists.".to_owned(),
         Message::InvalidSeamRange => {
             "A seam's range must start at or before the hole it ends at.".to_owned()
@@ -821,4 +894,14 @@ fn range((min, max): (f64, Option<f64>)) -> String {
 fn counted(count: usize, one: &str, many: &str) -> String {
     let noun = if count == 1 { one } else { many };
     format!("{count} {noun}")
+}
+
+/// A file size in kilobytes, shown in megabytes from 1 MB.
+fn file_size(kilobytes: u64, kb: &str, mb: &str) -> String {
+    if kilobytes < 1024 {
+        format!("{kilobytes} {kb}")
+    } else {
+        let tenths = kilobytes * 10 / 1024;
+        format!("{}.{} {mb}", tenths / 10, tenths % 10)
+    }
 }

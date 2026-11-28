@@ -19,16 +19,18 @@ pub enum PanelTab {
     Material,
     History,
     Align,
+    BackgroundImages,
 }
 
 impl PanelTab {
     /// The panels the Window menu lists; the canvas always stays open.
-    pub const CLOSEABLE: [Self; 5] = [
+    pub const CLOSEABLE: [Self; 6] = [
         Self::Properties,
         Self::Align,
         Self::Layout,
         Self::Material,
         Self::History,
+        Self::BackgroundImages,
     ];
 
     pub fn label(self) -> Label {
@@ -39,6 +41,7 @@ impl PanelTab {
             Self::Material => Label::Material,
             Self::History => Label::History,
             Self::Align => Label::Align,
+            Self::BackgroundImages => Label::BackgroundImages,
         }
     }
 }

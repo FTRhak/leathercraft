@@ -1,4 +1,5 @@
 pub mod align;
+pub mod background;
 pub mod boolean;
 pub mod drape;
 pub mod events;

@@ -1,3 +1,4 @@
+use crate::background::BackgroundImage;
 use crate::i18n::Message;
 use crate::material::Material;
 use crate::seams::SeamLink;
@@ -10,7 +11,7 @@ pub const PROJECT_VERSION: u32 = 2;
 const MAX_PIECES: usize = 10_000;
 const MAX_POINTS_PER_PIECE: usize = 2_048;
 const MAX_CHILDREN_PER_PIECE: usize = 512;
-const MAX_COORDINATE_MM: f64 = 1_000_000.0;
+pub(crate) const MAX_COORDINATE_MM: f64 = 1_000_000.0;
 pub(crate) const MIN_POLYGON_AREA_MM2: f64 = 1.0e-6;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -331,6 +332,9 @@ pub struct Project {
     /// are computed by `SeamLink::pairs`. Older files lack the field.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub seam_links: Vec<SeamLink>,
+    /// Photos or scans to trace from; never part of the pattern. Older files lack the field.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub background_images: Vec<BackgroundImage>,
     /// Where the document lives on disk; not part of the file format.
     #[serde(skip)]
     pub path: Option<PathBuf>,
@@ -347,6 +351,7 @@ impl Default for Project {
             pieces: Vec::new(),
             default_material: Material::default(),
             seam_links: Vec::new(),
+            background_images: Vec::new(),
             path: None,
             modified: false,
         }
@@ -392,7 +397,8 @@ impl Project {
             }
             piece.validate_shapes()?;
         }
-        self.validate_seam_links()
+        self.validate_seam_links()?;
+        self.validate_background_images()
     }
 
     pub fn next_piece_id(&self) -> u64 {

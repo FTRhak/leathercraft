@@ -157,6 +157,84 @@ pub fn paint_close(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stro
     painter.line_segment([rect.right_top(), rect.left_bottom()], stroke);
 }
 
+/// An eye, or an eye struck through when `open` is false: shown or hidden.
+pub fn paint_eye(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke, open: bool) {
+    const STEPS: usize = 10;
+    let center = rect.center();
+    let half_width = rect.width().min(rect.height()) * 0.42;
+    let half_height = half_width * 0.55;
+    // Two arcs meeting at the corners of the eye.
+    let mut outline = Vec::with_capacity(2 * STEPS);
+    for (sign, range) in [(-1.0_f32, 0..STEPS), (1.0, 0..STEPS)] {
+        for step in range {
+            let t = step as f32 / STEPS as f32;
+            let x = if sign < 0.0 {
+                -1.0 + 2.0 * t
+            } else {
+                1.0 - 2.0 * t
+            };
+            let y = sign * (1.0 - x * x).max(0.0).sqrt();
+            outline.push(center + egui::vec2(x * half_width, y * half_height));
+        }
+    }
+    painter.add(egui::Shape::closed_line(outline, stroke));
+    painter.circle_stroke(center, half_height * 0.55, stroke);
+    if !open {
+        let reach = half_width * 0.95;
+        painter.line_segment(
+            [
+                center + egui::vec2(-reach, reach * 0.8),
+                center + egui::vec2(reach, -reach * 0.8),
+            ],
+            stroke,
+        );
+    }
+}
+
+/// A framed landscape, a hill under a sun: an image.
+pub fn paint_image(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+    let side = rect.width().min(rect.height());
+    let frame = egui::Rect::from_center_size(rect.center(), egui::vec2(side * 0.84, side * 0.68));
+    painter.rect_stroke(frame, 1.5, stroke, egui::StrokeKind::Middle);
+    let hill = vec![
+        egui::pos2(frame.left(), frame.bottom() - frame.height() * 0.2),
+        egui::pos2(
+            frame.left() + frame.width() * 0.4,
+            frame.top() + frame.height() * 0.45,
+        ),
+        egui::pos2(
+            frame.left() + frame.width() * 0.65,
+            frame.bottom() - frame.height() * 0.3,
+        ),
+        egui::pos2(frame.right(), frame.top() + frame.height() * 0.55),
+    ];
+    painter.add(egui::Shape::line(hill, stroke));
+    painter.circle_stroke(
+        egui::pos2(
+            frame.right() - frame.width() * 0.25,
+            frame.top() + frame.height() * 0.28,
+        ),
+        side * 0.07,
+        stroke,
+    );
+}
+
+/// An open folder: choose a file.
+pub fn paint_folder(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
+    let side = rect.width().min(rect.height());
+    let body = egui::Rect::from_center_size(rect.center(), egui::vec2(side * 0.84, side * 0.62));
+    let tab = body.left() + body.width() * 0.38;
+    let points = vec![
+        body.left_bottom(),
+        body.left_top(),
+        egui::pos2(tab, body.top()),
+        egui::pos2(tab + side * 0.08, body.top() + side * 0.1),
+        egui::pos2(body.right(), body.top() + side * 0.1),
+        body.right_bottom(),
+    ];
+    painter.add(egui::Shape::closed_line(points, stroke));
+}
+
 /// A counter-clockwise arrow around a circle: reset.
 pub fn paint_reset(painter: &egui::Painter, rect: egui::Rect, stroke: egui::Stroke) {
     const STEPS: usize = 16;
@@ -184,8 +262,6 @@ pub fn icon_font_id(size: f32) -> egui::FontId {
 }
 
 /// A square button with a painted icon; the closure gets the button's rect and stroke.
-// No caller since the Layout panel draws its own row buttons; kept for new tool buttons.
-#[allow(dead_code)]
 pub fn icon_button(
     ui: &mut egui::Ui,
     size: f32,

@@ -2,6 +2,7 @@ mod en;
 mod uk;
 
 use crate::align::Arrange;
+use crate::background::{Depth, FrameMethod};
 use crate::material::{
     ColorGroup, Flexibility, HeatResistance, LeatherColor, Origin, Strength, Texture,
     ThicknessCategory, Treatment, WaterResistance,
@@ -343,6 +344,40 @@ pub enum Label {
     ThreadShade(ThreadShade),
     /// A thread color that isn't one of the named shades.
     ThreadCustomColor,
+    /// The Background images panel: its title and the Window menu item.
+    BackgroundImages,
+    AddBackgroundImage,
+    /// Section headers of a background image's entry.
+    ImageSource,
+    ImageDisplay,
+    ImagePlacement,
+    Opacity,
+    ImageDepth,
+    ImageDepthOption(Depth),
+    FrameMethodField,
+    FrameMethod(FrameMethod),
+    Offset,
+    Scale,
+    Flip,
+    /// Starts calibration: two points on the image and the real distance between them.
+    Calibrate,
+    CalibrateHint,
+    /// The field of the real distance in the calibration window.
+    CalibrateDistance,
+    /// The file dialog filter of image files.
+    ImageFileType,
+    /// After the name of an image whose file can't be read.
+    ImageNotFound,
+    BackgroundEmptyHint,
+    ShowImage,
+    HideImage,
+    LockImage,
+    UnlockImage,
+    RemoveImage,
+    BrowseImage,
+    ReloadImage,
+    /// The toggle that keeps the width and height in proportion.
+    KeepAspect,
 }
 
 /// Text with arguments, kept structured so it is rendered in the language current when shown.
@@ -606,6 +641,37 @@ pub enum Message {
         a: String,
         b: String,
     },
+    // Background images.
+    ActionAddBackgroundImage {
+        name: String,
+    },
+    ActionEditBackgroundImage {
+        name: String,
+    },
+    ActionRemoveBackgroundImage {
+        name: String,
+    },
+    ActionReorderBackgroundImages,
+    BackgroundImageNotFound,
+    InvalidBackgroundImage {
+        name: String,
+    },
+    InvalidBackgroundImageId {
+        name: String,
+    },
+    /// `detail` comes from the image decoder and is not translated.
+    ImageLoadFailed {
+        path: String,
+        detail: String,
+    },
+    /// The pixel size and file size of an image, under its path.
+    ImageInfo {
+        width: u32,
+        height: u32,
+        kilobytes: u64,
+    },
+    CalibrateFirstPoint,
+    CalibrateSecondPoint,
     // Seam links.
     SeamNotFound,
     InvalidSeamRange,

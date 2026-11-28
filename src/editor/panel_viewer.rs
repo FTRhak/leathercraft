@@ -1,6 +1,6 @@
 use super::{EditorState, ViewMode, canvas, send};
 use crate::document::{HistoryMessage, ProjectMessage};
-use crate::panels::{align, history, layout, material, properties};
+use crate::panels::{align, background_images, history, layout, material, properties};
 use crate::preview::PreviewSettings;
 use crate::settings::{Action, Hotkeys};
 use crate::ui_components::dock::{PanelTab, TabDecor};
@@ -43,8 +43,8 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
             PanelTab::Align => Some(glyph::ALIGN_LEFT),
             PanelTab::Layout => Some(glyph::LAYOUT),
             PanelTab::History => Some(glyph::HISTORY),
-            // No glyph yet for the canvas or the swatch of Material.
-            PanelTab::Canvas | PanelTab::Material => None,
+            // No glyph yet for the canvas, the swatch of Material or background images.
+            PanelTab::Canvas | PanelTab::Material | PanelTab::BackgroundImages => None,
         };
         self.decor.title(&self.style, *tab, glyph, text)
     }
@@ -171,6 +171,33 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
                     self.history_events.write(HistoryMessage(command));
                 }
             }
+            PanelTab::BackgroundImages => {
+                ui.add_enabled_ui(editing, |ui| {
+                    let state = &mut *self.state;
+                    let panel = background_images::PanelState {
+                        selected: state.selected_background,
+                        textures: &mut state.background_textures,
+                        view_area: state.view_area,
+                    };
+                    let (event, request) =
+                        background_images::show_panel(ui, self.project, panel, language);
+                    if let Some(event) = event {
+                        send(self.events, event);
+                    }
+                    match request {
+                        Some(background_images::Request::Select(id)) => {
+                            state.select_background(id);
+                        }
+                        Some(background_images::Request::Calibrate(id)) => {
+                            state.start_calibration(id);
+                        }
+                        Some(background_images::Request::Report(message)) => {
+                            state.report_error(message);
+                        }
+                        None => {}
+                    }
+                });
+            }
         }
     }
 
@@ -189,7 +216,7 @@ impl TabViewer for PanelViewer<'_, '_, '_, '_> {
 
     fn scroll_bars(&self, tab: &PanelTab) -> [bool; 2] {
         match tab {
-            PanelTab::Properties | PanelTab::Align => [false, true],
+            PanelTab::Properties | PanelTab::Align | PanelTab::BackgroundImages => [false, true],
             // The canvas pans itself, and these two have their own scroll areas.
             PanelTab::Canvas | PanelTab::Layout | PanelTab::Material | PanelTab::History => {
                 [false, false]

@@ -37,13 +37,13 @@ pub enum Shape {
 }
 
 /// Turns a point in a primitive's own axes into world coordinates.
-fn to_world(center: Point, rotation: f64, x: f64, y: f64) -> Point {
+pub(crate) fn to_world(center: Point, rotation: f64, x: f64, y: f64) -> Point {
     let (sin, cos) = rotation.sin_cos();
     Point::new(center.x + x * cos - y * sin, center.y + x * sin + y * cos)
 }
 
 /// Turns a world point into a primitive's own axes.
-fn to_local(center: Point, rotation: f64, point: Point) -> (f64, f64) {
+pub(crate) fn to_local(center: Point, rotation: f64, point: Point) -> (f64, f64) {
     let (sin, cos) = rotation.sin_cos();
     let (dx, dy) = (point.x - center.x, point.y - center.y);
     (dx * cos + dy * sin, -dx * sin + dy * cos)

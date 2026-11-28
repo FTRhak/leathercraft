@@ -86,6 +86,7 @@ For an ordinary edit:
 | `SetPieceMaterial` | `ActionMaterial` | Material changes of the same piece |
 | `SetBaseShape` | `ActionEditBase` | Base edits of the same piece |
 | `SetChildShape` | `ActionEditChild` | Edits of the same child of the same piece |
+| `UpdateBackgroundImage` | `ActionEditBackgroundImage` | Updates of the same background image |
 | `SetUnits`, `AddPiece`, `MovePiece`, `MovePieces`, `ArrangePieces` (align or distribute), `SetPieceLocked`, `RemovePiece`, `RemovePieces`, `AddChild`, `SetChildOp`, `ReorderChild`, `RemoveChild` | Their own `Action…` message; the group events count their pieces | Never |
 
 A merge chain ends at any other edit, at a save, or at an undo, redo or jump, so the next edit always gets its own entry after one of those.

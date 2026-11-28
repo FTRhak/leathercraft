@@ -1,6 +1,6 @@
 use crate::editor::EditorState;
 use bevy::prelude::*;
-use leathercraft::events::{ProjectChange, ProjectEvent};
+use leathercraft::events::ProjectEvent;
 use leathercraft::history::{History, HistoryCommand};
 use leathercraft::model::Project;
 use std::ops::Deref;
@@ -46,12 +46,13 @@ pub fn apply_project_events(
     mut state: ResMut<EditorState>,
 ) {
     for ProjectMessage(event) in messages.read() {
-        // Rejected events and saves leave the content as it was, so the preview must not rebuild.
+        // Rejected events and saves leave the content as it was, and background images aren't
+        // part of what the preview builds, so neither must rebuild it.
         let ActiveProject { project, history } = active.bypass_change_detection();
         match project.apply(event.clone()) {
             Ok(change) => {
                 history.record(event, change, project);
-                if change != ProjectChange::Saved {
+                if change.affects_pattern() {
                     active.set_changed();
                 }
                 state.on_project_change(change, &active);

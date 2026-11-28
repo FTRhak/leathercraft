@@ -1,4 +1,5 @@
 pub mod align;
+pub mod background_images;
 pub mod history;
 pub mod layout;
 pub mod material;

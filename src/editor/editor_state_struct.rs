@@ -1,6 +1,8 @@
 use super::ShapePart;
+use super::background::{BackgroundDrag, Calibration};
 use super::drag_state_struct::ShapeRef;
 use super::{DragState, ShapeDraft};
+use crate::background_textures::BackgroundTextures;
 use crate::panels::align::AlignOptions;
 use crate::panels::seam_link::{OpenLink, SeamLinkDraft};
 use crate::panels::settings::SettingsDraft;
@@ -75,6 +77,15 @@ pub struct EditorState {
     pub(super) status: Message,
     pub(super) status_is_error: bool,
     pub(super) cursor: Option<Point>,
+    /// The background image selected on the canvas or in its panel. Selecting a piece clears it.
+    pub(super) selected_background: Option<u64>,
+    pub(super) background_drag: Option<BackgroundDrag>,
+    pub(super) calibration: Option<Calibration>,
+    /// The decoded pictures of the background images.
+    pub(super) background_textures: BackgroundTextures,
+    /// The world center of the canvas and its size in mm, from its last frame, so that a new
+    /// background image can be fitted to the view.
+    pub(super) view_area: Option<(Point, (f64, f64))>,
 }
 
 impl Default for EditorState {
@@ -111,6 +122,11 @@ impl Default for EditorState {
             status: Message::Ready,
             status_is_error: false,
             cursor: None,
+            selected_background: None,
+            background_drag: None,
+            calibration: None,
+            background_textures: BackgroundTextures::default(),
+            view_area: None,
         }
     }
 }
@@ -191,6 +207,51 @@ impl EditorState {
         self.drag = None;
         self.rename_buffer = None;
         self.zoom_request = Some(ZoomRequest::All);
+        self.selected_background = None;
+        self.background_drag = None;
+        self.calibration = None;
+    }
+
+    /// Selects a background image instead of any piece.
+    pub(super) fn select_background(&mut self, id: u64) {
+        self.select(None, None);
+        self.selected_background = Some(id);
+    }
+
+    /// Starts calibrating an image: the next two canvas clicks place the points.
+    pub(super) fn start_calibration(&mut self, id: u64) {
+        self.draft.clear();
+        self.shape_draft = None;
+        self.select_background(id);
+        self.calibration = Some(Calibration {
+            id,
+            first: None,
+            second: None,
+            distance: 0.0,
+        });
+        self.report(Message::CalibrateFirstPoint);
+    }
+
+    /// Forgets a selected, dragged or calibrated background image that no longer exists.
+    fn prune_background(&mut self, project: &Project) {
+        let exists = |id: u64| project.background_image(id).is_some();
+        if self.selected_background.is_some_and(|id| !exists(id)) {
+            self.selected_background = None;
+        }
+        if self
+            .background_drag
+            .as_ref()
+            .is_some_and(|drag| !exists(drag.current.id))
+        {
+            self.background_drag = None;
+        }
+        if self
+            .calibration
+            .as_ref()
+            .is_some_and(|calibration| !exists(calibration.id))
+        {
+            self.calibration = None;
+        }
     }
 
     pub fn on_project_change(&mut self, change: ProjectChange, project: &Project) {
@@ -209,6 +270,8 @@ impl EditorState {
                 path: document_name(project),
             }),
             ProjectChange::Edited | ProjectChange::SeamLinkAdded(_) => {}
+            ProjectChange::BackgroundAdded(id) => self.select_background(id),
+            ProjectChange::BackgroundEdited => self.prune_background(project),
             ProjectChange::PieceAdded(id) => {
                 self.draft.clear();
                 self.select(Some(id), None);
@@ -279,6 +342,8 @@ impl EditorState {
         self.shape_draft = None;
         self.drag = None;
         self.rename_buffer = None;
+        self.background_drag = None;
+        self.prune_background(project);
         self.prune_selection(project);
         let piece = self
             .selected_child
@@ -318,6 +383,7 @@ impl EditorState {
     }
 
     pub(super) fn select(&mut self, piece: Option<u64>, child: Option<u64>) {
+        self.selected_background = None;
         self.selected = piece;
         self.pieces = piece.into_iter().collect();
         self.selected_child = piece.zip(child);
@@ -384,6 +450,7 @@ impl EditorState {
             self.pieces.push(piece);
             self.selected = Some(piece);
         }
+        self.selected_background = None;
         self.clear_children();
         self.selected_part = None;
     }
@@ -398,6 +465,7 @@ impl EditorState {
     /// The primary piece stays if there is one.
     pub(super) fn select_all(&mut self, project: &Project) {
         self.pieces = project.pieces.iter().map(|piece| piece.id).collect();
+        self.selected_background = None;
         if self.selected.is_none() {
             self.selected = self.pieces.last().copied();
         }

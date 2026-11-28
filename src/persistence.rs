@@ -6,7 +6,10 @@ use std::path::Path;
 
 pub fn save_project(path: &Path, project: &Project) -> Result<(), Message> {
     project.validate()?;
-    let json = serde_json::to_string_pretty(project).map_err(|error| Message::CouldNotEncode {
+    // Image paths are saved relative to the project file where they can be, so a project
+    // folder can be moved together with its images.
+    let stored = project.with_stored_image_paths(path);
+    let json = serde_json::to_string_pretty(&stored).map_err(|error| Message::CouldNotEncode {
         detail: error.to_string(),
     })?;
     fs::write(path, format!("{json}\n")).map_err(|error| Message::CouldNotWrite {
@@ -20,12 +23,13 @@ pub fn load_project(path: &Path) -> Result<Project, Message> {
         path: path.display().to_string(),
         detail: error.to_string(),
     })?;
-    let project: Project =
+    let mut project: Project =
         serde_json::from_str(&contents).map_err(|error| Message::CouldNotParse {
             path: path.display().to_string(),
             detail: error.to_string(),
         })?;
     project.validate()?;
+    project.resolve_image_paths(path);
     Ok(project)
 }
 
@@ -299,5 +303,40 @@ mod tests {
         save_project(&path, &project).unwrap();
         assert_eq!(load_project(&path).unwrap(), project);
         fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn background_image_paths_are_saved_relative_to_the_project() {
+        use crate::background::tests::image;
+        let path = temp_path("background");
+        let folder = path.parent().unwrap();
+        let mut inside = image(1);
+        inside.path = folder.join("res").join("skin.jpg");
+        let mut outside = image(2);
+        outside.path = std::env::current_dir().unwrap().join("missing.png");
+        let project = Project {
+            background_images: vec![inside.clone(), outside.clone()],
+            ..Project::default()
+        };
+
+        save_project(&path, &project).unwrap();
+        let json = std::fs::read_to_string(&path).unwrap();
+        let stored: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let stored_path = |index: usize| {
+            stored["background_images"][index]["path"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        };
+        assert_eq!(
+            std::path::PathBuf::from(stored_path(0)),
+            std::path::Path::new("res").join("skin.jpg")
+        );
+        assert_eq!(std::path::PathBuf::from(stored_path(1)), outside.path);
+
+        // The image files don't exist, which doesn't stop the project from loading.
+        let loaded = load_project(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(loaded.background_images, vec![inside, outside]);
     }
 }

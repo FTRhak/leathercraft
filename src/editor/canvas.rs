@@ -1,3 +1,4 @@
+use super::background;
 use super::drag::{begin_drag, begin_handle_drag, finish_drag, update_drag};
 use super::drag_state_struct::ShapeRef;
 use super::grid::draw_grid;
@@ -11,6 +12,7 @@ use crate::ui_components::view_controls::{self, ViewCommand, ViewControls};
 use bevy::prelude::*;
 use bevy_egui::egui;
 use earcutr::earcut;
+use leathercraft::background::Depth;
 use leathercraft::events::ProjectEvent;
 use leathercraft::i18n::{Label, Language, Message};
 use leathercraft::model::{BooleanOp, Bounds, PatternPiece, Point, Project, Units};
@@ -112,6 +114,14 @@ pub(super) fn canvas(
         origin: rect.center() + state.pan,
         zoom: state.zoom,
     };
+    let content = ruler::content_rect(rect);
+    state.view_area = Some((
+        view.to_world(content.center()),
+        (
+            f64::from(content.width() / view.zoom),
+            f64::from(content.height() / view.zoom),
+        ),
+    ));
     state.cursor = response
         .hover_pos()
         .or_else(|| response.interact_pointer_pos())
@@ -125,7 +135,10 @@ pub(super) fn canvas(
         state.draft.clear();
         state.draft_tool = state.tool;
     }
+    // Calibrating a background image takes the clicks, whatever the tool.
+    let calibrating = state.calibration.is_some();
     match state.tool {
+        _ if calibrating => background::handle_calibration(ui, &response, view, project, state),
         Tool::Select => handle_select(ui, &response, view, project, events, state),
         Tool::Edge => handle_edge(ui, &response, view, project, events, state),
         Tool::Draw => handle_draw(ui, &response, view, project, events, state),
@@ -142,11 +155,15 @@ pub(super) fn canvas(
         }
         Tool::Select | Tool::Edge => false,
     };
-    if drawing && let Some(position) = response.hover_pos() {
+    if drawing
+        && !calibrating
+        && let Some(position) = response.hover_pos()
+    {
         state.hover_target = Some(snap_draw(project, view, state, view.to_world(position)));
     }
 
     painter.rect_filled(rect, 0.0, Palette::of(&painter).surface.canvas);
+    background::draw_images(&painter, view, project, state, Depth::Back);
     let snap_grid = state.snap.enabled && state.snap.grid;
     draw_grid(
         &painter,
@@ -160,6 +177,7 @@ pub(super) fn canvas(
     draw_seam_links(&painter, view, project, state);
     draw_edges(&painter, response.hover_pos(), view, project, state);
     draw_dimensions(&painter, view, project, state);
+    background::draw_images(&painter, view, project, state, Depth::Front);
     if state.tool == Tool::StitchHoles {
         draw_stitch_draft(&painter, ui, response.hover_pos(), view, project, state);
     } else {
@@ -167,9 +185,11 @@ pub(super) fn canvas(
     }
     draw_shape_draft(&painter, view, project.units, state);
     draw_snap_feedback(&painter, view, state);
+    background::draw_selection(&painter, view, project, state);
+    background::draw_calibration(&painter, view, state);
     ruler::draw_rulers(&painter, rect, view, project.units, state.cursor);
-    let content = ruler::content_rect(rect);
     show_view_controls(ui, content, state);
+    background::calibration_window(ui.ctx(), view, project, events, state);
     snap::show(ui, content, &mut state.snap, snap_hotkey, state.language);
     let pointer_down = ui.input(|input| input.pointer.any_down());
     state.save_snap_when_settled(pointer_down);
@@ -431,28 +451,53 @@ fn handle_select(
     events: &mut MessageWriter<ProjectMessage>,
     state: &mut EditorState,
 ) {
+    let shift = ui.input(|input| input.modifiers.shift);
     if response.drag_started_by(egui::PointerButton::Primary) {
         // The drag only registers past a movement threshold, so hit test where it was pressed.
         if let Some(origin) = ui.input(|input| input.pointer.press_origin()) {
-            let shift = ui.input(|input| input.modifiers.shift);
-            begin_drag(origin, shift, view, project, state);
+            // The selected background image's handles come first, then pieces, then the image.
+            let piece_under =
+                piece_at(project, view.to_world(origin), view.hit_tolerance()).is_some();
+            if !background::begin_drag(origin, view, project, state, piece_under) {
+                begin_drag(origin, shift, view, project, state);
+            }
         }
     }
     if response.dragged_by(egui::PointerButton::Primary)
         && let Some(position) = response.interact_pointer_pos()
     {
-        let tolerance = view.snap_tolerance(state.snap.distance_px);
-        update_drag(view.to_world(position), tolerance, state);
+        if state.background_drag.is_some() {
+            background::update_drag(view.to_world(position), shift, state);
+        } else {
+            let tolerance = view.snap_tolerance(state.snap.distance_px);
+            update_drag(view.to_world(position), tolerance, state);
+        }
     }
     if response.drag_stopped() {
-        finish_drag(events, state);
+        if state.background_drag.is_some() {
+            background::finish_drag(events, state);
+        } else {
+            finish_drag(events, state);
+        }
+    }
+    if !ui.ctx().wants_keyboard_input() && ui.input(|input| input.key_pressed(egui::Key::Escape)) {
+        background::cancel(state);
     }
     if response.clicked()
         && let Some(position) = response.interact_pointer_pos()
     {
         let point = view.to_world(position);
         let tolerance = view.hit_tolerance();
-        if ui.input(|input| input.modifiers.shift) {
+        // A click inside the selected background image keeps it, unless a piece is there.
+        let keeps_image = state
+            .selected_background
+            .and_then(|id| project.background_image(id))
+            .is_some_and(|image| !image.locked && image.contains(point))
+            && piece_at(project, point, tolerance).is_none();
+        if keeps_image {
+            return;
+        }
+        if shift {
             match child_of_selected_at(project, point, tolerance, state) {
                 Some((piece, child)) => state.toggle_child(piece, child),
                 None => {

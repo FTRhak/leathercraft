@@ -6,6 +6,7 @@
 
 mod accent;
 mod align_button;
+mod background;
 mod borders;
 mod button;
 mod checkbox;
@@ -32,6 +33,7 @@ mod view_controls;
 use bevy_egui::egui::{self, Color32};
 
 use accent::AccentColors;
+use background::BackgroundColors;
 use borders::Borders;
 use dimension::DimensionColors;
 use ruler::RulerColors;
@@ -102,6 +104,7 @@ pub(crate) struct Palette {
     pub(crate) view_controls: ViewControlsColors,
     pub(crate) snap: SnapColors,
     pub(crate) seam_link: SeamLinkPaint,
+    pub(crate) background: BackgroundColors,
 }
 
 /// A color written as `0xRRGGBB`.
@@ -151,6 +154,7 @@ impl Palette {
         view_controls: ViewControlsColors::DARK,
         snap: SnapColors::DARK,
         seam_link: SeamLinkPaint::DARK,
+        background: BackgroundColors::DARK,
     };
     const LIGHT: Self = Self {
         grid_line: hex(0xE6E8EC),
@@ -185,6 +189,7 @@ impl Palette {
         view_controls: ViewControlsColors::LIGHT,
         snap: SnapColors::LIGHT,
         seam_link: SeamLinkPaint::LIGHT,
+        background: BackgroundColors::LIGHT,
     };
 
     /// The palette of the current theme, from `visuals.dark_mode`.

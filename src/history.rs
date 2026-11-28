@@ -22,6 +22,7 @@ enum MergeKey {
     Base(u64),
     Child(u64, u64),
     SeamLink(u64),
+    BackgroundImage(u64),
 }
 
 #[derive(Clone, Debug)]
@@ -277,6 +278,23 @@ impl History {
                     .map(|link| (name(link.a.piece), name(link.b.piece)))
                     .unwrap_or_else(|| (id.to_string(), id.to_string()));
                 (Message::ActionRemoveSeamLink { a, b }, None)
+            }
+            ProjectEvent::AddBackgroundImage { image } => (
+                Message::ActionAddBackgroundImage { name: image.name() },
+                None,
+            ),
+            ProjectEvent::UpdateBackgroundImage { image } => (
+                Message::ActionEditBackgroundImage { name: image.name() },
+                Some(MergeKey::BackgroundImage(image.id)),
+            ),
+            ProjectEvent::RemoveBackgroundImage { id } => {
+                let name = before
+                    .background_image(*id)
+                    .map_or_else(|| id.to_string(), |image| image.name());
+                (Message::ActionRemoveBackgroundImage { name }, None)
+            }
+            ProjectEvent::ReorderBackgroundImages { .. } => {
+                (Message::ActionReorderBackgroundImages, None)
             }
             // These are handled by their `ProjectChange` before describing.
             ProjectEvent::New { .. } | ProjectEvent::Open { .. } | ProjectEvent::Save { .. } => {
@@ -788,5 +806,50 @@ mod tests {
         );
         history.apply(HistoryCommand::Undo, &mut project);
         assert_eq!(project.seam_links[0].offset, 3);
+    }
+
+    #[test]
+    fn background_image_updates_merge_per_image() {
+        use crate::background::tests::image;
+        let mut project = Project::default();
+        let mut history = History::new(&project, Message::ActionNewProject);
+        for _ in 0..2 {
+            run(
+                &mut project,
+                &mut history,
+                ProjectEvent::AddBackgroundImage { image: image(1) },
+            );
+        }
+        for opacity in [0.1, 0.2, 0.3] {
+            let mut changed = project.background_images[0].clone();
+            changed.opacity = opacity;
+            run(
+                &mut project,
+                &mut history,
+                ProjectEvent::UpdateBackgroundImage { image: changed },
+            );
+        }
+        assert_eq!(history.actions().count(), 4);
+        let mut other = project.background_images[1].clone();
+        other.opacity = 0.9;
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::UpdateBackgroundImage { image: other },
+        );
+        assert_eq!(history.actions().count(), 5);
+        run(
+            &mut project,
+            &mut history,
+            ProjectEvent::RemoveBackgroundImage { id: 1 },
+        );
+        assert_eq!(
+            history.actions().last(),
+            Some(&Message::ActionRemoveBackgroundImage {
+                name: "skin_1.jpg".to_owned()
+            })
+        );
+        history.apply(HistoryCommand::Undo, &mut project);
+        assert_eq!(project.background_images[0].opacity, 0.3);
     }
 }

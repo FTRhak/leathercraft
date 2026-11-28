@@ -27,6 +27,11 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 |---|---:|---:|---|---|
 | `src/editor/mod.rs` | 86 | 600 | bin | `ViewMode`, `ShapePart` (edge or vertex picked with the Edge tool), `send`, `export`, `format_length` |
 | `src/editor/editor_state_struct.rs` | 440 | 3,700 | bin | `EditorState` and its methods (primary piece plus multi-selection, primary child plus multi-selection of children in that piece, selected edge or vertex; snap settings, Alt suspension, snap feedback and hover target: `active_snap`, `snap_point`, `save_snap_when_settled`; the Link seams dialog: `seam_link_dialog`, `open_seam_link`, `selected_seam`), `document_name` |
+| `src/editor/background.rs` | 458 | 4,000 | bin | Background images on the canvas: `draw_images` (textured quads per `Depth`), `draw_selection` (dashed frame, corner and rotate handles), `DragKind`, `BackgroundDrag`, `begin_drag`, `update_drag`, `scaled_from_corner`, `finish_drag`, `cancel`; calibration: `Calibration`, `handle_calibration`, `draw_calibration`, `calibration_window`; a test |
+| `src/background_textures.rs` | 115 | 1,000 | bin | `BackgroundTextures` (`get` decodes on first use, `reload`, `retain_used`), `Picture` (`Loaded` texture with pixel and file size, or `Failed`), `EXTENSIONS`; EXIF orientation, scaled to fit 4096 px and the device's texture limit |
+| `src/panels/background_images/mod.rs` | 627 | 5,450 | bin | Background images panel: `PanelState`, `Request` (`Select`, `Calibrate`, `Report`), `show_panel`; the Add button and file dialog, the empty hint, a card per image (header with caret, thumbnail, name, eye, lock and remove; Source, Display and Placement sections) |
+| `src/ui_components/slider/mod.rs` | 158 | 1,400 | bin | `Slider`: an `f32` field filled up to its value, click or drag to set, Ctrl for fine steps; `percent` |
+| `src/ui_components/palette/background.rs` | 50 | 450 | bin | `BackgroundColors`: image cards, slider fill and edge, the canvas frame and handles, missing-file border, empty hint border |
 | `src/editor/drag_state_struct.rs` | 60 | 480 | bin | `ShapeRef`, `DragTarget`, `DragState` (with the `group` of pieces or `child_group` of children moved along, and the snap `targets` and `moving` shapes gathered at the start) |
 | `src/editor/shape_draft_struct.rs` | 9 | 60 | bin | `ShapeDraft` |
 | `src/editor/canvas.rs` | 1,290 | 10,400 | bin | `canvas`, `Viewport` (`hit_tolerance`), tool behavior (Shift+click toggles a child of the selected piece, else a piece; the Edge tool picks a vertex or a polygon edge; a line or stitch line is always added as a child; the Stitch holes tool clicks a draft), hit testing (pieces and their lines, children with a line tolerance, handles, vertices, polygon edges), painting (centerlines in their dash pattern and stitch holes above all outlines; `draw_dimensions`: the selection's width and height as dimension lines with end ticks and a measurement plate, from the design's "Dim W" and "Dim H" overlays, following a drag through `selection_bounds`); snapping of drawing tools (`draw_targets`, `snap_draw`, the hover target) and `draw_snap_feedback`; `draw_seam_links` (pair lines while a linked seam is selected) |
@@ -155,6 +160,7 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 | `src/i18n/en.rs` | 638 | 5,400 | lib | English catalog, `counted` helper |
 | `src/history.rs` | 792 | 5,450 | lib | `History`, `HistoryCommand`: snapshots for undo and redo (consecutive changes of one seam link merge) |
 | `src/sewing.rs` | 438 | 3,450 | lib | How a seam link is sewn (`docs/seam-links.md#sewing`): `StitchMethod` (saddle, running, baseball, whip, cross; `thread_factor_tenths`), `Assembly` (flesh to flesh, lapped, butted, turned, folded; `uses_overlap`, `stacks`), `OnTop`, `ThreadKind` (`is_flat`), `ThreadColor` (saved as `#RRGGBB`: `to_hex`, `from_hex`, `shade`), `ThreadShade` (the eight swatches), `Thread` (kind, diameter, color; `profile_mm`), `Sewing` (lock holes, overlap, thread; `thread_mm`, `validate`), `MAX_LOCK_HOLES`, `MIN_OVERLAP_MM`, `MAX_OVERLAP_MM`, `MIN_THREAD_MM`, `MAX_THREAD_MM`; tests |
+| `src/background.rs` | 531 | 4,400 | lib | Background images (`docs/background-image.md`): `BackgroundImage` (`new` fitted to the view, `name`, `drawn_size`, `to_world`, `to_local`, `corners`, `contains`, `quad`, `scaled_about`), `Depth`, `FrameMethod`, `Quad`, `UnitRect`, `frame_rects`, `stored_path`, `resolve_path`, `DEFAULT_OPACITY`, `MIN_SCALE`, `MAX_SCALE`; `Project::background_image`, `next_background_id`, `validate_background_images`, `with_stored_image_paths`, `resolve_image_paths`; tests, with the `image` fixture shared with other modules' tests |
 | `src/seams.rs` | 563 | 5,050 | lib | Seam links (`docs/seam-links.md`): `SeamSide` (`whole`, `same_line`), `ManualPair`, `SeamLink` (with its `sewing`; `lines`, `uses_child`, `uses_piece`, `ranges_overlap`, `pairs`, `validate`), `HolePair`, `LinkPairs` (`count_mismatch`, `manual_count`); `Project::seam_link`, `next_seam_link_id`, `seam_links_of`, `validate_seam_links`; `stitch_line`, `stitch_lines`, `stitch_number`; tests, with fixtures (`two_lines`, `side`, `link`) shared with other modules' tests |
 | `src/persistence.rs` | 230 | 1,750 | lib | `save_project`, `load_project`, `write_export` |
 | `src/settings/mod.rs` | 165 | 1,350 | bin | `settings.json` in the OS config directory: language, panel layout, snap settings (`load_snap`, `save_snap`), and `Preferences` (default material, hotkeys, theme) with `load_preferences`, `save_preferences` |
@@ -416,11 +422,12 @@ Tokens are estimated as bytes / 4. The estimate is rougher for `uk.rs`, because 
 
 ## Tests
 
-There are 173 tests inline in the library crate, plus 7 in the binary (`settings::hotkeys`, `editor::ruler` and `panels::seam_link::table`, run with `cargo test --bin leathercraft`, which compiles Bevy):
+There are 207 tests inline in the library crate, plus 8 in the binary (`settings::hotkeys`, `editor::ruler`, `editor::background` and `panels::seam_link::table`, run with `cargo test --bin leathercraft`, which compiles Bevy):
 
 | Module | Tests |
 |---|---:|
 | `model` | 9 |
+| `background` | 9 |
 | `shapes` | 49 |
 | `boolean` | 11 |
 | `material` | 3 |
@@ -452,6 +459,7 @@ Apart from shortcut parsing, `document`, `editor`, `preview`, `settings` and `pa
 | `docs/seam-links.md` | Current. Spec for seam links: `SeamLink` keeps parameters, not pairs; the pairing algorithm (ranges, reverse, offset, manual pairs), `pitch_for_count`, validation (a range past the holes is clamped, not an error), the cascade on removal, history, the Link seams dialog and its schematic, the Properties section and the canvas lines. |
 | `docs/snap.md` | Current. Spec for snapping: the snap controls on the canvas, priority (vertex, guide, grid), scopes (a child only within its piece), the drag anchor, tolerance in px, Alt and F9, state and persistence. |
 | `docs/round-vertex.md` | Current. Spec for rounded vertices: per-vertex `radii`, `Shape::corners` vs `ring`, the fillet construction and its clamping, selecting a vertex with the Edge tool, the Corner radius field, extending to new shapes. |
+| `docs/background-image.md` | Current. Spec and mockup index for background images (photos or scans to trace): multiple per project, linked by path and saved in the project, opacity, Back/Front depth, Stretch/Fit/Crop, size in mm with calibration, offset, rotation, scale, flip; events, validation, canvas drawing as textured quads, the panel and its new `Slider`. The phased implementation plan is `docs/plans/background-image.md`. |
 | `docs/i18n.md` | Current. Spec for the localization module: `Label` vs `Message`, rendering, language selection, adding text and languages, translation conventions. |
 | `docs/plan.md` | Historical MVP plan. It still says the repo contains only a license. Its todo 6 asks for build and run docs, and there is no README; `CLAUDE.md` only lists the commands. |
 
